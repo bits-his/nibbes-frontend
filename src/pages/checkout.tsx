@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -24,6 +24,7 @@ export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -39,6 +40,17 @@ export default function Checkout() {
       setCart(JSON.parse(savedCart));
     } else {
       setLocation("/");
+    }
+    
+    // Get location data from localStorage
+    const savedLocation = localStorage.getItem("location");
+    if (savedLocation) {
+      try {
+        const parsedLocation = JSON.parse(savedLocation);
+        setLocationData(parsedLocation);
+      } catch (error) {
+        console.error("Error parsing location data:", error);
+      }
     }
   }, [setLocation]);
 
@@ -78,6 +90,14 @@ export default function Checkout() {
       customerName: values.customerName,
       customerPhone: values.customerPhone,
       orderType: "online",
+      // Include location data if available
+      ...(locationData && {
+        location: {
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          address: locationData.address,
+        }
+      }),
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
         quantity: item.quantity,
@@ -154,6 +174,32 @@ export default function Checkout() {
                     />
                   </CardContent>
                 </Card>
+
+                {/* Location Information Card */}
+                {locationData && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MapPin className="w-5 h-5" />
+                        Delivery Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
+                        <MapPin className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{locationData.address}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-3">
+                        Your order will be delivered to this location.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card>
                   <CardHeader>
