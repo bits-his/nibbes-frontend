@@ -25,12 +25,12 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMenuItemSchema } from "@shared/schema";
+import { insertMenuItemFormSchema } from "@shared/schema";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 
-type MenuFormValues = z.infer<typeof insertMenuItemSchema>;
+type MenuFormValues = z.infer<typeof insertMenuItemFormSchema>;
 
 export default function MenuManagement() {
   const { toast } = useToast();
@@ -38,7 +38,7 @@ export default function MenuManagement() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   const form = useForm<MenuFormValues>({
-    resolver: zodResolver(insertMenuItemSchema),
+    resolver: zodResolver(insertMenuItemFormSchema),
     defaultValues: {
       name: "",
       description: "",
@@ -121,9 +121,9 @@ export default function MenuManagement() {
       form.reset({
         name: item.name,
         description: item.description,
-        price: item.price,
+        price: item.price.toString(), // Convert number to string for form
         category: item.category,
-        imageUrl: item.imageUrl,
+        imageUrl: item.imageUrl || "",
         available: item.available,
       });
     } else {
@@ -147,10 +147,16 @@ export default function MenuManagement() {
   };
 
   const onSubmit = (values: MenuFormValues) => {
+    // Transform the form values for API submission
+    const transformedValues = {
+      ...values,
+      price: parseFloat(values.price), // Convert string to number for API
+    };
+    
     if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data: values });
+      updateMutation.mutate({ id: editingItem.id, data: transformedValues });
     } else {
-      createMutation.mutate(values);
+      createMutation.mutate(transformedValues);
     }
   };
 
