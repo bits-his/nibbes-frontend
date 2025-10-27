@@ -18,7 +18,9 @@ export default function KitchenDisplay() {
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
 
-  // WebSocket connection for real-time updates
+  // WebSocket connection for real-time updates now
+  // WebSocket connection for real-time updates now
+
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
