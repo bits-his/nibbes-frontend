@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Update backend URL - use environment variable or default to localhost:5050
+// Update backend URL - use Vite's environment variable or default to localhost:5050
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
 
 async function throwIfResNotOk(res: Response) {
@@ -15,7 +15,9 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`${BACKEND_URL}${url}`, {
+  // Ensure the URL is properly formatted without double slashes
+  const fullUrl = url.startsWith('/') ? `${BACKEND_URL}${url}` : `${BACKEND_URL}/${url}`;
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -32,8 +34,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const url = `${BACKEND_URL}/${queryKey.join("/")}`;
-    const res = await fetch(url, {
+    // Ensure the URL is properly formatted without double slashes
+    const path = queryKey.join("/");
+    const fullUrl = path.startsWith('/') ? `${BACKEND_URL}${path}` : `${BACKEND_URL}/${path}`;
+    const res = await fetch(fullUrl, {
       credentials: "include",
     });
 
