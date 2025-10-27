@@ -1,7 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 // Update backend URL - use environment variable or default to localhost:5050
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5050';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
