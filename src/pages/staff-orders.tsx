@@ -179,29 +179,37 @@ export default function StaffOrders() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                {filteredItems?.map((item) => (
-                  <Card
-                    key={item.id}
-                    className="overflow-hidden hover-elevate cursor-pointer transition-all"
-                    onClick={() => item.available && addToCart(item)}
-                    data-testid={`card-menu-item-${item.id}`}
-                  >
-                    <div className="aspect-video overflow-hidden">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold truncate mb-1">{item.name}</h3>
-                      <p className="text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
-                      {!item.available && (
-                        <Badge variant="secondary" className="mt-2">Unavailable</Badge>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                {filteredItems?.map((item) => {
+                  const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
+                  return (
+                    <Card
+                      key={item.id}
+                      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''}`}
+                      onClick={() => item.available && addToCart(item)}
+                      data-testid={`card-menu-item-${item.id}`}
+                    >
+                      <div className="aspect-video overflow-hidden relative">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {isInCart && (
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold truncate mb-1">{item.name}</h3>
+                        <p className="text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
+                        {!item.available && (
+                          <Badge variant="secondary" className="mt-2">Unavailable</Badge>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>

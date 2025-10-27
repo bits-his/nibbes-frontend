@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Users, ChefHat, LayoutDashboard, UtensilsCrossed } from "lucide-react";
+import { Home, Users, ChefHat, LayoutDashboard, UtensilsCrossed, ClipboardList } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,11 @@ const menuItems = [
     title: "Customer Menu",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Docket",
+    url: "/docket",
+    icon: ClipboardList,
   },
   {
     title: "Walk-in Orders",

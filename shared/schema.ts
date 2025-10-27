@@ -25,37 +25,54 @@ export const insertMenuItemSchema = z.object({
 export type MenuItem = z.infer<typeof menuItemSchema>;
 
 // Order schemas
-export const orderSchema = z.object({
-  id: z.number(),
-  tableNumber: z.number(),
-  status: z.enum(['pending', 'inProgress', 'completed', 'cancelled']),
-  totalAmount: z.string(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-
 export const orderItemSchema = z.object({
   id: z.number(),
   orderId: z.number(),
   menuItemId: z.number(),
   quantity: z.number(),
   price: z.string(),
+  specialInstructions: z.string().optional(),
+});
+
+export const orderSchema = z.object({
+  id: z.number(),
+  orderNumber: z.string(), // Added order number field
+  tableNumber: z.number(),
+  customerName: z.string(), // Added customer name field
+  customerPhone: z.string().optional(), // Added customer phone field
+  orderType: z.enum(['online', 'walk-in', 'dine-in']), // Added order type field
+  status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']), // Updated status enum to match frontend usage
+  totalAmount: z.string(),
+  paymentStatus: z.enum(['pending', 'paid', 'failed']).default('pending'), // Added payment status
+  paymentMethod: z.string().optional(), // Added payment method
+  notes: z.string().optional(), // Added notes field
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const orderWithItemsSchema = orderSchema.extend({
-  items: z.array(orderItemSchema),
+  orderItems: z.array(orderItemSchema.extend({
+    menuItem: menuItemSchema,
+  })),
 });
 
 export const insertOrderSchema = z.object({
   tableNumber: z.number(),
-  status: z.enum(['pending', 'inProgress', 'completed', 'cancelled']).default('pending'),
+  customerName: z.string(),
+  customerPhone: z.string().optional(),
+  orderType: z.enum(['online', 'walk-in', 'dine-in']).default('online'),
+  status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']).default('pending'),
   totalAmount: z.string(),
+  paymentStatus: z.enum(['pending', 'paid', 'failed']).default('pending'),
+  paymentMethod: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export const insertOrderItemSchema = z.object({
   menuItemId: z.number(),
   quantity: z.number(),
   price: z.string(),
+  specialInstructions: z.string().optional(),
 });
 
 export type OrderWithItems = z.infer<typeof orderWithItemsSchema>;
