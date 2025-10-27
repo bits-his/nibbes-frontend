@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Users, ChefHat, LayoutDashboard, UtensilsCrossed } from "lucide-react";
+import { Home, Users, ChefHat, LayoutDashboard, UtensilsCrossed, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -10,37 +10,121 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import React from "react";
 
-const menuItems = [
+// Define user type
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: 'admin' | 'kitchen' | 'customer';
+}
+
+// Define menu item type
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: React.ElementType;
+  roles: string[]; // Roles that can access this item
+}
+
+const menuItems: MenuItem[] = [
   {
     title: "Customer Menu",
     url: "/",
     icon: Home,
+    roles: ['admin', 'kitchen', 'customer'],
   },
   {
-    title: "Walk-in Orders",
-    url: "/staff",
+    title: "Ducket Display",  // Updated name as per request
+    url: "/ducket",
     icon: Users,
+    roles: ['customer'],
   },
   {
     title: "Kitchen Display",
     url: "/kitchen",
     icon: ChefHat,
+    roles: ['kitchen'],
+  },
+  {
+    title: "Walk-in Orders",
+    url: "/staff",
+    icon: Users,
+    roles: ['kitchen', 'admin'],
   },
   {
     title: "Order Management",
     url: "/orders",
     icon: LayoutDashboard,
+    roles: ['admin'],
   },
   {
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
+    roles: ['admin'],
+  },
+  {
+    title: "User Management",
+    url: "/users",
+    icon: Users,
+    roles: ['admin'],
   },
 ];
 
+// Get menu items based on user role
+const getMenuItems = (user: User | null) => {
+  if (!user) {
+    // Return public items for non-authenticated users
+    return menuItems.filter(item => item.roles.includes('customer'));
+  }
+  return menuItems.filter(item => item.roles.includes(user.role));
+};
+
 export function AppSidebar() {
   const [location] = useLocation();
+  const [user, setUser] = React.useState<User | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    // Get user from localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (e) {
+        console.error('Error parsing user data', e);
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  const availableMenuItems = getMenuItems(user);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
+  if (loading) {
+    return (
+      <Sidebar>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-lg font-serif">
+              <ChefHat className="inline w-5 h-5 mr-2" />
+              Nibbles Kitchen
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="flex items-center justify-center h-10">Loading...</div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+    );
+  }
 
   return (
     <Sidebar>
@@ -52,7 +136,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {availableMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -66,6 +150,19 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              
+              {/* Logout button */}
+              {user && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={handleLogout}
+                    data-testid="nav-logout"
+                  >
+                    <LogOut />
+                    <span>Logout</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

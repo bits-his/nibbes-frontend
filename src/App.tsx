@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,18 +12,173 @@ import StaffOrders from "@/pages/staff-orders";
 import KitchenDisplay from "@/pages/kitchen-display";
 import OrderManagement from "@/pages/order-management";
 import MenuManagement from "@/pages/menu-management";
+import UserManagement from "@/pages/user-management";
+import DucketDisplay from "@/pages/ducket-display";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
+import React, { useEffect, useState } from "react";
+
+// Define user type
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: 'admin' | 'kitchen' | 'customer';
+}
+
+// Create auth context
+const AuthContext = React.createContext<{
+  user: User | null;
+  login: (userData: User, token: string) => void;
+  logout: () => void;
+  loading: boolean;
+}>({
+  user: null,
+  login: () => {},
+  logout: () => {},
+  loading: true,
+});
+
+// Auth provider component
+const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in (from localStorage)
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+      } catch (e) {
+        // If there's an error parsing, clear the stored data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+    
+    setLoading(false);
+  }, []);
+
+  const login = (userData: User, token: string) => {
+    setUser(userData);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Protected route component
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+  const [location, setLocation] = useLocation();
+  const { user, loading } = React.useContext(AuthContext);
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        // Redirect to login if not authenticated
+        setLocation('/login');
+      } else if (allowedRoles && !allowedRoles.includes(user.role)) {
+        // Redirect to unauthorized page if user doesn't have required role
+        setLocation('/unauthorized');
+      }
+    }
+  }, [user, loading, allowedRoles, setLocation]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return null; // Redirect happens in useEffect
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return null; // Redirect happens in useEffect
+  }
+
+  return <>{children}</>;
+};
+
+// Unprotected route component (for login page)
+const PublicRoute: React.FC<{ children: React.ReactNode; restricted?: boolean }> = ({ children, restricted }) => {
+  const [location, setLocation] = useLocation();
+  const { user, loading } = React.useContext(AuthContext);
+
+  useEffect(() => {
+    if (restricted && user) {
+      // Redirect to dashboard if user is already logged in
+      setLocation('/');
+    }
+  }, [user, restricted, setLocation]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (restricted && user) {
+    return null; // Redirect happens in useEffect
+  }
+
+  return <>{children}</>;
+};
 
 function Router() {
+  const { user } = React.useContext(AuthContext);
+
   return (
     <Switch>
+      <Route path="/login" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <Login />
+          </PublicRoute>
+        )} 
+      />
+      <Route path="/unauthorized" component={() => <div>Unauthorized</div>} />
+      
+      {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/order-status" component={OrderStatus} />
-      <Route path="/staff" component={StaffOrders} />
-      <Route path="/kitchen" component={KitchenDisplay} />
-      <Route path="/orders" component={OrderManagement} />
-      <Route path="/menu" component={MenuManagement} />
+      
+      {/* Protected routes based on roles */}
+      {user?.role === 'admin' && (
+        <>
+          <Route path="/orders" component={OrderManagement} />
+          <Route path="/menu" component={MenuManagement} />
+          <Route path="/users" component={UserManagement} />
+        </>
+      )}
+      
+      {user?.role === 'kitchen' && (
+        <>
+          <Route path="/kitchen" component={KitchenDisplay} />
+          <Route path="/staff" component={StaffOrders} />
+        </>
+      )}
+      
+      {user?.role === 'customer' && (
+        <>
+          <Route path="/ducket" component={DucketDisplay} />
+        </>
+      )}
+      
+      {/* Fallback to not found for unauthorized access */}
       <Route component={NotFound} />
     </Switch>
   );
@@ -37,22 +192,24 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center h-14 px-4 border-b shrink-0">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-              </header>
-              <main className="flex-1 overflow-auto">
-                <Router />
-              </main>
+      <AuthProvider>
+        <TooltipProvider>
+          <SidebarProvider style={style as React.CSSProperties}>
+            <div className="flex h-screen w-full">
+              <AppSidebar />
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <header className="flex items-center h-14 px-4 border-b shrink-0">
+                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+                </header>
+                <main className="flex-1 overflow-auto">
+                  <Router />
+                </main>
+              </div>
             </div>
-          </div>
-        </SidebarProvider>
-        <Toaster />
-      </TooltipProvider>
+          </SidebarProvider>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
