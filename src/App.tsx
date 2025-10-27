@@ -12,6 +12,7 @@ import StaffOrders from "@/pages/staff-orders";
 import KitchenDisplay from "@/pages/kitchen-display";
 import OrderManagement from "@/pages/order-management";
 import MenuManagement from "@/pages/menu-management";
+import DocketPage from "@/pages/docket";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/" component={CustomerMenu} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/order-status" component={OrderStatus} />
+      <Route path="/docket" component={DocketPage} />
       <Route path="/staff" component={StaffOrders} />
       <Route path="/kitchen" component={KitchenDisplay} />
       <Route path="/orders" component={OrderManagement} />

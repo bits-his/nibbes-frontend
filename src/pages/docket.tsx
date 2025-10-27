@@ -1,0 +1,206 @@
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Clock, CheckCircle, ChefHat, Package, ClipboardList } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { queryClient } from "@/lib/queryClient";
+import type { OrderWithItems } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
+
+export default function DocketPage() {
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  // Get user-specific active orders
+  const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
+    queryKey: ["/api/orders/active"],
+    refetchInterval: 5000, // Fallback polling every 5 seconds
+  });
+
+  const activeOrders = orders?.filter((order) => 
+    order.status !== "completed" && order.status !== "cancelled"
+  );
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log("Docket WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (
+        data.type === "order_update" || 
+        data.type === "new_order" || 
+        data.type === "order_status_change"
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("Docket WebSocket error:", error);
+    };
+
+    socket.onclose = () => {
+      console.log("Docket WebSocket disconnected");
+    };
+
+    setWs(socket);
+
+    return () => {
+      socket.close();
+    };
+  }, []);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="w-5 h-5 text-muted-foreground" />;
+      case "preparing":
+        return <ChefHat className="w-5 h-5 text-primary" />;
+      case "ready":
+        return <Package className="w-5 h-5 text-primary" />;
+      case "completed":
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      default:
+        return <Clock className="w-5 h-5 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
+      pending: { variant: "secondary", label: "Pending" },
+      preparing: { variant: "default", label: "Preparing" },
+      ready: { variant: "default", label: "Ready" },
+      completed: { variant: "secondary", label: "Completed" },
+    };
+    const config = variants[status] || { variant: "secondary", label: status };
+    return (
+      <Badge variant={config.variant} className="px-3 py-1 text-sm">
+        {config.label}
+      </Badge>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <ClipboardList className="w-8 h-8 text-primary" />
+            <h1 className="font-serif text-4xl font-bold">Order Docket</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="px-4 py-2 text-base">
+              Active Orders: {activeOrders?.length || 0}
+            </Badge>
+            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="overflow-hidden">
+                <CardHeader className="p-6">
+                  <div className="h-8 bg-muted rounded animate-pulse mb-2" />
+                  <div className="h-6 bg-muted rounded animate-pulse" />
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-3">
+                    <div className="h-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : activeOrders && activeOrders.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeOrders.map((order) => (
+              <Card 
+                key={order.id} 
+                className="overflow-hidden border-2 hover:shadow-lg transition-shadow"
+                onClick={() => window.location.hash = `#/order-status?id=${order.id}`}
+              >
+                <CardHeader className="p-6 bg-card space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(order.status)}
+                      <CardTitle className="text-2xl">#{order.orderNumber}</CardTitle>
+                    </div>
+                    {getStatusBadge(order.status)}
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="capitalize">{order.orderType}</Badge>
+                    <span className="font-medium">{order.customerName}</span>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-center text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                    </div>
+                    <span>{order.orderItems.length} items</span>
+                  </div>
+
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {order.orderItems.slice(0, 3).map((item) => (
+                      <div key={item.id} className="flex justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            {item.quantity}x {item.menuItem.name}
+                          </div>
+                          {item.specialInstructions && (
+                            <div className="text-xs text-muted-foreground italic">
+                              Note: {item.specialInstructions}
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-medium">
+                          ₦{(parseFloat(item.price) * item.quantity).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                    {order.orderItems.length > 3 && (
+                      <div className="text-xs text-muted-foreground text-center pt-2">
+                        +{order.orderItems.length - 3} more items
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t">
+                    <div className="flex justify-between items-center font-bold text-lg">
+                      <span>Total</span>
+                      <span>₦{parseFloat(order.totalAmount).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-24">
+            <ClipboardList className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
+            <h2 className="text-2xl font-semibold mb-2">No Active Orders</h2>
+            <p className="text-muted-foreground mb-6">
+              Your orders will appear here when you place them
+            </p>
+            <Button asChild>
+              <a href="#/">Back to Menu</a>
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

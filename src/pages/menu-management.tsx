@@ -310,8 +310,7 @@ export default function MenuManagement() {
           </div>
         )}
       </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl" data-testid="dialog-menu-item">
           <DialogHeader>
             <DialogTitle>
@@ -404,8 +403,7 @@ export default function MenuManagement() {
                   )}
                 />
               </div>
-
-              <FormField
+<FormField
                 control={form.control}
                 name="imageUrl"
                 render={({ field: { onChange, value, ...fieldProps } }) => (

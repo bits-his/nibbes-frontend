@@ -1,20 +1,27 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ShoppingCart, Plus, Minus, X } from "lucide-react";
+import { ShoppingCart, Plus, Minus, X, MapPin, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { QRCodeSVG } from 'qrcode.react';
 import type { MenuItem, CartItem } from "@shared/schema";
 import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cartOpen, setCartOpen] = useState(false);
+  const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [showQRCode, setShowQRCode] = useState(false);
 
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu"],
@@ -30,12 +37,22 @@ export default function CustomerMenu() {
     setCart((prev) => {
       const existing = prev.find((item) => item.menuItem.id === menuItem.id);
       if (existing) {
+        toast({
+          title: "Quantity Increased",
+          description: `${menuItem.name} quantity increased in cart.`,
+          duration: 3000, // 3 seconds
+        });
         return prev.map((item) =>
           item.menuItem.id === menuItem.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
+      toast({
+        title: "Added to Cart",
+        description: `${menuItem.name} has been added to your cart.`,
+        duration: 3000, // 3 seconds
+      });
       return [...prev, { menuItem, quantity: 1 }];
     });
   };
@@ -71,8 +88,82 @@ export default function CustomerMenu() {
     0
   );
 
+  const checkLocation = () => {
+    setLocationLoading(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        try {
+          // Reverse geocode to get address
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          const address = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          
+          const locationInfo = { latitude, longitude, address };
+          setLocationData(locationInfo);
+          
+          // Store location in localStorage
+          localStorage.setItem("location", JSON.stringify(locationInfo));
+          
+          // Show success message
+          alert(`Location detected: ${address}`);
+        } catch (error) {
+          console.error("Error getting address:", error);
+          // If reverse geocoding fails, still store coordinates
+          const locationInfo = { 
+            latitude, 
+            longitude, 
+            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
+          };
+          setLocationData(locationInfo);
+          localStorage.setItem("location", JSON.stringify(locationInfo));
+          alert(`Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (error) => {
+        let errorMessage = "";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location access denied. Please allow location access in your browser settings.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "The request to get location timed out.";
+            break;
+          default:
+            errorMessage = "An unknown error occurred.";
+            break;
+        }
+        setLocationError(errorMessage);
+        setLocationLoading(false);
+      }
+    );
+  };
+
   const handleCheckout = () => {
     localStorage.setItem("cart", JSON.stringify(cart));
+    
+    // Store location info in localStorage if available
+    if (locationData) {
+      localStorage.setItem("location", JSON.stringify(locationData));
+    }
+    
     setLocation("/checkout");
   };
 
@@ -95,6 +186,48 @@ export default function CustomerMenu() {
           <p className="text-xl text-white/90 mb-8">
             Authentic Nigerian cuisine delivered to your table
           </p>
+          
+          {/* Location Section */}
+          <div className="mb-6 p-4 rounded-lg bg-white/10 backdrop-blur-sm max-w-md mx-auto">
+            <div className="flex flex-col items-center gap-3">
+              {locationData ? (
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <MapPin className="w-5 h-5 text-green-400" />
+                    <span className="text-white font-medium">Location Set</span>
+                  </div>
+                  <p className="text-white/80 text-sm line-clamp-2">{locationData.address}</p>
+                </div>
+              ) : (
+                <p className="text-white/80 text-sm">Help us locate you for delivery</p>
+              )}
+              
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-full max-w-xs"
+                onClick={checkLocation}
+                disabled={locationLoading}
+                data-testid="button-check-location"
+              >
+                {locationLoading ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                    Detecting...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4 mr-2" />
+                    {locationData ? "Update Location" : "Check My Location"}
+                  </>
+                )}
+              </Button>
+              
+              {locationError && (
+                <p className="text-red-300 text-sm text-center mt-2">{locationError}</p>
+              )}
+            </div>
+          </div>
           <Button
             size="lg"
             variant="default"
@@ -126,20 +259,31 @@ export default function CustomerMenu() {
                 ))}
               </div>
             </div>
-            <Button
-              size="icon"
-              variant="default"
-              className="relative shrink-0"
-              onClick={() => setCartOpen(true)}
-              data-testid="button-cart"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
-                  {cart.length}
-                </span>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="icon"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => setShowQRCode(true)}
+                data-testid="button-qr-code"
+              >
+                <QrCode className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="default"
+                className="relative shrink-0"
+                onClick={() => setCartOpen(true)}
+                data-testid="button-cart"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -162,45 +306,62 @@ export default function CustomerMenu() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems?.map((item) => (
-              <Card
-                key={item.id}
-                className="overflow-hidden hover-elevate transition-all"
-                data-testid={`card-menu-item-${item.id}`}
-              >
-                <div className="aspect-square overflow-hidden">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-6 space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {item.description}
-                    </p>
+            {filteredItems?.map((item) => {
+              const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
+              return (
+                <Card
+                  key={item.id}
+                  className={`overflow-hidden hover-elevate transition-all cursor-pointer ${isInCart ? 'ring-2 ring-primary' : ''}`}
+                  onClick={() => {
+                    if (item.available) {
+                      addToCart(item);
+                    }
+                  }}
+                  data-testid={`card-menu-item-${item.id}`}
+                >
+                  <div className="aspect-square overflow-hidden relative">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {isInCart && (
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                        <Plus className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-xl font-bold">₦{parseFloat(item.price).toLocaleString()}</span>
-                    <Button
-                      onClick={() => addToCart(item)}
-                      disabled={!item.available}
-                      data-testid={`button-add-${item.id}`}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add to Cart
-                    </Button>
-                  </div>
-                  {!item.available && (
-                    <Badge variant="secondary" className="w-full justify-center">
-                      Currently Unavailable
-                    </Badge>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  <CardContent className="p-6 space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-1">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xl font-bold">₦{parseFloat(item.price).toLocaleString()}</span>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent the card click event from firing when button is clicked
+                          addToCart(item);
+                        }}
+                        disabled={!item.available}
+                        data-testid={`button-add-${item.id}`}
+                        variant={isInCart ? "secondary" : "default"}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        {isInCart ? `Added (${cart.find(cartItem => cartItem.menuItem.id === item.id)?.quantity})` : "Add to Cart"}
+                      </Button>
+                    </div>
+                    {!item.available && (
+                      <Badge variant="secondary" className="w-full justify-center">
+                        Currently Unavailable
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
@@ -311,6 +472,53 @@ export default function CustomerMenu() {
                 </Button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="relative bg-white rounded-xl p-6 max-w-sm w-full mx-auto border">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="absolute top-3 right-3"
+              onClick={() => setShowQRCode(false)}
+              data-testid="button-close-qr-modal"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+            
+            <div className="text-center">
+              <h3 className="font-semibold text-lg mb-3">Scan to Share Menu</h3>
+              <div className="flex justify-center mb-4">
+                <div className="p-3 bg-white border rounded-lg">
+                  <QRCodeSVG 
+                    value={window.location.origin} 
+                    size={180}
+                    level="H"
+                    includeMargin={true}
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2 text-center">
+                Scan this QR code with your phone's camera to access the menu directly
+              </p>
+              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md mb-4">
+                <p className="mb-1"><strong>Note:</strong> To access from other devices:</p>
+                <p className="mb-1">1. Ensure devices are on the same network</p>
+                <p className="mb-1">2. Run dev server with: <code className="font-mono bg-gray-200 p-0.5 rounded">npm run dev</code></p>
+                <p className="mt-1">The QR code contains the correct IP address for your network.</p>
+              </div>
+              <Button 
+                onClick={() => navigator.clipboard && navigator.clipboard.writeText(window.location.origin)}
+                variant="outline"
+                className="w-full"
+              >
+                Copy Link
+              </Button>
+            </div>
           </div>
         </div>
       )}
