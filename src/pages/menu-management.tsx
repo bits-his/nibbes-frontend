@@ -25,12 +25,12 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMenuItemFormSchema } from "@shared/schema";
+import { insertMenuItemSchema } from "@shared/schema";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 
-type MenuFormValues = z.infer<typeof insertMenuItemFormSchema>;
+type MenuFormValues = z.infer<typeof insertMenuItemSchema>;
 
 export default function MenuManagement() {
   const { toast } = useToast();
@@ -38,7 +38,7 @@ export default function MenuManagement() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   const form = useForm<MenuFormValues>({
-    resolver: zodResolver(insertMenuItemFormSchema),
+    resolver: zodResolver(insertMenuItemSchema),
     defaultValues: {
       name: "",
       description: "",
@@ -121,9 +121,9 @@ export default function MenuManagement() {
       form.reset({
         name: item.name,
         description: item.description,
-        price: item.price.toString(), // Convert number to string for form
+        price: item.price,
         category: item.category,
-        imageUrl: item.imageUrl || "",
+        imageUrl: item.imageUrl,
         available: item.available,
       });
     } else {
@@ -145,18 +145,11 @@ export default function MenuManagement() {
     setEditingItem(null);
     form.reset();
   };
-
-  const onSubmit = (values: MenuFormValues) => {
-    // Transform the form values for API submission
-    const transformedValues = {
-      ...values,
-      price: parseFloat(values.price), // Convert string to number for API
-    };
-    
+const onSubmit = (values: MenuFormValues) => {
     if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data: transformedValues });
+      updateMutation.mutate({ id: editingItem.id, data: values });
     } else {
-      createMutation.mutate(transformedValues);
+      createMutation.mutate(values);
     }
   };
 
@@ -250,8 +243,7 @@ export default function MenuManagement() {
           </div>
         )}
       </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl" data-testid="dialog-menu-item">
           <DialogHeader>
             <DialogTitle>
@@ -344,8 +336,7 @@ export default function MenuManagement() {
                   )}
                 />
               </div>
-
-              <FormField
+<FormField
                 control={form.control}
                 name="imageUrl"
                 render={({ field }) => (
