@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMenuItemSchema } from "@shared/schema";
 import { z } from "zod";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 
 type MenuFormValues = z.infer<typeof insertMenuItemSchema>;
@@ -36,6 +36,9 @@ export default function MenuManagement() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<MenuFormValues>({
     resolver: zodResolver(insertMenuItemSchema),
@@ -126,6 +129,9 @@ export default function MenuManagement() {
         imageUrl: item.imageUrl,
         available: item.available,
       });
+      // Reset image states when editing an existing item
+      setImageFile(null);
+      setImagePreviewUrl(item.imageUrl);
     } else {
       setEditingItem(null);
       form.reset({
@@ -136,6 +142,12 @@ export default function MenuManagement() {
         imageUrl: "",
         available: true,
       });
+      // Reset image states for new item
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
     setDialogOpen(true);
   };
@@ -143,10 +155,64 @@ export default function MenuManagement() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingItem(null);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     form.reset();
   };
 
-  const onSubmit = (values: MenuFormValues) => {
+  const onImageFileChange = async (file: File) => {
+    setImageFile(file);
+    
+    // Create a preview URL for the selected image
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(previewUrl);
+    
+    try {
+      // Upload directly to Cloudinary using unsigned upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'nibbes_kitchen_unsigned'); // Using the provided unsigned preset
+      
+      const response = await fetch('https://api.cloudinary.com/v1_1/dv0gb0cy2/image/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Cloudinary upload failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      const cloudinaryUrl = result.secure_url;
+      
+      // Update the form's imageUrl field with the Cloudinary URL
+      form.setValue('imageUrl', cloudinaryUrl);
+    } catch (error) {
+      console.error('Error uploading image to Cloudinary:', error);
+      // Show error to user
+      toast({
+        title: "Error",
+        description: "Failed to upload image to Cloudinary. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const onSubmit = async (values: MenuFormValues) => {
+    // Validate that imageUrl is valid (this will be handled by the form validation now)
+    if (!values.imageUrl) {
+      toast({
+        title: "Error",
+        description: "Please select an image to upload.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create or update menu item with the image URL that was already uploaded to Cloudinary
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, data: values });
     } else {
@@ -342,26 +408,31 @@ export default function MenuManagement() {
               <FormField
                 control={form.control}
                 name="imageUrl"
-                render={({ field }) => (
+                render={({ field: { onChange, value, ...fieldProps } }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
+                    <FormLabel>Upload Image</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="https://example.com/image.jpg"
-                        {...field}
-                        data-testid="input-image-url"
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            onImageFileChange(file);
+                          }
+                        }}
+                        {...fieldProps}
+                        data-testid="input-image-upload"
                       />
                     </FormControl>
                     <FormMessage />
-                    {field.value && (
+                    {(imagePreviewUrl || value) && (
                       <div className="mt-2 aspect-video rounded-lg overflow-hidden border">
                         <img
-                          src={field.value}
+                          src={imagePreviewUrl || value}
                           alt="Preview"
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = "https://via.placeholder.com/400x300?text=Invalid+URL";
-                          }}
                         />
                       </div>
                     )}
