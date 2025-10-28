@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Clock, CheckCircle, Package, ChefHat } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
@@ -12,7 +12,11 @@ export function Docket() {
 
   // Get user-specific active orders
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders/active"],
+    queryKey: ["/api/orders/active/customer"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/orders/active/customer');
+      return response.json();
+    },
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
 
@@ -37,7 +41,7 @@ export function Docket() {
         data.type === "new_order" || 
         data.type === "order_status_change"
       ) {
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
       }
     };
 

@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import React from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 // Define user type
 interface User {
@@ -84,19 +85,10 @@ const getMenuItems = (user: User | null) => {
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
-  const [user, setUser] = React.useState<User | null>(null);
+  const { user, logout } = useAuth();
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    // Get user from localStorage
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (e) {
-        console.error('Error parsing user data', e);
-      }
-    }
     setLoading(false);
   }, []);
 
@@ -104,11 +96,8 @@ export function AppSidebar() {
 
   // Function to handle logout using the auth context
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    // Update state to trigger re-render
-    setUser(null);
-    // Redirect to login page
+    logout(); // Use the auth context logout function
+    // Redirect to login page after logout
     setLocation('/login', { replace: true });
   };
 
