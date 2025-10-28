@@ -20,6 +20,7 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import { useAuth } from './hooks/useAuth';
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
@@ -248,7 +249,7 @@ function Router() {
 
 function App() {
   const [location] = useLocation();
-  const { user } = React.useContext(AuthContext);
+  const { user } = useAuth();
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
