@@ -70,7 +70,13 @@ export default function Checkout() {
         console.error("Error parsing location data:", error);
       }
     }
-  }, [user, loading, setLocation]);
+    
+    // Prefill form with user data if available
+    if (user) {
+      form.setValue("customerName", user.username || user.email); // Use username or email as name
+      // Phone number is not available in user profile, so leave it empty for user to input
+    }
+  }, [user, loading, setLocation, form]);
 
   const subtotal = cart.reduce(
     (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,
@@ -173,6 +179,7 @@ export default function Checkout() {
                             <Input
                               placeholder="Enter your full name"
                               {...field}
+                              readOnly={!!user} // Read-only when user is authenticated
                               data-testid="input-name"
                             />
                           </FormControl>
@@ -191,6 +198,7 @@ export default function Checkout() {
                               type="tel"
                               placeholder="08012345678"
                               {...field}
+                              readOnly={!!(user && field.value)} // Only read-only if user is authenticated AND field has a value
                               data-testid="input-phone"
                             />
                           </FormControl>
