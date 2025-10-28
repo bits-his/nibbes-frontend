@@ -145,16 +145,17 @@ export default function StaffOrders() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex h-screen">
-        <div className="flex-1 flex flex-col border-r overflow-hidden">
-          <div className="p-6 border-b">
-            <h1 className="font-serif text-3xl font-bold mb-4">Walk-in Orders</h1>
+      <div className="flex flex-col md:flex-row h-auto md:h-screen overflow-hidden">
+        {/* Menu Section - Full width on mobile, flex-1 on desktop */}
+        <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">
+          <div className="p-4 md:p-6 border-b">
+            <h1 className="font-serif text-2xl md:text-3xl font-bold mb-3 md:mb-4">Walk-in Orders</h1>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {categories.map((category) => (
                 <Badge
                   key={category}
                   variant={selectedCategory === category ? "default" : "secondary"}
-                  className="cursor-pointer whitespace-nowrap px-4 py-2 hover-elevate"
+                  className="cursor-pointer whitespace-nowrap px-3 py-1.5 text-xs md:px-4 md:py-2 md:text-sm hover-elevate flex-shrink-0"
                   onClick={() => setSelectedCategory(category)}
                   data-testid={`filter-${category.toLowerCase().replace(" ", "-")}`}
                 >
@@ -164,21 +165,21 @@ export default function StaffOrders() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
             {isLoading ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {[1, 2, 3, 4].map((i) => (
                   <Card key={i} className="overflow-hidden">
                     <div className="aspect-video bg-muted animate-pulse" />
-                    <CardContent className="p-4">
-                      <div className="h-5 bg-muted rounded animate-pulse mb-2" />
-                      <div className="h-4 bg-muted rounded animate-pulse" />
+                    <CardContent className="p-3 md:p-4">
+                      <div className="h-4 md:h-5 bg-muted rounded animate-pulse mb-1 md:mb-2" />
+                      <div className="h-3 md:h-4 bg-muted rounded animate-pulse" />
                     </CardContent>
                   </Card>
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                 {filteredItems?.map((item) => {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
                   return (
@@ -195,16 +196,16 @@ export default function StaffOrders() {
                           className="w-full h-full object-cover"
                         />
                         {isInCart && (
-                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-                            <Plus className="w-4 h-4" />
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1">
+                            <Plus className="w-3 h-3 md:w-4 md:h-4" />
                           </div>
                         )}
                       </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold truncate mb-1">{item.name}</h3>
-                        <p className="text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
+                      <CardContent className="p-3 md:p-4">
+                        <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{item.name}</h3>
+                        <p className="text-base md:text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
                         {!item.available && (
-                          <Badge variant="secondary" className="mt-2">Unavailable</Badge>
+                          <Badge variant="secondary" className="mt-2 text-xs">Unavailable</Badge>
                         )}
                       </CardContent>
                     </Card>
@@ -215,20 +216,21 @@ export default function StaffOrders() {
           </div>
         </div>
 
-        <div className="w-[400px] flex flex-col bg-card">
+        {/* Cart Section - Full width on mobile, fixed width on desktop */}
+        <div className="w-full md:w-[400px] md:pb-[0px] pb-[70px] md:pt-[70px] flex flex-col bg-card border-t md:border-t-0 md:border-l">
           <CardHeader className="border-b">
-            <CardTitle>Current Order</CardTitle>
+            <CardTitle className="text-lg md:text-xl">Current Order</CardTitle>
           </CardHeader>
-
+          
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col">
-              <div className="p-6 border-b space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+              <div className="p-4 md:p-6 border-b space-y-3 md:space-y-4">
                 <FormField
                   control={form.control}
                   name="customerName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer Name</FormLabel>
+                      <FormLabel className="text-sm">Customer Name</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Enter customer name"
@@ -245,7 +247,7 @@ export default function StaffOrders() {
                   name="customerPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number (Optional)</FormLabel>
+                      <FormLabel className="text-sm">Phone Number (Optional)</FormLabel>
                       <FormControl>
                         <Input
                           type="tel"
@@ -260,9 +262,9 @@ export default function StaffOrders() {
                 />
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
                 {cart.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
+                  <div className="text-center py-8 md:py-12 text-muted-foreground">
                     <p>No items added yet</p>
                     <p className="text-sm mt-2">Click on menu items to add them</p>
                   </div>
@@ -329,14 +331,15 @@ export default function StaffOrders() {
                 )}
               </div>
 
-              <div className="p-6 border-t space-y-4">
-                <div className="flex items-center justify-between text-xl">
+              {/* Desktop submit section - hidden on mobile */}
+              <div className="p-4 md:p-6 border-t space-y-3 md:space-y-4 hidden md:block">
+                <div className="flex items-center justify-between text-base md:text-xl">
                   <span className="font-semibold">Total</span>
                   <span className="font-bold" data-testid="text-total">
                     ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 md:gap-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -359,6 +362,29 @@ export default function StaffOrders() {
           </Form>
         </div>
       </div>
+
+      {/* Floating submit bar for mobile when cart has items - only visible on mobile */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 md:hidden z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold">Total: ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? 's' : ''}</div>
+            </div>
+            <Button
+              type="submit"
+              disabled={createOrderMutation.isPending}
+              data-testid="mobile-submit-button"
+              onClick={(e) => {
+                e.preventDefault();
+                form.handleSubmit(onSubmit)();
+              }}
+            >
+              {createOrderMutation.isPending ? "Submitting..." : "Submit to Kitchen"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
