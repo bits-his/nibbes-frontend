@@ -77,6 +77,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('cart'); // Clear cart when user logs out
+    localStorage.removeItem('pendingCheckoutCart'); // Also clear any pending checkout cart
+    localStorage.removeItem('location'); // Clear location data as well
   };
 
   return (
@@ -157,13 +160,7 @@ function Router() {
       
       {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
-      <Route path="/checkout" 
-        component={() => (
-          <ProtectedRoute allowedRoles={['customer', 'admin']}>
-            <Checkout />
-          </ProtectedRoute>
-        )} 
-      />
+      <Route path="/checkout" component={Checkout} />
       <Route path="/order-status" 
         component={() => (
           <ProtectedRoute allowedRoles={['customer', 'admin']}>

@@ -24,7 +24,7 @@ type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
 
@@ -37,6 +37,22 @@ export default function Checkout() {
   });
 
   useEffect(() => {
+    // Wait for auth loading to complete
+    if (loading) return; // Don't run this effect until loading is complete
+    
+    // Check if user is authenticated
+    if (!user) {
+      // Save current cart to localStorage before redirecting
+      const savedCart = localStorage.getItem("cart");
+      if (savedCart) {
+        localStorage.setItem("pendingCheckoutCart", savedCart);
+      }
+      
+      // Redirect to login with a return URL to checkout
+      setLocation("/login?redirect=/checkout");
+      return;
+    }
+    
     const savedCart = localStorage.getItem("cart");
     if (savedCart) {
       setCart(JSON.parse(savedCart));
@@ -54,7 +70,7 @@ export default function Checkout() {
         console.error("Error parsing location data:", error);
       }
     }
-  }, [setLocation]);
+  }, [user, loading, setLocation]);
 
   const subtotal = cart.reduce(
     (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,

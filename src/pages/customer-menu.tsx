@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ShoppingCart, Plus, Minus, X, MapPin, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,26 @@ export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  // Load cart from localStorage on initial render
+  useEffect(() => {
+    const savedCart = localStorage.getItem("cart");
+    if (savedCart) {
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        setCart(parsedCart);
+      } catch (error) {
+        console.error("Error parsing cart from localStorage:", error);
+        // If there's an error, clear the invalid cart data
+        localStorage.removeItem("cart");
+      }
+    }
+  }, []);
+
+  // Save cart to localStorage whenever cart changes
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cartOpen, setCartOpen] = useState(false);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
