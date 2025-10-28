@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
-  customerPhone: z.string().min(10, "Please enter a valid phone number"),
+  customerPhone: z.string().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
@@ -31,7 +31,7 @@ export default function Checkout() {
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
     defaultValues: {
-      customerName: "",
+      customerName: user?.username || "",
       customerPhone: "",
     },
   });

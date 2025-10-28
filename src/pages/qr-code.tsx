@@ -36,7 +36,7 @@ export default function QRCodePage() {
       displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         // Replace localhost with a generic local IP
-        const localIP = '192.168.1.136'; // This should be replaced with actual IP detection
+        const localIP = '192.168.1.37'; // This should be replaced with actual IP detection
         displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
       }
     }

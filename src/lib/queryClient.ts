@@ -1,7 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Update backend URL - use Vite's environment variable or default to localhost:5010
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.1.136:5050';
+// Update backend URL - use Vite's environment variable or default to localhost
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
