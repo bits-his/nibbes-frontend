@@ -15,9 +15,13 @@ import OrderManagement from "@/pages/order-management";
 import MenuManagement from "@/pages/menu-management";
 import UserManagement from "@/pages/user-management";
 import DucketDisplay from "@/pages/docket";
-// import DocketPage from "@/pages/docket";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
+import QRCodePage from "@/pages/qr-code";
+import { useAuth } from './hooks/useAuth';
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
@@ -156,6 +160,27 @@ function Router() {
           </PublicRoute>
         )} 
       />
+      <Route path="/signup" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <Signup />
+          </PublicRoute>
+        )} 
+      />
+      <Route path="/forgot-password" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <ForgotPassword />
+          </PublicRoute>
+        )} 
+      />
+      <Route path="/reset-password" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <ResetPassword />
+          </PublicRoute>
+        )} 
+      />
       <Route path="/unauthorized" component={() => <div className="p-6">Unauthorized Access</div>} />
       
       {/* Public routes */}
@@ -213,6 +238,13 @@ function Router() {
           </ProtectedRoute>
         )} 
       />
+      <Route path="/qr-code" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <QRCodePage />
+          </ProtectedRoute>
+        )} 
+      />
       
       {/* Fallback to not found for unauthorized access */}
       <Route path="*" component={NotFound} />
@@ -220,13 +252,9 @@ function Router() {
   );
 }
 
-function App() {
+function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const style = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "3rem",
-  };
-  // const [location] = useLocation();
+  const { user } = useAuth();
   const mainRef = useRef<HTMLMainElement>(null);
 
   useEffect(() => {
@@ -239,39 +267,54 @@ function App() {
     }
   }, [location]);
 
-  const renderPage = () => {
-    if (location === '/') return createElement(CustomerMenu);
-    if (location === '/checkout') return createElement(Checkout);
-    if (location === '/order-status') return createElement(OrderStatus);
-    if (location === '/docket') return createElement(DocketPage);
-    if (location === '/staff') return createElement(StaffOrders);
-    if (location === '/kitchen') return createElement(KitchenDisplay);
-    if (location === '/orders') return createElement(OrderManagement);
-    if (location === '/menu') return createElement(MenuManagement);
-    return createElement(NotFound);
-  };
+  // Don't show sidebar on login, signup, forgot password, and reset password pages
+  const showSidebar = location !== '/login' && location !== '/signup' && location !== '/forgot-password' && location !== '/reset-password' && location !== '/unauthorized';
 
-  // Don't show sidebar on login page
-  const showSidebar = location !== '/login' && location !== '/unauthorized';
+  return (
+    <div className="flex h-screen w-full">
+      {showSidebar && <AppSidebar />}
+      <div className={`flex flex-col flex-1 overflow-hidden ${showSidebar ? '' : 'w-full'}`}>
+        {showSidebar && (
+          <header className="flex items-center h-14 px-4 border-b shrink-0 justify-between">
+            <div className="flex items-center">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-[#50BAA8] font-medium">
+                {user ? (user.email || user.username) : 'Guest'}
+              </div>
+              <div className="text-[#50BAA8]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+            </div>
+          </header>
+        )}
+        <main className="flex-1 overflow-auto" ref={mainRef}>
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [location] = useLocation();
+  const style = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3rem",
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
           <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              {showSidebar && <AppSidebar />}
-              <div className={`flex flex-col flex-1 overflow-hidden ${showSidebar ? '' : 'w-full'}`}>
-                {showSidebar && (
-                  <header className="flex items-center h-14 px-4 border-b shrink-0">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  </header>
-                )}
-                <main className="flex-1 overflow-auto" ref={mainRef}>
-                  <Router />
-                </main>
-              </div>
-            </div>
+            <Layout>
+              <Router />
+            </Layout>
           </SidebarProvider>
           <Toaster />
         </TooltipProvider>

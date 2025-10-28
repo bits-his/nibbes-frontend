@@ -37,7 +37,7 @@ const menuItems: MenuItem[] = [
     roles: ['admin', 'customer'],
   },
   {
-    title: "Docket",  // Updated name as per request
+    title: "Ducket Display",  // Updated name as per request
     url: "/docket",
     icon: Users,
     roles: ['customer'],
@@ -52,7 +52,7 @@ const menuItems: MenuItem[] = [
     title: "Walk-in Orders",
     url: "/staff",
     icon: Users,
-    roles: ['admin'],
+    roles: ['admin', 'kitchen'],
   },
   {
     title: "Order Management",
@@ -70,6 +70,12 @@ const menuItems: MenuItem[] = [
     title: "User Management",
     url: "/users",
     icon: Users,
+    roles: ['admin'],
+  },
+  {
+    title: "QR Code",
+    url: "/qr-code",
+    icon: ClipboardList,
     roles: ['admin'],
   },
 ];
@@ -106,9 +112,12 @@ export function AppSidebar() {
       <Sidebar>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-lg font-serif">
-              <ChefHat className="inline w-5 h-5 mr-2" />
-              Nibbles Kitchen
+            <SidebarGroupLabel className="text-lg font-serif flex items-center">
+              <img 
+                src="/nibbles.jpg" 
+                alt="Nibbles Kitchen Logo" 
+                className="h-12 w-auto object-contain mr-2"
+              />
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="flex items-center justify-center h-10">Loading...</div>
@@ -123,9 +132,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-serif">
-            <ChefHat className="inline w-5 h-5 mr-2" />
-            Nibbles Kitchen
+          <SidebarGroupLabel className="text-lg font-serif flex items-center">
+            <img 
+              src="/nibbles.jpg" 
+              alt="Nibbles Kitchen Logo" 
+              className="h-12 w-auto object-contain mr-2"
+            />
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>

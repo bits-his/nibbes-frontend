@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
-import { formatDistanceToNow } from "date-fns";
 
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -90,7 +89,7 @@ export default function DocketPage() {
       </Badge>
     );
   };
-
+  
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
@@ -115,13 +114,6 @@ export default function DocketPage() {
                   <div className="h-8 bg-muted rounded animate-pulse mb-2" />
                   <div className="h-6 bg-muted rounded animate-pulse" />
                 </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <div className="h-4 bg-muted rounded animate-pulse" />
-                    <div className="h-4 bg-muted rounded animate-pulse" />
-                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                  </div>
-                </CardContent>
               </Card>
             ))}
           </div>
@@ -131,7 +123,6 @@ export default function DocketPage() {
               <Card 
                 key={order.id} 
                 className="overflow-hidden border-2 hover:shadow-lg transition-shadow"
-                onClick={() => window.location.hash = `#/order-status?id=${order.id}`}
               >
                 <CardHeader className="p-6 bg-card space-y-3">
                   <div className="flex items-center justify-between">
@@ -141,54 +132,7 @@ export default function DocketPage() {
                     </div>
                     {getStatusBadge(order.status)}
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="capitalize">{order.orderType}</Badge>
-                    <span className="font-medium">{order.customerName}</span>
-                  </div>
                 </CardHeader>
-
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-center text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
-                    </div>
-                    <span>{order.orderItems.length} items</span>
-                  </div>
-
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {order.orderItems.slice(0, 3).map((item) => (
-                      <div key={item.id} className="flex justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {item.quantity}x {item.menuItem.name}
-                          </div>
-                          {item.specialInstructions && (
-                            <div className="text-xs text-muted-foreground italic">
-                              Note: {item.specialInstructions}
-                            </div>
-                          )}
-                        </div>
-                        <div className="font-medium">
-                          ₦{(parseFloat(item.price) * item.quantity).toLocaleString()}
-                        </div>
-                      </div>
-                    ))}
-                    {order.orderItems.length > 3 && (
-                      <div className="text-xs text-muted-foreground text-center pt-2">
-                        +{order.orderItems.length - 3} more items
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-3 border-t">
-                    <div className="flex justify-between items-center font-bold text-lg">
-                      <span>Total</span>
-                      <span>₦{parseFloat(order.totalAmount).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </CardContent>
               </Card>
             ))}
           </div>
