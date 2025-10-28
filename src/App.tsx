@@ -1,4 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
+import React,{ useEffect, useState, useRef, createElement } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,11 +14,10 @@ import KitchenDisplay from "@/pages/kitchen-display";
 import OrderManagement from "@/pages/order-management";
 import MenuManagement from "@/pages/menu-management";
 import UserManagement from "@/pages/user-management";
-import DucketDisplay from "@/pages/ducket-display";
+import DucketDisplay from "@/pages/docket";
 // import DocketPage from "@/pages/docket";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
-import React, { useEffect, useState } from "react";
 
 // Define user type
 interface User {
@@ -214,6 +214,30 @@ function App() {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
+  // const [location] = useLocation();
+  const mainRef = useRef<HTMLMainElement>(null);
+
+  useEffect(() => {
+    // Scroll to top of the main element whenever the location changes
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    } else {
+      // Fallback to window scroll if main element is not available
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [location]);
+
+  const renderPage = () => {
+    if (location === '/') return createElement(CustomerMenu);
+    if (location === '/checkout') return createElement(Checkout);
+    if (location === '/order-status') return createElement(OrderStatus);
+    if (location === '/docket') return createElement(DocketPage);
+    if (location === '/staff') return createElement(StaffOrders);
+    if (location === '/kitchen') return createElement(KitchenDisplay);
+    if (location === '/orders') return createElement(OrderManagement);
+    if (location === '/menu') return createElement(MenuManagement);
+    return createElement(NotFound);
+  };
 
   // Don't show sidebar on login page
   const showSidebar = location !== '/login' && location !== '/unauthorized';
@@ -231,7 +255,7 @@ function App() {
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
                   </header>
                 )}
-                <main className="flex-1 overflow-auto">
+                <main className="flex-1 overflow-auto" ref={mainRef}>
                   <Router />
                 </main>
               </div>
