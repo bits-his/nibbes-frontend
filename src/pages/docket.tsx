@@ -13,7 +13,7 @@ export default function DocketPage() {
 
   // Get user-specific active orders
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders/active"],
+    queryKey: ["/api/orders/active/customer"],
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
 
@@ -38,7 +38,7 @@ export default function DocketPage() {
         data.type === "new_order" || 
         data.type === "order_status_change"
       ) {
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
       }
     };
 

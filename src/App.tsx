@@ -194,7 +194,7 @@ function Router() {
           </ProtectedRoute>
         )} 
       />
-      <Route path="/ducket" 
+      <Route path="/docket" 
         component={() => (
           <ProtectedRoute allowedRoles={['customer', 'admin']}>
             <DucketDisplay />

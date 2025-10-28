@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import type { CartItem } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
@@ -23,6 +24,7 @@ type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
 
@@ -73,7 +75,15 @@ export default function Checkout() {
           description: `Your order #${data.orderNumber} has been received.`,
         });
         localStorage.removeItem("cart");
-        setLocation("/order-status?id=" + data.id);
+        // Redirect authenticated users to docket page to see all their orders
+        // Non-authenticated users will see the specific order status
+        if (user) {
+          // Redirect to docket page to see user's orders instead of individual order status
+          setLocation("/docket");
+        } else {
+          // For non-authenticated users, keep the original behavior
+          setLocation("/order-status?id=" + data.id);
+        }
       }
     },
     onError: () => {
