@@ -45,7 +45,20 @@ export default function Login() {
           setLocation('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      try {
+        // The error message is in the format: "401: {\"error\":\"Invalid email or password\"}"
+        const errorMatch = err.message.match(/\d+:\s*({.*})/);
+        if (errorMatch && errorMatch[1]) {
+          const errorData = JSON.parse(errorMatch[1]);
+          setError(errorData.error || 'Login failed');
+        } else {
+          // If we can't parse the error message, show a generic error
+          setError('Invalid credentials. Please try again.');
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, show the original error message
+        setError(err.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -92,7 +105,9 @@ export default function Login() {
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="text-red-500 text-sm text-center">{error}</div>
+              <div className="text-red-500 text-sm text-center">
+                {error}
+              </div>
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

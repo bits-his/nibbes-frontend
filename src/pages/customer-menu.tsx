@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ShoppingCart, Plus, Minus, X, MapPin, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,14 @@ import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_3376
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    // Load cart from localStorage on initial render
+    if (typeof window !== 'undefined') {
+      const savedCart = localStorage.getItem('cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    }
+    return [];
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cartOpen, setCartOpen] = useState(false);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
@@ -33,6 +40,13 @@ export default function CustomerMenu() {
     (item) => selectedCategory === "All" || item.category === selectedCategory
   );
 
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+  }, [cart]);
+
   const addToCart = (menuItem: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.menuItem.id === menuItem.id);
@@ -40,7 +54,7 @@ export default function CustomerMenu() {
         toast({
           title: "Quantity Increased",
           description: `${menuItem.name} quantity increased in cart.`,
-          duration: 3000, // 3 seconds
+          duration: 1000, // 3 seconds
         });
         return prev.map((item) =>
           item.menuItem.id === menuItem.id
@@ -51,7 +65,7 @@ export default function CustomerMenu() {
       toast({
         title: "Added to Cart",
         description: `${menuItem.name} has been added to your cart.`,
-        duration: 3000, // 3 seconds
+        duration: 1000, // 3 seconds
       });
       return [...prev, { menuItem, quantity: 1 }];
     });
@@ -157,8 +171,6 @@ export default function CustomerMenu() {
   };
 
   const handleCheckout = () => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-    
     // Store location info in localStorage if available
     if (locationData) {
       localStorage.setItem("location", JSON.stringify(locationData));

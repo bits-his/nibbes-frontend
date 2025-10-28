@@ -112,15 +112,15 @@ export function AppSidebar() {
       <Sidebar>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-lg font-serif flex items-center">
+            <SidebarGroupLabel className="text-xl font-serif flex items-center py-4 px-2">
               <img 
                 src="/nibbles.jpg" 
                 alt="Nibbles Kitchen Logo" 
-                className="h-12 w-auto object-contain mr-2"
+                className="h-16 w-auto object-contain mr-3"
               />
             </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <div className="flex items-center justify-center h-10">Loading...</div>
+            <SidebarGroupContent className="py-2">
+              <div className="flex items-center justify-center h-16 text-lg">Loading...</div>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
@@ -132,25 +132,26 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-serif flex items-center">
+          <SidebarGroupLabel className="text-xl font-serif flex items-center py-4 px-2">
             <img 
               src="/nibbles.jpg" 
               alt="Nibbles Kitchen Logo" 
-              className="h-12 w-auto object-contain mr-2"
+              className="h-16 w-auto object-contain mr-3"
             />
           </SidebarGroupLabel>
-          <SidebarGroupContent>
+          <SidebarGroupContent className="py-2">
             <SidebarMenu>
               {availableMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.title} className="mb-1">
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
                     data-testid={`nav-${item.url.replace("/", "") || "home"}`}
+                    className="text-base py-3 px-3"
                   >
                     <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
+                      <item.icon className="h-5 w-5" />
+                      <span className="text-base font-medium">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -158,13 +159,14 @@ export function AppSidebar() {
               
               {/* Logout button */}
               {user && (
-                <SidebarMenuItem>
+                <SidebarMenuItem className="mt-4">
                   <SidebarMenuButton
                     onClick={handleLogout}
                     data-testid="nav-logout"
+                    className="text-base py-3 px-3"
                   >
-                    <LogOut />
-                    <span>Logout</span>
+                    <LogOut className="h-5 w-5" />
+                    <span className="text-base font-medium">Logout</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
