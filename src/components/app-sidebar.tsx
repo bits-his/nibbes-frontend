@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Users, ChefHat, LayoutDashboard, UtensilsCrossed, LogOut } from "lucide-react";
+import { Home, Users, ChefHat, LayoutDashboard, UtensilsCrossed, ClipboardList, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -33,7 +33,7 @@ const menuItems: MenuItem[] = [
     title: "Customer Menu",
     url: "/",
     icon: Home,
-    roles: ['admin', 'kitchen', 'customer'],
+    roles: ['admin', 'customer'],
   },
   {
     title: "Ducket Display",  // Updated name as per request
@@ -51,7 +51,7 @@ const menuItems: MenuItem[] = [
     title: "Walk-in Orders",
     url: "/staff",
     icon: Users,
-    roles: ['kitchen', 'admin'],
+    roles: ['admin'],
   },
   {
     title: "Order Management",
@@ -83,7 +83,7 @@ const getMenuItems = (user: User | null) => {
 };
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -102,10 +102,14 @@ export function AppSidebar() {
 
   const availableMenuItems = getMenuItems(user);
 
+  // Function to handle logout using the auth context
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    // Update state to trigger re-render
+    setUser(null);
+    // Redirect to login page
+    setLocation('/login', { replace: true });
   };
 
   if (loading) {

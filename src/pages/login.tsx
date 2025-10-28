@@ -5,9 +5,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const { login } = useAuth(); // Use the auth context
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,11 +24,9 @@ export default function Login() {
       const response = await apiRequest('POST', '/api/auth/login', { email, password });
       const data = await response.json();
       
-      // Store user data and token
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Use context login function to update state
+      login(data.user, data.token);
       
-      // Update context to reflect login (this will be handled by the context)
       // Redirect based on user role
       switch(data.user.role) {
         case 'admin':
@@ -50,7 +50,17 @@ export default function Login() {
 
   const handleGuestLogin = (role: 'admin' | 'kitchen' | 'customer') => {
     // This is for demonstration - in real app, you'd have actual guest accounts
-    // For now, we'll just redirect to the role-specific page
+    // For now, we'll just set a mock user and redirect
+    const mockUser = {
+      id: `mock-${role}-id`,
+      username: `${role}_user`,
+      email: `${role}@example.com`,
+      role: role
+    };
+    
+    // Use context login function with mock data
+    login(mockUser, 'mock-token');
+    
     switch(role) {
       case 'admin':
         setLocation('/orders');

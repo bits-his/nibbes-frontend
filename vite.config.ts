@@ -22,7 +22,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@shared": path.resolve(import.meta.dirname, "..", "shared"), // Shared is in backend
+      "@shared": path.resolve(import.meta.dirname, "shared"), // Shared is in frontend
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },

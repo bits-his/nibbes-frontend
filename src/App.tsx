@@ -14,6 +14,7 @@ import OrderManagement from "@/pages/order-management";
 import MenuManagement from "@/pages/menu-management";
 import UserManagement from "@/pages/user-management";
 import DucketDisplay from "@/pages/ducket-display";
+// import DocketPage from "@/pages/docket";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import React, { useEffect, useState } from "react";
@@ -27,7 +28,7 @@ interface User {
 }
 
 // Create auth context
-const AuthContext = React.createContext<{
+export const AuthContext = React.createContext<{
   user: User | null;
   login: (userData: User, token: string) => void;
   logout: () => void;
@@ -149,46 +150,73 @@ function Router() {
           </PublicRoute>
         )} 
       />
-      <Route path="/unauthorized" component={() => <div>Unauthorized</div>} />
+      <Route path="/unauthorized" component={() => <div className="p-6">Unauthorized Access</div>} />
       
       {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/order-status" component={OrderStatus} />
       
-      {/* Protected routes based on roles */}
-      {user?.role === 'admin' && (
-        <>
-          <Route path="/orders" component={OrderManagement} />
-          <Route path="/menu" component={MenuManagement} />
-          <Route path="/users" component={UserManagement} />
-        </>
-      )}
-      
-      {user?.role === 'kitchen' && (
-        <>
-          <Route path="/kitchen" component={KitchenDisplay} />
-          <Route path="/staff" component={StaffOrders} />
-        </>
-      )}
-      
-      {user?.role === 'customer' && (
-        <>
-          <Route path="/ducket" component={DucketDisplay} />
-        </>
-      )}
+      {/* Protected routes with role checks inside the components or via ProtectedRoute */}
+      {/* Admins can access all pages, other roles only specific pages */}
+      <Route path="/kitchen" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['kitchen', 'admin']}>
+            <KitchenDisplay />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/staff" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <StaffOrders />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/orders" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <OrderManagement />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/menu" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <MenuManagement />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/users" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <UserManagement />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/ducket" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['customer', 'admin']}>
+            <DucketDisplay />
+          </ProtectedRoute>
+        )} 
+      />
       
       {/* Fallback to not found for unauthorized access */}
-      <Route component={NotFound} />
+      <Route path="*" component={NotFound} />
     </Switch>
   );
 }
 
 function App() {
+  const [location] = useLocation();
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
+
+  // Don't show sidebar on login page
+  const showSidebar = location !== '/login' && location !== '/unauthorized';
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -196,11 +224,13 @@ function App() {
         <TooltipProvider>
           <SidebarProvider style={style as React.CSSProperties}>
             <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center h-14 px-4 border-b shrink-0">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                </header>
+              {showSidebar && <AppSidebar />}
+              <div className={`flex flex-col flex-1 overflow-hidden ${showSidebar ? '' : 'w-full'}`}>
+                {showSidebar && (
+                  <header className="flex items-center h-14 px-4 border-b shrink-0">
+                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  </header>
+                )}
                 <main className="flex-1 overflow-auto">
                   <Router />
                 </main>

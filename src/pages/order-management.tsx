@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Filter, Eye } from "lucide-react";
+import { Search, Filter, Eye, CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,19 +18,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
 
 export default function OrderManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders"],
+    queryKey: ["/api/orders", dateRange.from, dateRange.to],
+    queryFn: async () => {
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (dateRange.from) params.append('from', dateRange.from.toISOString());
+      if (dateRange.to) params.append('to', dateRange.to.toISOString());
+      
+      const queryString = params.toString();
+      const url = queryString ? `/api/orders?${queryString}` : '/api/orders';
+      
+      const response = await apiRequest("GET", url);
+      return await response.json();
+    },
   });
 
   const { data: stats } = useQuery<{
@@ -39,7 +59,19 @@ export default function OrderManagement() {
     pendingOrders: number;
     completedOrders: number;
   }>({
-    queryKey: ["/api/orders/stats"],
+    queryKey: ["/api/orders/stats", dateRange.from, dateRange.to],
+    queryFn: async () => {
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (dateRange.from) params.append('from', dateRange.from.toISOString());
+      if (dateRange.to) params.append('to', dateRange.to.toISOString());
+      
+      const queryString = params.toString();
+      const url = queryString ? `/api/orders/stats?${queryString}` : '/api/orders/stats';
+      
+      const response = await apiRequest("GET", url);
+      return await response.json();
+    },
   });
 
   const updateStatusMutation = useMutation({
@@ -68,7 +100,14 @@ export default function OrderManagement() {
       order.orderNumber.toString().includes(searchQuery) ||
       order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    // Filter by date range if dates are selected
+    const orderDate = new Date(order.createdAt);
+    const matchesDateRange = 
+      (!dateRange.from || orderDate >= dateRange.from) && 
+      (!dateRange.to || orderDate <= dateRange.to);
+
+    return matchesSearch && matchesStatus && matchesDateRange;
   });
 
   const getStatusBadge = (status: string) => {
@@ -87,7 +126,6 @@ export default function OrderManagement() {
     <div className="min-h-screen bg-background">
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         <h1 className="font-serif text-4xl font-bold mb-8">Order Management</h1>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -152,6 +190,44 @@ export default function OrderManagement() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Date Range Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date-range"
+                    variant="outline"
+                    className={cn(
+                      "w-full md:w-[280px] justify-start text-left font-normal",
+                      !dateRange.from && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "LLL dd, y")} -{" "}
+                          {format(dateRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </CardContent>
         </Card>

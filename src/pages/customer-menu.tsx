@@ -7,12 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from 'qrcode.react';
 import type { MenuItem, CartItem } from "@shared/schema";
 import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cartOpen, setCartOpen] = useState(false);
@@ -35,12 +37,22 @@ export default function CustomerMenu() {
     setCart((prev) => {
       const existing = prev.find((item) => item.menuItem.id === menuItem.id);
       if (existing) {
+        toast({
+          title: "Quantity Increased",
+          description: `${menuItem.name} quantity increased in cart.`,
+          duration: 3000, // 3 seconds
+        });
         return prev.map((item) =>
           item.menuItem.id === menuItem.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
+      toast({
+        title: "Added to Cart",
+        description: `${menuItem.name} has been added to your cart.`,
+        duration: 3000, // 3 seconds
+      });
       return [...prev, { menuItem, quantity: 1 }];
     });
   };
@@ -294,45 +306,62 @@ export default function CustomerMenu() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems?.map((item) => (
-              <Card
-                key={item.id}
-                className="overflow-hidden hover-elevate transition-all"
-                data-testid={`card-menu-item-${item.id}`}
-              >
-                <div className="aspect-square overflow-hidden">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-6 space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {item.description}
-                    </p>
+            {filteredItems?.map((item) => {
+              const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
+              return (
+                <Card
+                  key={item.id}
+                  className={`overflow-hidden hover-elevate transition-all cursor-pointer ${isInCart ? 'ring-2 ring-primary' : ''}`}
+                  onClick={() => {
+                    if (item.available) {
+                      addToCart(item);
+                    }
+                  }}
+                  data-testid={`card-menu-item-${item.id}`}
+                >
+                  <div className="aspect-square overflow-hidden relative">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {isInCart && (
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                        <Plus className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-xl font-bold">₦{parseFloat(item.price).toLocaleString()}</span>
-                    <Button
-                      onClick={() => addToCart(item)}
-                      disabled={!item.available}
-                      data-testid={`button-add-${item.id}`}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add to Cart
-                    </Button>
-                  </div>
-                  {!item.available && (
-                    <Badge variant="secondary" className="w-full justify-center">
-                      Currently Unavailable
-                    </Badge>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  <CardContent className="p-6 space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-1">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xl font-bold">₦{parseFloat(item.price).toLocaleString()}</span>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent the card click event from firing when button is clicked
+                          addToCart(item);
+                        }}
+                        disabled={!item.available}
+                        data-testid={`button-add-${item.id}`}
+                        variant={isInCart ? "secondary" : "default"}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        {isInCart ? `Added (${cart.find(cartItem => cartItem.menuItem.id === item.id)?.quantity})` : "Add to Cart"}
+                      </Button>
+                    </div>
+                    {!item.available && (
+                      <Badge variant="secondary" className="w-full justify-center">
+                        Currently Unavailable
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>

@@ -7,7 +7,11 @@ import { apiRequest } from "@/lib/queryClient";
 
 export default function DucketDisplay() {
   const { data: orders, refetch } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders/active"],
+    queryKey: ["/api/orders/active/customer"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/orders/active/customer');
+      return response.json();
+    },
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
