@@ -4,7 +4,7 @@ import { Clock, CheckCircle, ChefHat, Package, ClipboardList } from "lucide-reac
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
@@ -13,7 +13,11 @@ export default function DocketPage() {
 
   // Get user-specific active orders
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders/active"],
+    queryKey: ["/api/orders/active/customer"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/orders/active/customer');
+      return response.json();
+    },
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
 
@@ -38,7 +42,7 @@ export default function DocketPage() {
         data.type === "new_order" || 
         data.type === "order_status_change"
       ) {
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
       }
     };
 
