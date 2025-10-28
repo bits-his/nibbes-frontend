@@ -1,37 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
+import { jsPDF } from 'jspdf';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 
 export default function QRCodePage() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [ipAddress, setIpAddress] = useState<string>('');
+  const [customUrl, setCustomUrl] = useState<string>('');
+  const [isUsingCustomUrl, setIsUsingCustomUrl] = useState<boolean>(false);
+  const qrCodeRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    // In development, we'll use a placeholder IP - in production, this would use the actual server IP
-    // For development purposes, we'll construct the IP address based on a common pattern
-    // This is a simplified approach - in a real environment, you'd get the IP from the server
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const port = window.location.port;
+    const generateQrCode = (url: string) => {
+      QRCode.toDataURL(url, { width: 300, margin: 2 })
+        .then(setQrCodeUrl)
+        .catch((error) => {
+          console.error('Error generating QR code:', error);
+        });
+    };
     
-    // If running on localhost, show a typical local IP
-    let displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // Replace localhost with a generic local IP
-      const localIP = '192.168.1.136'; // This should be replaced with actual IP detection
-      displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
+    let displayUrl: string;
+    
+    if (isUsingCustomUrl && customUrl) {
+      // Use the custom URL if provided
+      displayUrl = customUrl;
+    } else {
+      // Get the current origin (protocol + host) and generate QR code
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      
+      // If running on localhost, show the actual server IP instead of localhost
+      displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Replace localhost with a generic local IP
+        const localIP = '192.168.1.136'; // This should be replaced with actual IP detection
+        displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
+      }
     }
     
     setIpAddress(displayUrl);
-    
-    // Generate QR code for the display URL
-    QRCode.toDataURL(displayUrl, { width: 300, margin: 2 })
-      .then(setQrCodeUrl)
-      .catch((error) => {
-        console.error('Error generating QR code:', error);
-      });
-  }, []);
+    generateQrCode(displayUrl);
+  }, [isUsingCustomUrl, customUrl]);
 
   // Function to get the actual IP (would need backend support to be truly accurate)
   const getActualIP = async () => {
@@ -47,6 +59,86 @@ export default function QRCodePage() {
       console.error('Error getting IP:', error);
     }
   };
+
+  const handleDownloadPDF = () => {
+    if (!qrCodeUrl) {
+      console.error('No QR code available to download');
+      return;
+    }
+
+    try {
+      // Create a new PDF document
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Calculate dimensions to fit the QR code nicely on the page
+      const qrWidth = 100; // Width of the QR code in mm
+      const qrHeight = 100; // Height of the QR code in mm
+      
+      // Calculate position to center the QR code
+      const x = (pdfWidth - qrWidth) / 2;
+      const y = (pdfHeight - qrHeight) / 2 - 10; // Slightly above center to account for title
+      
+      // Add title to the PDF
+      pdf.setFontSize(18);
+      pdf.text('Nibbles Kitchen', pdfWidth / 2, 20, { align: 'center' });
+      pdf.setFontSize(12);
+      pdf.text('Scan this QR code to access the menu', pdfWidth / 2, 30, { align: 'center' });
+      
+      // Add the URL to the PDF
+      pdf.setFontSize(10);
+      pdf.text(`URL: ${ipAddress}`, pdfWidth / 2, 40, { align: 'center' });
+      
+      // Add the QR code image to the PDF
+      pdf.addImage(qrCodeUrl, 'PNG', x, y, qrWidth, qrHeight);
+      
+      // Add instructions at the bottom based on URL type
+      if (ipAddress.includes('192.168.') || ipAddress.includes('localhost') || ipAddress.includes('127.0.0.1')) {
+        pdf.setFontSize(8);
+        pdf.text('Make sure your device is on the same network', pdfWidth / 2, pdfHeight - 20, { align: 'center' });
+      }
+      
+      // Save the PDF with a meaningful name
+      pdf.save(`nibbles-kitchen-qr-code-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
+  // const handleRefresh = async () => {
+  //   await getActualIP();
+    
+  //   // Refresh the QR code with current settings
+  //   let displayUrl: string;
+    
+  //   if (isUsingCustomUrl && customUrl) {
+  //     // Use the custom URL if provided
+  //     displayUrl = customUrl;
+  //   } else {
+  //     // Get the current origin (protocol + host) and generate QR code
+  //     const protocol = window.location.protocol;
+  //     const hostname = window.location.hostname;
+  //     const port = window.location.port;
+      
+  //     // If running on localhost, show the actual server IP instead of localhost
+  //     displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
+  //     if (hostname === 'localhost' || hostname === '127.0.0.1') {
+  //       // Replace localhost with a generic local IP
+  //       const localIP = '192.168.1.136'; // This should be replaced with actual IP detection
+  //       displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
+  //     }
+  //   }
+    
+  //   setIpAddress(displayUrl);
+    
+  //   // Regenerate the QR code
+  //   QRCode.toDataURL(displayUrl, { width: 300, margin: 2 })
+  //     .then(setQrCodeUrl)
+  //     .catch((error) => {
+  //       console.error('Error generating QR code:', error);
+  //     });
+  // };
 
   const handleRefresh = async () => {
     await getActualIP();
@@ -93,26 +185,60 @@ export default function QRCodePage() {
             </div>
           )}
           
-          <div className="text-center space-y-2">
+          {/* <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
               Access URL:
             </p>
             <p className="font-mono text-lg font-semibold">
               {ipAddress}
             </p>
-            <p className="text-sm text-muted-foreground">
-              Make sure your device is on the same network
-            </p>
-          </div>
-          
-          <div className="pt-4 w-full">
+            
+            {/* Custom URL Input Section */}
+            {/* <div className="pt-4 space-y-4">
+              <div className="flex items-center justify-center space-x-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isUsingCustomUrl}
+                    onChange={(e) => setIsUsingCustomUrl(e.target.checked)}
+                    className="rounded text-[#50BAA8] focus:ring-[#50BAA8]"
+                  />
+                  <span className="text-sm">Use custom URL</span>
+                </label>
+              </div>
+              
+              {isUsingCustomUrl && (
+                <div className="space-y-2">
+                  <input
+                    type="url"
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    placeholder="Enter custom URL (e.g., https://yourdomain.com)"
+                    className="w-full px-3 py-2 border rounded-md text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Enter your deployed URL to generate QR code for production
+                  </p>
+                </div>
+              )}
+            </div>
+           */}
+          <div className="pt-4 w-full flex flex-col gap-2">
             <Button 
+              className="w-full" 
+              onClick={handleDownloadPDF}
+              variant="outline"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download as PDF
+            </Button>
+            {/* <Button 
               className="w-full" 
               onClick={handleRefresh}
               variant="outline"
             >
               Refresh QR Code
-            </Button>
+            </Button> */}
           </div>
         </CardContent>
       </Card>

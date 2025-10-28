@@ -77,7 +77,7 @@ export default function Checkout() {
       form.reset();
       // Redirect to ducket page after a short delay to allow toast to show
       setTimeout(() => {
-        setLocation("/ducket");
+        setLocation("/docket");
       }, 1500);
     },
     onError: () => {
