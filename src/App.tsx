@@ -248,6 +248,7 @@ function Router() {
 
 function App() {
   const [location] = useLocation();
+  const { user } = React.useContext(AuthContext);
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -277,8 +278,8 @@ function App() {
     return createElement(NotFound);
   };
 
-  // Don't show sidebar on login page
-  const showSidebar = location !== '/login' && location !== '/unauthorized';
+  // Don't show sidebar on login, signup, forgot password, and reset password pages
+  const showSidebar = location !== '/login' && location !== '/signup' && location !== '/forgot-password' && location !== '/reset-password' && location !== '/unauthorized';
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -289,8 +290,15 @@ function App() {
               {showSidebar && <AppSidebar />}
               <div className={`flex flex-col flex-1 overflow-hidden ${showSidebar ? '' : 'w-full'}`}>
                 {showSidebar && (
-                  <header className="flex items-center h-14 px-4 border-b shrink-0">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  <header className="flex items-center h-14 px-4 border-b shrink-0 justify-between">
+                    <div className="flex items-center">
+                      <SidebarTrigger data-testid="button-sidebar-toggle" />
+                    </div>
+                    <div className="flex items-center">
+                      <div className="text-orange-500 font-medium">
+                        {user ? (user.username || user.email) : 'Loading...'}
+                      </div>
+                    </div>
                   </header>
                 )}
                 <main className="flex-1 overflow-auto" ref={mainRef}>

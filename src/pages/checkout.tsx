@@ -65,16 +65,18 @@ export default function Checkout() {
       return await response.json();
     },
     onSuccess: (data: any) => {
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else {
-        toast({
-          title: "Order Placed!",
-          description: `Your order #${data.orderNumber} has been received.`,
-        });
-        localStorage.removeItem("cart");
-        setLocation("/order-status?id=" + data.id);
-      }
+      // Show success toast and then redirect to ducket page
+      toast({
+        title: "Order Placed!",
+        description: `Your order #${data.orderNumber} has been received and placed.`,
+      });
+      localStorage.removeItem("cart");
+      // Reset form after successful order
+      form.reset();
+      // Redirect to ducket page after a short delay to allow toast to show
+      setTimeout(() => {
+        setLocation("/ducket");
+      }, 1500);
     },
     onError: () => {
       toast({

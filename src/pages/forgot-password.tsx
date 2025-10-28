@@ -10,25 +10,72 @@ import { forgotPasswordSchema } from '@shared/schema';
 export default function ForgotPassword() {
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [showPasswordInputs, setShowPasswordInputs] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
 
     try {
-      const response = await apiRequest('POST', '/api/auth/forgot-password', { email });
+      const response = await apiRequest('POST', '/api/auth/forgot-password/verify', { email });
+      const data = await response.json();
+      
+      if (data.emailExists === false) {
+        setError('No account found with this email address. Please check your email and try again.');
+      } else {
+        // Email exists, show the password inputs
+        setShowPasswordInputs(true);
+        setEmailVerified(true);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setMessage('');
+
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await apiRequest('POST', '/api/auth/forgot-password/reset-direct', { 
+        email,
+        newPassword 
+      });
       await response.json();
       
-      setMessage('Password reset instructions have been sent to your email.');
-      setEmailSent(true);
+      setMessage('Password updated successfully!');
+      // Reset form
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setEmail('');
+      setShowPasswordInputs(false);
+      setEmailVerified(false);
     } catch (err: any) {
-      setError(err.message || 'Failed to send reset instructions');
+      setError(err.message || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -39,16 +86,18 @@ export default function ForgotPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Nibbles Kitchen</CardTitle>
-          <CardDescription>Enter your email to reset your password</CardDescription>
+          <CardDescription>
+            {showPasswordInputs 
+              ? "Enter your new password" 
+              : "Enter your email to reset your password"}
+          </CardDescription>
         </CardHeader>
-        {!emailSent ? (
-          <form onSubmit={handleForgotPassword}>
+        
+        {!showPasswordInputs ? (
+          <form onSubmit={handleVerifyEmail}>
             <CardContent className="space-y-4">
               {error && (
                 <div className="text-red-500 text-sm text-center">{error}</div>
-              )}
-              {message && (
-                <div className="text-green-500 text-sm text-center">{message}</div>
               )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -64,7 +113,7 @@ export default function ForgotPassword() {
             </CardContent>
             <CardFooter className="flex flex-col">
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Sending...' : 'Send Reset Instructions'}
+                {loading ? 'Verifying...' : 'Verify Email'}
               </Button>
               
               <div className="mt-4 text-center text-sm text-muted-foreground">
@@ -81,15 +130,59 @@ export default function ForgotPassword() {
             </CardFooter>
           </form>
         ) : (
-          <CardContent className="text-center py-8">
-            <p className="text-green-500 mb-4">Password reset instructions have been sent to your email.</p>
-            <Button 
-              type="button" 
-              onClick={() => setLocation('/login')}
-            >
-              Back to Login
-            </Button>
-          </CardContent>
+          <form onSubmit={handlePasswordReset}>
+            <CardContent className="space-y-4">
+              {error && (
+                <div className="text-red-500 text-sm text-center">{error}</div>
+              )}
+              {message && (
+                <div className="text-green-500 text-sm text-center">{message}</div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-new-password"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  required
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Updating...' : 'Reset Password'}
+              </Button>
+              
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="p-0 h-auto"
+                  onClick={() => {
+                    setShowPasswordInputs(false);
+                    setEmailVerified(false);
+                    setNewPassword('');
+                    setConfirmNewPassword('');
+                  }}
+                >
+                  Back to email verification
+                </Button>
+              </div>
+            </CardFooter>
+          </form>
         )}
       </Card>
     </div>
