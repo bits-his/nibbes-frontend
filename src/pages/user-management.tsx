@@ -336,7 +336,7 @@ export default function UserManagement() {
                             Edit
                           </Button>
                           <Button
-                            variant="destructive"
+                            variant=""
                             size="sm"
                             onClick={() => handleDeleteUser(user.id)}
                           >

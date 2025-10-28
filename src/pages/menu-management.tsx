@@ -43,6 +43,8 @@ type MenuFormValues = z.infer<typeof menuItemFormSchema>;
 export default function MenuManagement() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -347,13 +349,8 @@ export default function MenuManagement() {
                         size="icon"
                         variant="destructive"
                         onClick={() => {
-                          if (
-                            confirm(
-                              "Are you sure you want to delete this item?"
-                            )
-                          ) {
-                            deleteMutation.mutate(item.id);
-                          }
+                          setItemToDelete(item);
+                          setDeleteDialogOpen(true);
                         }}
                         data-testid={`button-delete-${item.id}`}
                       >
@@ -562,6 +559,46 @@ export default function MenuManagement() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent data-testid="dialog-delete-confirmation">
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">"{itemToDelete?.name}"</span>?
+              This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+              data-testid="button-delete-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                if (itemToDelete) {
+                  deleteMutation.mutate(itemToDelete.id);
+                  setDeleteDialogOpen(false);
+                  setItemToDelete(null);
+                }
+              }}
+              data-testid="button-delete-confirm"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
