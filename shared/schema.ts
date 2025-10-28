@@ -22,6 +22,9 @@ export const insertMenuItemSchema = z.object({
   available: z.boolean().default(true),
 });
 
+// Create an alias for the form schema
+export const menuItemFormSchema = insertMenuItemSchema;
+
 export type MenuItem = z.infer<typeof menuItemSchema>;
 
 // Order schemas
