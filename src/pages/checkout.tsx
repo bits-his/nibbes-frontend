@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import type { CartItem } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
@@ -23,6 +24,7 @@ type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
 

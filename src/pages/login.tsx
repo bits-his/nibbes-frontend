@@ -50,29 +50,27 @@ export default function Login() {
   };
 
   const handleGuestLogin = (role: 'admin' | 'kitchen' | 'customer') => {
-    // This is for demonstration - in real app, you'd have actual guest accounts
-    // For now, we'll just set a mock user and redirect
-    const mockUser = {
-      id: `mock-${role}-id`,
-      username: `${role}_user`,
-      email: `${role}@example.com`,
-      role: role
-    };
-    
-    // Use context login function with mock data
-    login(mockUser, 'mock-token');
-    
+    // Set the form fields based on the selected role
     switch(role) {
       case 'admin':
-        setLocation('/orders');
+        setEmail('admin@example.com');
+        setPassword('admin123');
         break;
       case 'kitchen':
-        setLocation('/kitchen');
+        setEmail('kitchen@example.com');
+        setPassword('kitchen123');
         break;
       case 'customer':
-        setLocation('/');
+        setEmail('customer@example.com');
+        setPassword('customer123');
         break;
     }
+    
+    // Optional: Set focus to the login button
+    setTimeout(() => {
+      const loginButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
+      if (loginButton) loginButton.focus();
+    }, 100);
   };
 
   return (

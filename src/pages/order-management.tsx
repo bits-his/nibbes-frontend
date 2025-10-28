@@ -34,16 +34,29 @@ export default function OrderManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
+    from: new Date(new Date().setHours(0, 0, 0, 0)),  // Start of today
+    to: new Date(new Date().setHours(23, 59, 59, 999))   // End of today
+  });
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders", dateRange.from, dateRange.to],
+    queryKey: ["/api/orders", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters
+      // Build query parameters with proper date range (start of from date to end of to date)
       const params = new URLSearchParams();
-      if (dateRange.from) params.append('from', dateRange.from.toISOString());
-      if (dateRange.to) params.append('to', dateRange.to.toISOString());
+      if (dateRange.from) {
+        // Set time to start of the day (00:00:00)
+        const fromDate = new Date(dateRange.from);
+        fromDate.setHours(0, 0, 0, 0);
+        params.append('from', fromDate.toISOString());
+      }
+      if (dateRange.to) {
+        // Set time to end of the day (23:59:59.999)
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        params.append('to', toDate.toISOString());
+      }
       
       const queryString = params.toString();
       const url = queryString ? `/api/orders?${queryString}` : '/api/orders';
@@ -59,12 +72,22 @@ export default function OrderManagement() {
     pendingOrders: number;
     completedOrders: number;
   }>({
-    queryKey: ["/api/orders/stats", dateRange.from, dateRange.to],
+    queryKey: ["/api/orders/stats", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters
+      // Build query parameters with proper date range (start of from date to end of to date)
       const params = new URLSearchParams();
-      if (dateRange.from) params.append('from', dateRange.from.toISOString());
-      if (dateRange.to) params.append('to', dateRange.to.toISOString());
+      if (dateRange.from) {
+        // Set time to start of the day (00:00:00)
+        const fromDate = new Date(dateRange.from);
+        fromDate.setHours(0, 0, 0, 0);
+        params.append('from', fromDate.toISOString());
+      }
+      if (dateRange.to) {
+        // Set time to end of the day (23:59:59.999)
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        params.append('to', toDate.toISOString());
+      }
       
       const queryString = params.toString();
       const url = queryString ? `/api/orders/stats?${queryString}` : '/api/orders/stats';
@@ -103,9 +126,21 @@ export default function OrderManagement() {
     
     // Filter by date range if dates are selected
     const orderDate = new Date(order.createdAt);
+    
+    // Convert order date to start of day for comparison
+    const orderStartOfDay = new Date(orderDate);
+    orderStartOfDay.setHours(0, 0, 0, 0);
+    
+    // Convert date range dates to start/end of day for comparison
+    const rangeStartOfDay = dateRange.from ? new Date(dateRange.from) : null;
+    if (rangeStartOfDay) rangeStartOfDay.setHours(0, 0, 0, 0);
+    
+    const rangeEndOfDay = dateRange.to ? new Date(dateRange.to) : null;
+    if (rangeEndOfDay) rangeEndOfDay.setHours(23, 59, 59, 999);
+
     const matchesDateRange = 
-      (!dateRange.from || orderDate >= dateRange.from) && 
-      (!dateRange.to || orderDate <= dateRange.to);
+      (!rangeStartOfDay || orderStartOfDay >= rangeStartOfDay) && 
+      (!rangeEndOfDay || orderStartOfDay <= rangeEndOfDay);
 
     return matchesSearch && matchesStatus && matchesDateRange;
   });
@@ -203,14 +238,16 @@ export default function OrderManagement() {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
+                    {dateRange.from && dateRange.to ? (
+                      // Check if it's showing today's data (default)
+                      (dateRange.from.toDateString() === new Date().toDateString() && 
+                       dateRange.to.toDateString() === new Date().toDateString()) ? (
+                        <span>Today</span>
+                      ) : (
                         <>
                           {format(dateRange.from, "LLL dd, y")} -{" "}
                           {format(dateRange.to, "LLL dd, y")}
                         </>
-                      ) : (
-                        format(dateRange.from, "LLL dd, y")
                       )
                     ) : (
                       <span>Pick a date range</span>
@@ -221,9 +258,20 @@ export default function OrderManagement() {
                   <Calendar
                     initialFocus
                     mode="range"
-                    defaultMonth={dateRange.from}
+                    defaultMonth={dateRange.from || undefined}
                     selected={dateRange}
-                    onSelect={setDateRange}
+                    onSelect={(range) => {
+                      if (range) {
+                        // If range is provided (even if same date for both from and to)
+                        setDateRange({
+                          from: range.from || null,
+                          to: range.to || range.from || null
+                        });
+                      } else {
+                        // If range is null/undefined (user cleared selection)
+                        setDateRange({ from: null, to: null });
+                      }
+                    }}
                     numberOfMonths={2}
                   />
                 </PopoverContent>

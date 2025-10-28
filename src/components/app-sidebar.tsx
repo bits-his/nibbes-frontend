@@ -37,8 +37,8 @@ const menuItems: MenuItem[] = [
     roles: ['admin', 'customer'],
   },
   {
-    title: "Ducket Display",  // Updated name as per request
-    url: "/ducket",
+    title: "Docket",  // Updated name as per request
+    url: "/docket",
     icon: Users,
     roles: ['customer'],
   },

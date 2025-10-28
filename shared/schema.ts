@@ -7,7 +7,7 @@ export const menuItemSchema = z.object({
   description: z.string().optional(),
   price: z.string().min(1, 'Price is required'),
   category: z.string().min(1, 'Category is required'),
-  imageUrl: z.string().url('Invalid image URL').optional().nullable(),
+  // imageUrl: z.string().url('Invalid image URL').optional().nullable(),
   available: z.boolean().default(true),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -18,9 +18,12 @@ export const insertMenuItemSchema = z.object({
   description: z.string().optional(),
   price: z.string().min(1, 'Price is required'),
   category: z.string().min(1, 'Category is required'),
-  imageUrl: z.string().url('Invalid image URL').optional().nullable(),
+  // imageUrl: z.string().url('Invalid image URL').optional().nullable(),
   available: z.boolean().default(true),
 });
+
+// Create an alias for the form schema
+export const menuItemFormSchema = insertMenuItemSchema;
 
 export type MenuItem = z.infer<typeof menuItemSchema>;
 

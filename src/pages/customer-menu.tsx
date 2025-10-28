@@ -505,12 +505,12 @@ export default function CustomerMenu() {
               <p className="text-sm text-muted-foreground mb-2 text-center">
                 Scan this QR code with your phone's camera to access the menu directly
               </p>
-              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md mb-4">
+              {/* <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md mb-4">
                 <p className="mb-1"><strong>Note:</strong> To access from other devices:</p>
                 <p className="mb-1">1. Ensure devices are on the same network</p>
                 <p className="mb-1">2. Run dev server with: <code className="font-mono bg-gray-200 p-0.5 rounded">npm run dev</code></p>
                 <p className="mt-1">The QR code contains the correct IP address for your network.</p>
-              </div>
+              </div> */}
               <Button 
                 onClick={() => navigator.clipboard && navigator.clipboard.writeText(window.location.origin)}
                 variant="outline"
