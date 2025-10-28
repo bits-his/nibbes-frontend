@@ -15,9 +15,11 @@ import OrderManagement from "@/pages/order-management";
 import MenuManagement from "@/pages/menu-management";
 import UserManagement from "@/pages/user-management";
 import DucketDisplay from "@/pages/docket";
-// import DocketPage from "@/pages/docket";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
@@ -150,6 +152,27 @@ function Router() {
         component={() => (
           <PublicRoute restricted={true}>
             <Login />
+          </PublicRoute>
+        )} 
+      />
+      <Route path="/signup" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <Signup />
+          </PublicRoute>
+        )} 
+      />
+      <Route path="/forgot-password" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <ForgotPassword />
+          </PublicRoute>
+        )} 
+      />
+      <Route path="/reset-password" 
+        component={() => (
+          <PublicRoute restricted={true}>
+            <ResetPassword />
           </PublicRoute>
         )} 
       />

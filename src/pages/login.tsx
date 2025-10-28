@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
+import { loginSchema } from '@shared/schema';
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -114,32 +115,55 @@ export default function Login() {
             </Button>
             
             <div className="mt-4 text-center text-sm text-muted-foreground">
-              Demo accounts:
-              <div className="flex flex-col gap-2 mt-2">
+              <div className="mb-4">
+                Demo accounts:
+                <div className="flex flex-col gap-2 mt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleGuestLogin('admin')}
+                  >
+                    Admin Login
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleGuestLogin('kitchen')}
+                  >
+                    Kitchen Staff Login
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleGuestLogin('customer')}
+                  >
+                    Customer Login
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="mt-4 space-y-2">
                 <Button 
                   type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleGuestLogin('admin')}
+                  variant="link" 
+                  className="p-0 h-auto"
+                  onClick={() => setLocation('/signup')}
                 >
-                  Admin Login
+                  Create an account
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleGuestLogin('kitchen')}
-                >
-                  Kitchen Staff Login
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleGuestLogin('customer')}
-                >
-                  Customer Login
-                </Button>
+                <div className="mt-2">
+                  <Button 
+                    type="button" 
+                    variant="link" 
+                    className="p-0 h-auto"
+                    onClick={() => setLocation('/forgot-password')}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
               </div>
             </div>
           </CardFooter>
