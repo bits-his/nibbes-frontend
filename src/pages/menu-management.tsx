@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +28,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMenuItemSchema } from "@shared/schema";
 import { z } from "zod";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 
 type MenuFormValues = z.infer<typeof insertMenuItemSchema>;
@@ -36,6 +37,10 @@ export default function MenuManagement() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false); // Track upload status
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<MenuFormValues>({
     resolver: zodResolver(insertMenuItemSchema),
@@ -126,6 +131,10 @@ export default function MenuManagement() {
         imageUrl: item.imageUrl,
         available: item.available,
       });
+      // Reset image states when editing an existing item
+      setImageFile(null);
+      setImagePreviewUrl(item.imageUrl);
+      setIsUploading(false); // Reset upload state
     } else {
       setEditingItem(null);
       form.reset({
@@ -136,6 +145,13 @@ export default function MenuManagement() {
         imageUrl: "",
         available: true,
       });
+      // Reset image states for new item
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      setIsUploading(false); // Reset upload state
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
     setDialogOpen(true);
   };
@@ -143,9 +159,140 @@ export default function MenuManagement() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingItem(null);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setIsUploading(false); // Reset upload state
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     form.reset();
   };
-const onSubmit = (values: MenuFormValues) => {
+
+  // Function to compress image
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Set maximum dimensions for faster uploads
+        let { width, height } = img;
+        const maxWidth = 800;
+        const maxHeight = 600;
+        
+        // Calculate new dimensions while maintaining aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw image on canvas with new dimensions
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to blob with 80% quality for faster uploads
+        canvas.toBlob(
+          (blob) => {
+            resolve(blob || file); // fallback to original file if compression fails
+          },
+          'image/jpeg',
+          0.8
+        );
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const onImageFileChange = async (file: File) => {
+    setIsUploading(true);
+    setImageFile(file);
+    
+    // Create a preview URL for the selected image
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(previewUrl);
+    
+    try {
+      // Compress the image before uploading
+      const compressedFile = await compressImage(file);
+      
+      // Create a new File object from the compressed blob
+      const compressedFileObj = new File([compressedFile], file.name, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+      
+      // Upload directly to Cloudinary using unsigned upload
+      const formData = new FormData();
+      formData.append('file', compressedFileObj);
+      formData.append('upload_preset', 'nibbes_kitchen_unsigned'); // Using the provided unsigned preset
+      
+      const response = await fetch('https://api.cloudinary.com/v1_1/dv0gb0cy2/image/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Cloudinary upload failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      const cloudinaryUrl = result.secure_url;
+      
+      // Update the form's imageUrl field with the Cloudinary URL
+      form.setValue('imageUrl', cloudinaryUrl);
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully!",
+      });
+    } catch (error) {
+      console.error('Error uploading image to Cloudinary:', error);
+      // Show error to user
+      toast({
+        title: "Error",
+        description: "Failed to upload image to Cloudinary. Please try again.",
+        variant: "destructive",
+      });
+      // Reset form field if upload failed
+      form.setValue('imageUrl', '');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onSubmit = async (values: MenuFormValues) => {
+    // Validate that imageUrl is valid and that upload is not in progress
+    if (!values.imageUrl) {
+      toast({
+        title: "Error",
+        description: "Please select and upload an image first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if upload is still in progress
+    if (isUploading) {
+      toast({
+        title: "Please wait",
+        description: "Image is still uploading. Please wait for upload to complete.",
+      });
+      return;
+    }
+    
+    // Create or update menu item with the image URL that was already uploaded to Cloudinary
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, data: values });
     } else {
@@ -339,26 +486,32 @@ const onSubmit = (values: MenuFormValues) => {
 <FormField
                 control={form.control}
                 name="imageUrl"
-                render={({ field }) => (
+                render={({ field: { onChange, value, ...fieldProps } }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
+                    <FormLabel>Upload Image</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="https://example.com/image.jpg"
-                        {...field}
-                        data-testid="input-image-url"
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            onImageFileChange(file);
+                          }
+                        }}
+                        {...fieldProps}
+                        disabled={isUploading} // Disable input while uploading
+                        data-testid="input-image-upload"
                       />
                     </FormControl>
                     <FormMessage />
-                    {field.value && (
+                    {(imagePreviewUrl || value) && (
                       <div className="mt-2 aspect-video rounded-lg overflow-hidden border">
                         <img
-                          src={field.value}
+                          src={imagePreviewUrl || value}
                           alt="Preview"
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = "https://via.placeholder.com/400x300?text=Invalid+URL";
-                          }}
                         />
                       </div>
                     )}
@@ -401,11 +554,13 @@ const onSubmit = (values: MenuFormValues) => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending || isUploading}
                   data-testid="button-save"
                 >
-                  {createMutation.isPending || updateMutation.isPending
+                  {(createMutation.isPending || updateMutation.isPending) && !isUploading
                     ? "Saving..."
+                    : isUploading
+                    ? "Uploading Image..."
                     : editingItem
                     ? "Update Item"
                     : "Create Item"}
