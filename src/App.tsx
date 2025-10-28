@@ -20,6 +20,7 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import QRCodePage from "@/pages/qr-code";
 import { useAuth } from './hooks/useAuth';
 
 // Fix missing import reference in the renderPage function
@@ -237,6 +238,13 @@ function Router() {
         component={() => (
           <ProtectedRoute allowedRoles={['customer', 'admin']}>
             <DucketDisplay />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/qr-code" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <QRCodePage />
           </ProtectedRoute>
         )} 
       />

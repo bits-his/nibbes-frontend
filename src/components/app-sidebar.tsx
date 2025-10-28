@@ -72,6 +72,12 @@ const menuItems: MenuItem[] = [
     icon: Users,
     roles: ['admin'],
   },
+  {
+    title: "QR Code",
+    url: "/qr-code",
+    icon: ClipboardList,
+    roles: ['admin'],
+  },
 ];
 
 // Get menu items based on user role
