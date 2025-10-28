@@ -15,6 +15,10 @@ export default function KitchenDisplay() {
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/orders/active');
+      return response.json();
+    },
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
 

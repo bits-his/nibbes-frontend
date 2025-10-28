@@ -19,6 +19,9 @@ import DucketDisplay from "@/pages/docket";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 
+// Fix missing import reference in the renderPage function
+import DocketPage from "@/pages/docket";
+
 // Define user type
 interface User {
   id: string;
@@ -154,8 +157,20 @@ function Router() {
       
       {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/order-status" component={OrderStatus} />
+      <Route path="/checkout" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['customer', 'admin']}>
+            <Checkout />
+          </ProtectedRoute>
+        )} 
+      />
+      <Route path="/order-status" 
+        component={() => (
+          <ProtectedRoute allowedRoles={['customer', 'admin']}>
+            <OrderStatus />
+          </ProtectedRoute>
+        )} 
+      />
       
       {/* Protected routes with role checks inside the components or via ProtectedRoute */}
       {/* Admins can access all pages, other roles only specific pages */}
