@@ -36,6 +36,7 @@ import { insertMenuItemSchema, menuItemFormSchema } from "@shared/schema";
 import { z } from "zod";
 import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
+import { log } from "console";
 
 type MenuFormValues = z.infer<typeof menuItemFormSchema>;
 
@@ -45,6 +46,7 @@ export default function MenuManagement() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<MenuFormValues>({
@@ -170,60 +172,87 @@ export default function MenuManagement() {
     form.reset();
   };
 
-  const onImageFileChange = (file: File) => {
+  const onImageFileChange = async (file: File) => {
     setImageFile(file);
-    // Create a preview URL for the selected image
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreviewUrl(previewUrl);
+    setIsUploading(true);
+    
+    // Upload image directly to Cloudinary immediately on selection
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "nibbes_kitchen_unsigned"); // Using unsigned preset
+
+      // Upload to Cloudinary
+      const response = await fetch("https://api.cloudinary.com/v1_1/dv0gb0cy2/image/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to upload image to Cloudinary");
+      }
+
+      const result = await response.json();
+      const cloudinaryUrl = result.secure_url; // Get the secure URL from Cloudinary response
+      
+      // alert(JSON.stringify(cloudinaryUrl));
+      // Update the form's imageUrl field
+      form.setValue("imageUrl", cloudinaryUrl);
+      
+      // Create a preview URL for the selected image
+      setImagePreviewUrl(cloudinaryUrl);
+      
+      toast({
+        title: "Success",
+        description: "Image uploaded to Cloudinary successfully.",
+      });
+    } catch (error) {
+      console.error("Error uploading image to Cloudinary:", error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image to Cloudinary. Please try again.",
+        variant: "destructive",
+      });
+      // Clear the form's imageUrl if upload failed
+      form.setValue("imageUrl", "");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const onSubmit = async (values: MenuFormValues) => {
-    // Check if we have an image to upload or if we're editing and keeping the existing image
-    if (!imageFile && !values.imageUrl) {
+    // Get the current imageUrl value directly from the form to ensure we have the latest value
+    const currentImageUrl = form.getValues('imageUrl');
+    
+    // Debug log to see what values are being sent
+    console.log('Form values:', JSON.stringify(values));
+    console.log('Current imageUrl from form:', currentImageUrl);
+    
+    // Check if we have an image URL to submit
+    if (!currentImageUrl) {
       toast({
         title: "Error",
-        description: "Please select an image to upload.",
+        description: "Please select and upload an image.",
         variant: "destructive",
       });
       return;
     }
 
-    let imageUrl = values.imageUrl; // This will be the existing URL when editing
-
-    // If there's an image file to upload, upload it first
-    if (imageFile) {
-      const formData = new FormData();
-      formData.append("image", imageFile);
-
-      try {
-        // Upload image to backend endpoint - use the same BACKEND_URL as in queryClient
-        const response = await fetch(`${BACKEND_URL}/api/upload/image`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || "Failed to upload image");
-        }
-
-        const result = await response.json();
-        imageUrl = result.imageUrl;
-      } catch (error) {
-        console.error("Error uploading image:", error);
-        toast({
-          title: "Error",
-          description: "Failed to upload image. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
+    // Don't submit if still uploading
+    if (isUploading) {
+      toast({
+        title: "Please wait",
+        description: "Image is still uploading to Cloudinary...",
+        variant: "destructive",
+      });
+      return;
     }
 
-    // Create or update menu item with the image URL
+    // Create or update menu item with the image URL from Cloudinary
     const finalValues = {
       ...values,
-      imageUrl,
+      imageUrl: currentImageUrl, // Use the current value from the form
     };
 
     if (editingItem) {
@@ -439,38 +468,44 @@ export default function MenuManagement() {
                 />
               </div>
 
+              <FormItem>
+                <FormLabel>Upload Image</FormLabel>
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        onImageFileChange(file);
+                      }
+                    }}
+                    disabled={isUploading}
+                  />
+                </FormControl>
+                <FormMessage />
+                {(imagePreviewUrl || form.watch('imageUrl')) && (
+                  <div className="mt-2 aspect-video rounded-lg overflow-hidden border">
+                    <img
+                      src={imagePreviewUrl || form.watch('imageUrl')}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+              </FormItem>
+
+              {/* Hidden field to track the uploaded image URL */}
               <FormField
                 control={form.control}
                 name="imageUrl"
-                render={({ field: { onChange, value, ...fieldProps } }) => (
-                  <FormItem>
-                    <FormLabel>Upload Image</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            onImageFileChange(file);
-                          }
-                        }}
-                        {...fieldProps}
-                        data-testid="input-image-upload"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                    {(imagePreviewUrl || value) && (
-                      <div className="mt-2 aspect-video rounded-lg overflow-hidden border">
-                        <img
-                          src={imagePreviewUrl || value}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                  </FormItem>
+                render={({ field }) => (
+                  <input
+                    type="hidden"
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                  />
                 )}
               />
 
@@ -510,11 +545,15 @@ export default function MenuManagement() {
                 <Button
                   type="submit"
                   disabled={
-                    createMutation.isPending || updateMutation.isPending
+                    createMutation.isPending || 
+                    updateMutation.isPending || 
+                    isUploading
                   }
                   data-testid="button-save"
                 >
-                  {createMutation.isPending || updateMutation.isPending
+                  {isUploading 
+                    ? "Uploading..." 
+                    : createMutation.isPending || updateMutation.isPending
                     ? "Saving..."
                     : editingItem
                     ? "Update Item"
