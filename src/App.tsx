@@ -283,10 +283,10 @@ function Layout({ children }: { children: React.ReactNode }) {
               <SidebarTrigger data-testid="button-sidebar-toggle" />
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-orange-500 font-medium">
+              <div className="text-[#50BAA8] font-medium">
                 {user ? (user.email || user.username) : 'Guest'}
               </div>
-              <div className="text-orange-500">
+              <div className="text-[#50BAA8]">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user">
                   <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
                   <circle cx="12" cy="7" r="4"/>

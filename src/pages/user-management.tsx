@@ -319,7 +319,7 @@ export default function UserManagement() {
                       <td className="py-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                          user.role === 'kitchen' ? 'bg-orange-100 text-orange-800' :
+                          user.role === 'kitchen' ? 'bg-[#50BAA8]/10 text-[#50BAA8]' :
                           'bg-green-100 text-green-800'
                         }`}>
                           {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
