@@ -326,3 +326,7 @@
     inset: -1px;
   }
 }
+.sidebar-active {
+  background-color: #7ED4C2 !important;
+  color: #FFFFFF !important;
+}
