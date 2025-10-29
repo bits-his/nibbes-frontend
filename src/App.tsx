@@ -255,7 +255,7 @@ function Router() {
       <Route
         path="/menu"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
             <MenuManagement />
           </ProtectedRoute>
         )}
