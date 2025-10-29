@@ -77,6 +77,7 @@ export default function ForgotPassword() {
       setEmail('');
       setShowPasswordInputs(false);
       setEmailVerified(false);
+      setLocation('/login');
     } catch (err: any) {
       setError(err.message || 'Failed to reset password');
     } finally {

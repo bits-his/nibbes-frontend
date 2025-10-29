@@ -10,15 +10,23 @@ import type { OrderWithItems } from "@shared/schema";
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
 
-  // Get user-specific active orders
-  const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
+  // Get user-specific active orders with immediate data fetching
+  const { data: orders, isLoading, refetch } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active/customer"],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/orders/active/customer');
       return response.json();
     },
-    refetchInterval: 5000, // Fallback polling every 5 seconds
+    refetchInterval: 10000, // Poll every 10 seconds (reduced from 5 to reduce traffic)
+    refetchOnMount: true,    // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 0,            // Always consider data as stale to ensure fresh data
   });
+
+  // Force a refetch when the component mounts
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
 
   const activeOrders = orders?.filter((order) => 
     order.status !== "completed" && order.status !== "cancelled"
@@ -93,16 +101,19 @@ export default function DocketPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <ClipboardList className="w-8 h-8 text-primary" />
-            <h1 className="font-serif text-4xl font-bold">Order Docket</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ClipboardList className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Order Docket</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="px-4 py-2 text-base">
-              Active Orders: {activeOrders?.length || 0}
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-normal">
+            <Badge variant="outline" className="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base whitespace-nowrap">
+              Active: {activeOrders?.length || 0}
             </Badge>
-            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">Live updates</span>
+              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+            </div>
           </div>
         </div>
 

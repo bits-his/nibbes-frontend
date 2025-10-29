@@ -15,27 +15,14 @@ import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_3376
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [cart, setCart] = useState<CartItem[]>([]);
-
-  // Load cart from localStorage on initial render
-  useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        setCart(parsedCart);
-      } catch (error) {
-        console.error("Error parsing cart from localStorage:", error);
-        // If there's an error, clear the invalid cart data
-        localStorage.removeItem("cart");
-      }
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    // Load cart from localStorage on initial render
+    if (typeof window !== 'undefined') {
+      const savedCart = localStorage.getItem('cart');
+      return savedCart ? JSON.parse(savedCart) : [];
     }
-  }, []);
-
-  // Save cart to localStorage whenever cart changes
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
+    return [];
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cartOpen, setCartOpen] = useState(false);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
@@ -53,6 +40,13 @@ export default function CustomerMenu() {
     (item) => selectedCategory === "All" || item.category === selectedCategory
   );
 
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+  }, [cart]);
+
   const addToCart = (menuItem: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.menuItem.id === menuItem.id);
@@ -60,7 +54,7 @@ export default function CustomerMenu() {
         toast({
           title: "Quantity Increased",
           description: `${menuItem.name} quantity increased in cart.`,
-          duration: 3000, // 3 seconds
+          duration: 1000, // 3 seconds
         });
         return prev.map((item) =>
           item.menuItem.id === menuItem.id
@@ -71,7 +65,7 @@ export default function CustomerMenu() {
       toast({
         title: "Added to Cart",
         description: `${menuItem.name} has been added to your cart.`,
-        duration: 3000, // 3 seconds
+        duration: 1000, // 3 seconds
       });
       return [...prev, { menuItem, quantity: 1 }];
     });
@@ -177,8 +171,6 @@ export default function CustomerMenu() {
   };
 
   const handleCheckout = () => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-    
     // Store location info in localStorage if available
     if (locationData) {
       localStorage.setItem("location", JSON.stringify(locationData));
@@ -523,14 +515,14 @@ export default function CustomerMenu() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mb-2 text-center">
-                Scan this QR code with your phone's camera to access the menu directly
+                Scan this QR code with your phone's camera or access from other devices:
               </p>
-              {/* <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md mb-4">
+              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md mb-4">
                 <p className="mb-1"><strong>Note:</strong> To access from other devices:</p>
                 <p className="mb-1">1. Ensure devices are on the same network</p>
                 <p className="mb-1">2. Run dev server with: <code className="font-mono bg-gray-200 p-0.5 rounded">npm run dev</code></p>
                 <p className="mt-1">The QR code contains the correct IP address for your network.</p>
-              </div> */}
+              </div>
               <Button 
                 onClick={() => navigator.clipboard && navigator.clipboard.writeText(window.location.origin)}
                 variant="outline"
