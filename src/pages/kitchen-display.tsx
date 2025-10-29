@@ -36,7 +36,7 @@ export default function KitchenDisplay() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === "order_update" || data.type === "new_order") {
+      if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
         
         if (data.type === "new_order") {
@@ -45,6 +45,9 @@ export default function KitchenDisplay() {
             description: `Order #${data.orderNumber} has been placed.`,
           });
         }
+      } else if (data.type === "menu_item_update") {
+        // Refresh menu data when items are updated
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
       }
     };
 

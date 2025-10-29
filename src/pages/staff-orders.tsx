@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Minus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,6 +142,45 @@ export default function StaffOrders() {
     setCart([]);
     form.reset();
   };
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log("Staff Orders WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (
+        data.type === "order_update" || 
+        data.type === "new_order" || 
+        data.type === "order_status_change"
+      ) {
+        // Refresh active orders when there are changes
+        queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      } else if (data.type === "menu_item_update") {
+        // Refresh menu data when items are updated
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("Staff Orders WebSocket error:", error);
+    };
+
+    socket.onclose = () => {
+      console.log("Staff Orders WebSocket disconnected");
+    };
+
+    // Cleanup function to close the WebSocket connection
+    return () => {
+      socket.close();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">

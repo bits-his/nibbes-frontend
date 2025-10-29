@@ -37,6 +37,15 @@ export default function OrderStatus() {
       if (data.type === "order_update" && data.orderId === orderId) {
         // Refetch order data
         window.location.reload();
+      } else if (data.type === "order_status_change" && data.orderId === orderId) {
+        // Refetch order data for status changes
+        window.location.reload();
+      } else if (data.type === "new_order" && data.orderId === orderId) {
+        // Refetch order data for new orders
+        window.location.reload();
+      } else if (data.type === "menu_item_update") {
+        // Refresh menu data when items are updated
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
       }
     };
 

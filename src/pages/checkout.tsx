@@ -28,6 +28,46 @@ export default function Checkout() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
 
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log("Checkout WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "menu_item_update") {
+        // Refresh cart items if menu items are updated (prices, availability, etc.)
+        // This will help keep cart items in sync with menu updates
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      } else if (
+        data.type === "order_update" || 
+        data.type === "new_order" || 
+        data.type === "order_status_change"
+      ) {
+        // Refresh active orders when there are changes
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("Checkout WebSocket error:", error);
+    };
+
+    socket.onclose = () => {
+      console.log("Checkout WebSocket disconnected");
+    };
+
+    // Cleanup function to close the WebSocket connection
+    return () => {
+      socket.close();
+    };
+  }, []);
+
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
     defaultValues: {

@@ -50,6 +50,9 @@ export default function DocketPage() {
         data.type === "order_status_change"
       ) {
         queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+      } else if (data.type === "menu_item_update") {
+        // Refresh menu data when items are updated
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
       }
     };
 

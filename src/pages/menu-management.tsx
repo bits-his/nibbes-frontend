@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,45 @@ export default function MenuManagement() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log("Menu Management WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "menu_item_update") {
+        // Refresh menu data when items are updated
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      } else if (
+        data.type === "order_update" || 
+        data.type === "new_order" || 
+        data.type === "order_status_change"
+      ) {
+        // Refresh orders data when there are changes (for menu analytics/usage)
+        queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("Menu Management WebSocket error:", error);
+    };
+
+    socket.onclose = () => {
+      console.log("Menu Management WebSocket disconnected");
+    };
+
+    // Cleanup function to close the WebSocket connection
+    return () => {
+      socket.close();
+    };
+  }, []);
 
   const form = useForm<MenuFormValues>({
     resolver: zodResolver(menuItemFormSchema),
