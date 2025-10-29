@@ -17,6 +17,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import React from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -80,7 +81,7 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const [loading, setLoading] = React.useState(true);
-  const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
   React.useEffect(() => setLoading(false), []);
 
   const availableMenuItems = getMenuItems(user);
@@ -91,36 +92,35 @@ export function AppSidebar() {
   };
   const handleMenuClick = (url: string) => {
     setLocation(url);
-    if (window.innerWidth < 1024) {
-    // only close on mobile/tablet
-    setIsMobileOpen(false);
+    // Close the sidebar on mobile when a menu item is clicked
+    if (isMobile && openMobile) {
+      setOpenMobile(false);
     }
   };
 
   if (loading) {
     return (
-      <Sidebar>
+      <Sidebar className="bg-[#50BAA8] text-white">
         <SidebarContent className="flex flex-col items-center justify-center h-full">
           <img
             src="/nibbles.jpg"
             alt="Nibbles Kitchen Logo"
             className="h-16 w-auto mb-4 object-contain"
           />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-white">Loading...</p>
         </SidebarContent>
       </Sidebar>
     );
   }
 
   return (
-    <Sidebar
-    >
+    <Sidebar className="bg-[#50BAA8] text-white">
       <SidebarContent className="flex flex-col justify-between h-full">
         {/* === Top Section (Logo + Menu) === */}
         <div>
           {/* Logo Section */}
           <SidebarGroup>
-            <SidebarGroupLabel className="flex  h-30 justify-center py-6 border-b border-border">
+            <SidebarGroupLabel className="flex  h-30 justify-center py-6 border-b border-white/20">
               <img
                 src="/nibbles.jpg"
                 alt="Nibbles Kitchen Logo"
@@ -136,15 +136,15 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={location === item.url}
-                      className={`flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
+                      className={`flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 ${
                         location === item.url
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : ""
+                          ? "bg-[#50BAA8] text-white font-semibold"
+                          : "text-[#50BAA8] hover:bg-[#50BAA8] hover:text-white"
                       }`}
                       onClick={() => handleMenuClick(item.url)}
                     >
                       <Link href={item.url}>
-                        <item.icon className="w-5 h-5" />
+                        <item.icon className="w-5 h-5 text-white" />
                         <span className="font-medium">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -157,12 +157,12 @@ export function AppSidebar() {
 
         {/* === Bottom Section (Logout) === */}
         {user && (
-          <div className="p-4 border-t border-border">
+          <div className="p-4 border-t border-white/20">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 hover:bg-destructive hover:text-destructive-foreground"
+                  className="flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 bg-red-600 hover:bg-red-700 text-white"
                 >
                   <LogOut className="w-5 h-5" />
                   <span className="font-medium">Logout</span>
