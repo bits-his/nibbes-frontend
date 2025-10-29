@@ -66,7 +66,7 @@ const menuItems: MenuItem[] = [
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
-    roles: ["admin"],
+    roles: ["admin", "kitchen"],
   },
   { title: "User Management", url: "/users", icon: Users, roles: ["admin"] },
   { title: "QR Code", url: "/qr-code", icon: ClipboardList, roles: ["admin"] },
@@ -144,7 +144,7 @@ export function AppSidebar() {
                       onClick={() => handleMenuClick(item.url)}
                     >
                       <Link href={item.url}>
-                        <item.icon className="w-5 h-5 text-white" />
+                        <item.icon className="w-5 h-5 " />
                         <span className="font-medium">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -162,7 +162,7 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 bg-red-600 hover:bg-red-700 text-white"
+                  className="flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 bg-red-600 hover:bg-red-700 hover:text-white text-white"
                 >
                   <LogOut className="w-5 h-5" />
                   <span className="font-medium">Logout</span>
