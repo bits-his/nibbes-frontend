@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from 'qrcode.react';
 import type { MenuItem, CartItem } from "@shared/schema";
 import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
+import { queryClient } from "@/lib/queryClient";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();

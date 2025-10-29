@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import type { OrderWithItems } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function DucketDisplay() {
   const { data: orders, refetch } = useQuery<OrderWithItems[]>({
@@ -32,9 +32,12 @@ export default function DucketDisplay() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === "order_update") {
+      if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         // Refetch orders when there's an update
         refetch();
+      } else if (data.type === "menu_item_update") {
+        // Refresh menu data when items are updated
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
       }
     };
 
