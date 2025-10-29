@@ -82,6 +82,7 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const [loading, setLoading] = React.useState(true);
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const [selectedUrl, setSelectedUrl] = React.useState(location);
   React.useEffect(() => setLoading(false), []);
 
   const availableMenuItems = getMenuItems(user);
@@ -91,8 +92,8 @@ export function AppSidebar() {
     setLocation("/login", { replace: true });
   };
   const handleMenuClick = (url: string) => {
-    setLocation(url);
-    // Close the sidebar on mobile when a menu item is clicked
+    setSelectedUrl(url); // mark active immediately
+    setLocation(url); // navigate
     if (isMobile && openMobile) {
       setOpenMobile(false);
     }
@@ -135,14 +136,13 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
-                      isActive={location === item.url}
-                      className={`flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150
+                      isActive={selectedUrl === item.url}
+                      className={`sidebar-menu-button  flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150
   ${
-    location === item.url
+    selectedUrl === item.url
       ? "sidebar-active font-semibold !important"
       : "text-[#50BAA8] hover:bg-[#50BAA8] hover:text-white"
   }`}
-
                       onClick={() => handleMenuClick(item.url)}
                     >
                       <Link href={item.url}>

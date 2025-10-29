@@ -330,3 +330,10 @@
   background-color: #50BAA8 !important;
   color: #FFFFFF !important;
 }
+/* Ensures the active click state uses your brand style */
+.sidebar-menu-button:active,
+.sidebar-menu-button:focus,
+.sidebar-menu-button[data-active="true"] {
+  background-color: #7ED4C2 !important;
+  color: #FFFFFF !important;
+}
