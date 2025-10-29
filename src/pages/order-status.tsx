@@ -18,7 +18,7 @@ export default function OrderStatus() {
   const { data: order, isLoading } = useQuery<OrderWithItems>({
     queryKey: ["/api/orders", orderId],
     enabled: !!orderId,
-    refetchInterval: 5000,
+    // Remove refetchInterval since we're using WebSockets for real-time updates
   });
 
   // WebSocket for real-time updates
