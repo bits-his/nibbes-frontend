@@ -205,7 +205,7 @@ function Router() {
       />
       <Route path="/staff" 
         component={() => (
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedRoute allowedRoles={['admin', 'kitchen']}>
             <StaffOrders />
           </ProtectedRoute>
         )} 
