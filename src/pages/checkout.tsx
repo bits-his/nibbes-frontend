@@ -232,7 +232,7 @@ export default function Checkout() {
                               type="tel"
                               placeholder="08012345678"
                               {...field}
-                              readOnly={!!(user && field.value)} // Only read-only if user is authenticated AND field has a value
+                              // readOnly={!!(user && field.value)} 
                               data-testid="input-phone"
                             />
                           </FormControl>
