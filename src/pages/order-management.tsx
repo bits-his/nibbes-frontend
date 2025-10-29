@@ -182,17 +182,23 @@ export default function OrderManagement() {
     return matchesSearch && matchesStatus && matchesDateRange;
   });
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-      pending: { variant: "secondary", label: "Pending" },
-      preparing: { variant: "default", label: "Preparing" },
-      ready: { variant: "default", label: "Ready" },
-      completed: { variant: "secondary", label: "Completed" },
-      cancelled: { variant: "destructive", label: "Cancelled" },
-    };
-    const config = variants[status] || { variant: "secondary", label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+const getStatusBadge = (status: string) => {
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-200 capitalize text-yellow-800",
+    preparing: "bg-orange-200 capitalize text-orange-800",
+    ready: " capitalize",
+    completed: "bg-red-200 capitalize text-red-800",
+    cancelled: "bg-black-200 capitalize text-black-800",
   };
+
+  const config = statusColors[status] || "bg-black-200 text-black-800";
+
+  return (
+    <Badge variant="default" className={config}>
+      {status}
+    </Badge>
+  );
+};
 
   return (
     <div className="min-h-screen bg-background">

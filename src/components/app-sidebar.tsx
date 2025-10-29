@@ -83,7 +83,11 @@ export function AppSidebar() {
   const [loading, setLoading] = React.useState(true);
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
   const [selectedUrl, setSelectedUrl] = React.useState(location);
+  
   React.useEffect(() => setLoading(false), []);
+  React.useEffect(() => {
+    setSelectedUrl(location);
+  }, [location]);
 
   const availableMenuItems = getMenuItems(user);
 
@@ -91,9 +95,10 @@ export function AppSidebar() {
     logout();
     setLocation("/login", { replace: true });
   };
+
   const handleMenuClick = (url: string) => {
-    setSelectedUrl(url); // mark active immediately
-    setLocation(url); // navigate
+    setSelectedUrl(url);
+    setLocation(url);
     if (isMobile && openMobile) {
       setOpenMobile(false);
     }
@@ -101,57 +106,97 @@ export function AppSidebar() {
 
   if (loading) {
     return (
-      <Sidebar className="bg-[#50BAA8] text-white">
+      <Sidebar className="bg-gradient-to-b from-[#50BAA8] to-[#50BAA8] text-white border-r border-white/10">
         <SidebarContent className="flex flex-col items-center justify-center h-full">
-          <img
-            src="/nibbles.jpg"
-            alt="Nibbles Kitchen Logo"
-            className="h-16 w-auto mb-4 object-contain"
-          />
-          <p className="text-sm text-white">Loading...</p>
+          <div className="relative">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl animate-pulse mb-4 flex items-center justify-center">
+              <div className="w-8 h-8 bg-white/30 rounded-lg"></div>
+            </div>
+          </div>
+          <p className="text-sm text-white/80 mt-2">Loading...</p>
         </SidebarContent>
       </Sidebar>
     );
   }
 
   return (
-    <Sidebar className="bg-[#50BAA8] text-white">
+    <Sidebar className="bg-gradient-to-b from-[#50BAA8] to-[#50BAA8] text-white border-r border-white/10 shadow-xl">
       <SidebarContent className="flex flex-col justify-between h-full">
         {/* === Top Section (Logo + Menu) === */}
         <div>
           {/* Logo Section */}
           <SidebarGroup>
-            <SidebarGroupLabel className="flex  h-30 justify-center py-6 border-b border-white/20">
-              <img
-                src="/nibbles.jpg"
-                alt="Nibbles Kitchen Logo"
-                className="h-30 w-40 rounded-xl shadow-sm"
-              />
+            <SidebarGroupLabel className="flex justify-center py-6 px-4 border-b border-white/2 h-300">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md group-hover:blur-lg transition-all duration-300"></div>
+                <img
+                  src="/nibbles.jpg"
+                  alt="Nibbles Kitchen Logo"
+                  className="relative h-30 w-40 rounded-2xl object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
             </SidebarGroupLabel>
 
+            {/* User Info Section */}
+            {user && (
+              <div className="px-4 py-3 mb-2">
+                <div className="text-center">
+                  <p className="font-semibold text-[#50BAAB] text-sm truncate">
+                    {user.email}
+                  </p>
+                  <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">
+                    {user.role}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Menu Section */}
-            <SidebarGroupContent className="mt-4">
+            <SidebarGroupContent className="mt-2 px-3">
               <SidebarMenu>
-                {availableMenuItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={selectedUrl === item.url}
-                      className={`sidebar-menu-button  flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150
-  ${
-    selectedUrl === item.url
-      ? "sidebar-active font-semibold !important"
-      : "text-[#50BAA8] hover:bg-[#50BAA8] hover:text-white"
-  }`}
-                      onClick={() => handleMenuClick(item.url)}
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {availableMenuItems.map((item) => {
+                  const isActive = selectedUrl === item.url;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={`
+                          group relative flex items-center gap-3 px-3 py-3 text-sm rounded-xl transition-all duration-200
+                          ${
+                            isActive
+                              ? "sidebar-active bg-[#50BAA8] text-[#50BAA8] shadow-lg shadow-black/10 backdrop-blur-sm"
+                              : "text-[#50BAA8] hover:bg-[#50BAA8] hover:text-white/90 hover:shadow-lg"
+                          }
+                          hover:scale-[1.02] active:scale-[0.98]
+                        `}
+                        onClick={() => handleMenuClick(item.url)}
+                      >
+                        <Link href={item.url} className="flex items-center gap-3 w-full">
+                          <div className={`
+                            relative transition-transform duration-200
+                            ${isActive ? "scale-110" : "group-hover:scale-105"}
+                          `}>
+                            <item.icon className="w-5 h-5" />
+                            {isActive && (
+                              <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-20"></div>
+                            )}
+                          </div>
+                          <span className={`font-medium transition-all duration-200 ${
+                            isActive ? "text-white" : "text-/90"
+                          }`}>
+                            {item.title}
+                          </span>
+                          
+                          {/* Active indicator dot */}
+                          {isActive && (
+                            <div className="absolute right-3 w-2 h-2 bg-white rounded-full shadow-sm"></div>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -164,10 +209,12 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 bg-red-600 hover:bg-red-700 hover:text-white text-white"
+                  className="group flex items-center gap-3 px-3 py-3 text-sm rounded-xl transition-all duration-200 bg-red-500/10 hover:bg-red-500/90 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-red-400/90 hover:text-white border border-white/10 hover:border-red-400/50"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <LogOut className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   <span className="font-medium">Logout</span>
+                  <div className="flex-1"></div>
+                  <div className="w-2 h-2 bg-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
