@@ -12,7 +12,7 @@ export default function DucketDisplay() {
       const response = await apiRequest('GET', '/api/orders/active/customer');
       return response.json();
     },
-    refetchInterval: 5000, // Refresh every 5 seconds
+    // Remove refetchInterval since we're using WebSockets for real-time updates
   });
 
   // Filter orders that are ready or completed

@@ -23,7 +23,7 @@ export default function KitchenDisplay() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     },
-    refetchInterval: 5000, // Fallback polling every 5 seconds
+    // Remove refetchInterval since we're using WebSockets for real-time updates
   });
 
   // WebSocket connection for real-time updates now

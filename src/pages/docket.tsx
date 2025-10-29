@@ -17,16 +17,8 @@ export default function DocketPage() {
       const response = await apiRequest('GET', '/api/orders/active/customer');
       return response.json();
     },
-    refetchInterval: 10000, // Poll every 10 seconds (reduced from 5 to reduce traffic)
-    refetchOnMount: true,    // Always refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-    staleTime: 0,            // Always consider data as stale to ensure fresh data
+    // Remove all polling options since we're using WebSockets for real-time updates
   });
-
-  // Force a refetch when the component mounts
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
 
   const activeOrders = orders?.filter((order) => 
     order.status !== "completed" && order.status !== "cancelled"
