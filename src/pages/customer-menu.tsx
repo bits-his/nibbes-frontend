@@ -312,7 +312,7 @@ export default function CustomerMenu() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button
+              {/* <Button
                 size="icon"
                 variant="outline"
                 className="shrink-0"
@@ -320,7 +320,7 @@ export default function CustomerMenu() {
                 data-testid="button-qr-code"
               >
                 <QrCode className="w-5 h-5" />
-              </Button>
+              </Button> */}
               <Button
                 size="icon"
                 variant="default"
