@@ -17,7 +17,11 @@ export default function KitchenDisplay() {
     queryKey: ["/api/orders/active"],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/orders/active');
-      return response.json();
+      const data = await response.json();
+      // Sort orders by createdAt in descending order (newest first)
+      return data.sort((a: OrderWithItems, b: OrderWithItems) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
     },
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
