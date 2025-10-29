@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, CheckCircle, ChefHat, Package, ClipboardList } from "lucide-react";
+import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,35 +71,40 @@ export default function DocketPage() {
     };
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="w-5 h-5 text-muted-foreground" />;
-      case "preparing":
-        return <ChefHat className="w-5 h-5 text-primary" />;
-      case "ready":
-        return <Package className="w-5 h-5 text-primary" />;
-      case "completed":
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-muted-foreground" />;
-    }
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case "pending":
+      return <Clock className="w-5 h-5 text-muted-foreground" />;
+    case "preparing":
+      return <ChefHat className="w-5 h-5 text-yellow-500" />;
+    case "ready":
+      return <Package className="w-5 h-5 text-green-500" />;
+    case "completed":
+      return <CheckCircle className="w-5 h-5 text-green-500" />;
+    case "cancelled":
+      return <XCircle className="w-5 h-5 text-red-500" />;
+    default:
+      return <Clock className="w-5 h-5 text-muted-foreground" />;
+  }
+};
+
+const getStatusBadge = (status: string) => {
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+    preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
+    ready: "px-6 py-3 capitalize ",
+    completed: "bg-red-200 px-6 py-3 capitalize text-red-800",
+    cancelled: "bg-black-200 px-6 py-3 capitalize text-black-800",
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-      pending: { variant: "secondary", label: "Pending" },
-      preparing: { variant: "default", label: "Preparing" },
-      ready: { variant: "default", label: "Ready" },
-      completed: { variant: "secondary", label: "Completed" },
-    };
-    const config = variants[status] || { variant: "secondary", label: status };
-    return (
-      <Badge variant={config.variant} className="px-3 py-1 text-sm">
-        {config.label}
-      </Badge>
-    );
-  };
+  const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3 ";
+
+  return (
+    <Badge variant="default" className={config}>
+      {status}
+    </Badge>
+  );
+};
   
   return (
     <div className="min-h-screen bg-background p-6">
