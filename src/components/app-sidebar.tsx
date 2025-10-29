@@ -136,9 +136,9 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={location === item.url}
-                      className={`flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
+                      className={`flex items-center gap-3 px-4 py-3 text-[15px] rounded-md transition-all duration-150 text-[#50BAA8] hover:bg-[#50BAA8] hover:text-white ${
                         location === item.url
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          ? "bg-[#50BAA8] text-white"
                           : ""
                       }`}
                       onClick={() => handleMenuClick(item.url)}

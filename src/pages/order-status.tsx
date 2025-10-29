@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import { queryClient } from "@/lib/queryClient";
 
 export default function OrderStatus() {
   const [, setLocation] = useLocation();

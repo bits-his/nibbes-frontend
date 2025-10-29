@@ -34,7 +34,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMenuItemSchema, menuItemFormSchema } from "@shared/schema";
 import { z } from "zod";
-import { apiRequest, BACKEND_URL } from "@/lib/queryClient";
+import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 import { log } from "console";
 
