@@ -86,20 +86,23 @@ export default function KitchenDisplay() {
     },
   });
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-      pending: { variant: "secondary", label: "Pending" },
-      preparing: { variant: "default", label: "Preparing" },
-      ready: { variant: "default", label: "Ready" },
-      completed: { variant: "secondary", label: "Completed" },
-    };
-    const config = variants[status] || { variant: "secondary", label: status };
-    return (
-      <Badge variant={config.variant} className="px-6 py-3 text-base font-semibold">
-        {config.label}
-      </Badge>
-    );
+const getStatusBadge = (status: string) => {
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+    preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
+    ready: "px-6 py-3 capitalize ",
+    completed: "bg-red-200 px-6 py-3 capitalize text-red-800",
+    cancelled: "bg-black-200 px-6 py-3 capitalize text-black-800",
   };
+
+  const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3 ";
+
+  return (
+    <Badge variant="default" className={config}>
+      {status}
+    </Badge>
+  );
+};
 
   const activeOrders = orders?.filter((order) => 
     order.status !== "completed" && order.status !== "cancelled"

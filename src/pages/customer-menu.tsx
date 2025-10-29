@@ -529,7 +529,7 @@ export default function CustomerMenu() {
       )}
 
       {/* QR Code Modal */}
-      {showQRCode && (
+      {/* {showQRCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="relative bg-white rounded-xl p-6 max-w-sm w-full mx-auto border">
             <Button
@@ -573,7 +573,7 @@ export default function CustomerMenu() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
