@@ -403,27 +403,28 @@ export default function CustomerMenu() {
             </div>
 
             <div className="flex items-center justify-between gap-2">
-              {/* Category Dropdown */}
-              <div className="relative flex-1">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full appearance-none bg-background border rounded-md py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
+              {/* Scrollable Category Buttons */}
+              <div className="flex-1 overflow-x-auto -mx-4 px-4 mr-[1px]">
+                <div className="flex gap-2 w-max">
                   {categories.map((category) => (
-                    <option key={category} value={category}>
+                    <Badge
+                      key={category}
+                      variant={selectedCategory === category ? "default" : "secondary"}
+                      className="cursor-pointer whitespace-nowrap px-4 py-2 hover-elevate flex-shrink-0"
+                      onClick={() => setSelectedCategory(category)}
+                      data-testid={`filter-mobile-${category.toLowerCase().replace(" ", "-")}`}
+                    >
                       {category}
-                    </option>
+                    </Badge>
                   ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                </div>
               </div>
 
               {/* Cart Button */}
               <Button
                 size="icon"
                 variant="default"
-                className="relative shrink-0"
+                className="relative shrink-0 ml-2"
                 onClick={() => setCartOpen(true)}
               >
                 <ShoppingCart className="w-5 h-5" />
