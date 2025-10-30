@@ -7,6 +7,7 @@ import {
   UtensilsCrossed,
   ClipboardList,
   LogOut,
+  LogIn,
 } from "lucide-react";
 import {
   Sidebar,
@@ -93,6 +94,10 @@ export function AppSidebar() {
 
   const handleLogout = () => {
     logout();
+    setLocation("/login", { replace: true });
+  };
+
+  const handleLogin = () => {
     setLocation("/login", { replace: true });
   };
 
@@ -202,11 +207,11 @@ export function AppSidebar() {
           </SidebarGroup>
         </div>
 
-        {/* === Bottom Section (Logout) === */}
-        {user && (
-          <div className="p-4 border-t border-white/20">
-            <SidebarMenu>
-              <SidebarMenuItem>
+        {/* === Bottom Section (Login/Logout) === */}
+        <div className="p-4 border-t border-white/20">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              {user ? (
                 <SidebarMenuButton
                   onClick={handleLogout}
                   className="group flex items-center gap-3 px-3 py-3 text-sm rounded-xl transition-all duration-200 bg-red-500/10 hover:bg-red-500/90 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-red-400/90 hover:text-white border border-white/10 hover:border-red-400/50"
@@ -216,10 +221,20 @@ export function AppSidebar() {
                   <div className="flex-1"></div>
                   <div className="w-2 h-2 bg-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
-        )}
+              ) : (
+                <SidebarMenuButton
+                  onClick={handleLogin}
+                  className="group flex items-center gap-3 px-3 py-3 text-sm rounded-xl transition-all duration-200 bg-green-500/10 hover:bg-green-500/90 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-green-400/90 hover:text-white border border-white/10 hover:border-green-400/50"
+                >
+                  <LogIn className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                  <span className="font-medium">Login</span>
+                  <div className="flex-1"></div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                </SidebarMenuButton>
+              )}
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </div>
       </SidebarContent>
     </Sidebar>
   );

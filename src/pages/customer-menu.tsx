@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ShoppingCart, Plus, Minus, X, MapPin, QrCode } from "lucide-react";
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  X,
+  MapPin,
+  QrCode,
+  Search,
+  ChevronDown,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem, CartItem } from "@shared/schema";
 import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
 import { queryClient } from "@/lib/queryClient";
@@ -18,15 +27,20 @@ export default function CustomerMenu() {
   const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>(() => {
     // Load cart from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      const savedCart = localStorage.getItem('cart');
+    if (typeof window !== "undefined") {
+      const savedCart = localStorage.getItem("cart");
       return savedCart ? JSON.parse(savedCart) : [];
     }
     return [];
   });
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartOpen, setCartOpen] = useState(false);
-  const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
+  const [locationData, setLocationData] = useState<{
+    latitude: number;
+    longitude: number;
+    address: string;
+  } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -46,12 +60,14 @@ export default function CustomerMenu() {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
       } else if (
-        data.type === "order_update" || 
-        data.type === "new_order" || 
+        data.type === "order_update" ||
+        data.type === "new_order" ||
         data.type === "order_status_change"
       ) {
         // Refresh active orders when there are changes
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/orders/active/customer"],
+        });
       }
     };
 
@@ -74,16 +90,26 @@ export default function CustomerMenu() {
     queryKey: ["/api/menu"],
   });
 
-  const categories = ["All", "Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"];
+  const categories = [
+    "All",
+    "Main Course",
+    "Appetizer",
+    "Dessert",
+    "Drinks",
+    "Snacks",
+  ];
 
   const filteredItems = menuItems?.filter(
-    (item) => selectedCategory === "All" || item.category === selectedCategory
+    (item) =>
+      (selectedCategory === "All" || item.category === selectedCategory) &&
+      (searchQuery === "" ||
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cart', JSON.stringify(cart));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("cart", JSON.stringify(cart));
     }
   }, [cart]);
 
@@ -162,28 +188,32 @@ export default function CustomerMenu() {
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
           const data = await response.json();
-          
-          const address = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-          
+
+          const address =
+            data.display_name ||
+            `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
           const locationInfo = { latitude, longitude, address };
           setLocationData(locationInfo);
-          
+
           // Store location in localStorage
           localStorage.setItem("location", JSON.stringify(locationInfo));
-          
+
           // Show success message
           alert(`Location detected: ${address}`);
         } catch (error) {
           console.error("Error getting address:", error);
           // If reverse geocoding fails, still store coordinates
-          const locationInfo = { 
-            latitude, 
-            longitude, 
-            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
+          const locationInfo = {
+            latitude,
+            longitude,
+            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
           };
           setLocationData(locationInfo);
           localStorage.setItem("location", JSON.stringify(locationInfo));
-          alert(`Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          alert(
+            `Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+          );
         } finally {
           setLocationLoading(false);
         }
@@ -192,7 +222,8 @@ export default function CustomerMenu() {
         let errorMessage = "";
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = "Location access denied. Please allow location access in your browser settings.";
+            errorMessage =
+              "Location access denied. Please allow location access in your browser settings.";
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage = "Location information is unavailable.";
@@ -215,7 +246,7 @@ export default function CustomerMenu() {
     if (locationData) {
       localStorage.setItem("location", JSON.stringify(locationData));
     }
-    
+
     setLocation("/checkout");
   };
 
@@ -238,7 +269,7 @@ export default function CustomerMenu() {
           <p className="text-xl text-white/90 mb-8">
             Authentic Nigerian cuisine delivered to your table
           </p>
-          
+
           {/* Location Section */}
           <div className="mb-6 p-4 rounded-lg bg-white/10 backdrop-blur-sm max-w-md mx-auto">
             <div className="flex flex-col items-center gap-3">
@@ -248,12 +279,16 @@ export default function CustomerMenu() {
                     <MapPin className="w-5 h-5 text-green-400" />
                     <span className="text-white font-medium">Location Set</span>
                   </div>
-                  <p className="text-white/80 text-sm line-clamp-2">{locationData.address}</p>
+                  <p className="text-white/80 text-sm line-clamp-2">
+                    {locationData.address}
+                  </p>
                 </div>
               ) : (
-                <p className="text-white/80 text-sm">Help us locate you for delivery</p>
+                <p className="text-white/80 text-sm">
+                  Help us locate you for delivery
+                </p>
               )}
-              
+
               <Button
                 size="sm"
                 variant="secondary"
@@ -274,9 +309,11 @@ export default function CustomerMenu() {
                   </>
                 )}
               </Button>
-              
+
               {locationError && (
-                <p className="text-red-300 text-sm text-center mt-2">{locationError}</p>
+                <p className="text-red-300 text-sm text-center mt-2">
+                  {locationError}
+                </p>
               )}
             </div>
           </div>
@@ -284,7 +321,11 @@ export default function CustomerMenu() {
             size="lg"
             variant="default"
             className="text-lg px-8 py-6 backdrop-blur-md bg-white/20 border-2 border-white/30 hover:bg-white/30"
-            onClick={() => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" })}
+            onClick={() =>
+              document
+                .getElementById("menu")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
             data-testid="button-browse-menu"
           >
             Browse Menu
@@ -292,11 +333,27 @@ export default function CustomerMenu() {
         </div>
       </section>
 
-      {/* Category Navigation */}
+      {/* Category Navigation and Search */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 overflow-x-auto">
+          {/* Desktop Layout */}
+          <div className="hidden md:flex items-center gap-4">
+            {/* Search Bar */}
+            <div className="flex-1 max-w-md">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search menu items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9"
+                  data-testid="input-search"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-x-auto min-w-0">
               <div className="flex gap-2">
                 {categories.map((category) => (
                   <Badge
@@ -311,16 +368,8 @@ export default function CustomerMenu() {
                 ))}
               </div>
             </div>
+
             <div className="flex gap-2">
-              {/* <Button
-                size="icon"
-                variant="outline"
-                className="shrink-0"
-                onClick={() => setShowQRCode(true)}
-                data-testid="button-qr-code"
-              >
-                <QrCode className="w-5 h-5" />
-              </Button> */}
               <Button
                 size="icon"
                 variant="default"
@@ -337,8 +386,58 @@ export default function CustomerMenu() {
               </Button>
             </div>
           </div>
+
+          {/* Mobile Layout */}
+          <div className="md:hidden space-y-3">
+            {/* Search Bar - Full width on mobile */}
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search menu items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9"
+                data-testid="input-search-mobile"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              {/* Category Dropdown */}
+              <div className="relative flex-1">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full appearance-none bg-background border rounded-md py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              </div>
+
+              {/* Cart Button */}
+              <Button
+                size="icon"
+                variant="default"
+                className="relative shrink-0"
+                onClick={() => setCartOpen(true)}
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+          </div>
         </div>
-      </div>
+     
 
       {/* Menu Grid */}
       <section id="menu" className="max-w-7xl mx-auto px-4 py-12">
@@ -359,11 +458,15 @@ export default function CustomerMenu() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems?.map((item) => {
-              const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
+              const isInCart = cart.some(
+                (cartItem) => cartItem.menuItem.id === item.id
+              );
               return (
                 <Card
                   key={item.id}
-                  className={`overflow-hidden hover-elevate transition-all cursor-pointer ${isInCart ? 'ring-2 ring-primary' : ''}`}
+                  className={`overflow-hidden hover-elevate transition-all cursor-pointer ${
+                    isInCart ? "ring-2 ring-primary" : ""
+                  }`}
                   onClick={() => {
                     if (item.available) {
                       addToCart(item);
@@ -385,13 +488,17 @@ export default function CustomerMenu() {
                   </div>
                   <CardContent className="p-6 space-y-4">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1">{item.name}</h3>
+                      <h3 className="text-lg font-semibold mb-1">
+                        {item.name}
+                      </h3>
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {item.description}
                       </p>
                     </div>
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-xl font-bold">₦{parseFloat(item.price).toLocaleString()}</span>
+                      <span className="text-xl font-bold">
+                        ₦{parseFloat(item.price).toLocaleString()}
+                      </span>
                       <Button
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent the card click event from firing when button is clicked
@@ -402,11 +509,20 @@ export default function CustomerMenu() {
                         variant={isInCart ? "secondary" : "default"}
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        {isInCart ? `Added (${cart.find(cartItem => cartItem.menuItem.id === item.id)?.quantity})` : "Add to Cart"}
+                        {isInCart
+                          ? `Added (${
+                              cart.find(
+                                (cartItem) => cartItem.menuItem.id === item.id
+                              )?.quantity
+                            })`
+                          : "Add to Cart"}
                       </Button>
                     </div>
                     {!item.available && (
-                      <Badge variant="secondary" className="w-full justify-center">
+                      <Badge
+                        variant="secondary"
+                        className="w-full justify-center"
+                      >
                         Currently Unavailable
                       </Badge>
                     )}
@@ -446,7 +562,10 @@ export default function CustomerMenu() {
                 </div>
               ) : (
                 cart.map((item) => (
-                  <Card key={item.menuItem.id} data-testid={`cart-item-${item.menuItem.id}`}>
+                  <Card
+                    key={item.menuItem.id}
+                    data-testid={`cart-item-${item.menuItem.id}`}
+                  >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex gap-3">
                         <img
@@ -455,7 +574,9 @@ export default function CustomerMenu() {
                           className="w-16 h-16 rounded-lg object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold truncate">{item.menuItem.name}</h4>
+                          <h4 className="font-semibold truncate">
+                            {item.menuItem.name}
+                          </h4>
                           <p className="text-sm text-muted-foreground">
                             ₦{parseFloat(item.menuItem.price).toLocaleString()}
                           </p>
@@ -479,7 +600,10 @@ export default function CustomerMenu() {
                         >
                           <Minus className="w-4 h-4" />
                         </Button>
-                        <span className="w-12 text-center font-medium" data-testid={`quantity-${item.menuItem.id}`}>
+                        <span
+                          className="w-12 text-center font-medium"
+                          data-testid={`quantity-${item.menuItem.id}`}
+                        >
                           {item.quantity}
                         </span>
                         <Button
@@ -495,7 +619,9 @@ export default function CustomerMenu() {
                       <Textarea
                         placeholder="Special instructions (optional)"
                         value={item.specialInstructions || ""}
-                        onChange={(e) => updateInstructions(item.menuItem.id, e.target.value)}
+                        onChange={(e) =>
+                          updateInstructions(item.menuItem.id, e.target.value)
+                        }
                         className="text-sm"
                         rows={2}
                         data-testid={`input-instructions-${item.menuItem.id}`}
@@ -511,7 +637,11 @@ export default function CustomerMenu() {
                 <div className="flex items-center justify-between text-lg">
                   <span className="font-semibold">Subtotal</span>
                   <span className="font-bold" data-testid="text-subtotal">
-                    ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₦
+                    {subtotal.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 <Button
