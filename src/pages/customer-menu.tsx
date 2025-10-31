@@ -58,7 +58,10 @@ export default function CustomerMenu() {
       const data = JSON.parse(event.data);
       if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
-        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu"] }).then(() => {
+          // After invalidation, refetch the menu data to ensure immediate update
+          queryClient.fetchQuery({ queryKey: ["/api/menu"] });
+        });
       } else if (
         data.type === "order_update" ||
         data.type === "new_order" ||
@@ -253,20 +256,21 @@ export default function CustomerMenu() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative h-[70vh] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[50vh] min-h-[300px] max-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
           <img
             src={heroImage}
             alt="Nibbles Kitchen"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
+            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-          <h1 className="font-serif text-5xl md:text-6xl font-bold text-white mb-4">
+          <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
             Order Fresh from Nibbles Kitchen
           </h1>
-          <p className="text-xl text-white/90 mb-8">
+          <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-8">
             Authentic Nigerian cuisine delivered to your table
           </p>
 
@@ -320,7 +324,7 @@ export default function CustomerMenu() {
           <Button
             size="lg"
             variant="default"
-            className="text-lg px-8 py-6 backdrop-blur-md bg-white/20 border-2 border-white/30 hover:bg-white/30"
+            className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 backdrop-blur-md bg-white/20 border-2 border-white/30 hover:bg-white/30"
             onClick={() =>
               document
                 .getElementById("menu")
