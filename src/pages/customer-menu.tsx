@@ -121,7 +121,7 @@ export default function CustomerMenu() {
         toast({
           title: "Quantity Increased",
           description: `${menuItem.name} quantity increased in cart.`,
-          duration: 1000, // 3 seconds
+          duration: 1000, 
         });
         return prev.map((item) =>
           item.menuItem.id === menuItem.id
@@ -132,7 +132,7 @@ export default function CustomerMenu() {
       toast({
         title: "Added to Cart",
         description: `${menuItem.name} has been added to your cart.`,
-        duration: 1000, // 3 seconds
+        duration: 1000, 
       });
       return [...prev, { menuItem, quantity: 1 }];
     });
