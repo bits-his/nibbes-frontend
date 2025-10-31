@@ -47,10 +47,22 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    // Retrieve token from localStorage (or wherever your app stores it)
+    const token = localStorage.getItem('token');
+    
     // Ensure the URL is properly formatted without double slashes
     const path = queryKey.join("/");
     const fullUrl = path.startsWith('/') ? `${BACKEND_URL}${path}` : `${BACKEND_URL}/${path}`;
+    
+    const headers: Record<string, string> = {};
+    
+    // Add authorization header if token exists
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const res = await fetch(fullUrl, {
+      headers,
       credentials: "include",
     });
 

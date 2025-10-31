@@ -65,7 +65,7 @@ export default function MenuManagement() {
       const data = JSON.parse(event.data);
       if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
-        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       } else if (
         data.type === "order_update" || 
         data.type === "new_order" || 
@@ -103,7 +103,7 @@ export default function MenuManagement() {
   });
 
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu"],
+    queryKey: ["/api/menu/all"],
   });
 
   const createMutation = useMutation({
@@ -111,7 +111,7 @@ export default function MenuManagement() {
       return await apiRequest("POST", "/api/menu", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       toast({
         title: "Success",
         description: "Menu item created successfully.",
@@ -132,7 +132,7 @@ export default function MenuManagement() {
       return await apiRequest("PATCH", `/api/menu/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       toast({
         title: "Success",
         description: "Menu item updated successfully.",
@@ -153,7 +153,7 @@ export default function MenuManagement() {
       return await apiRequest("DELETE", `/api/menu/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       toast({
         title: "Success",
         description: "Menu item deleted successfully.",
