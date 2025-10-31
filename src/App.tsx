@@ -21,6 +21,8 @@ import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import QRCodePage from "@/pages/qr-code";
+import ProfilePage from "@/pages/profile";
+import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import { useAuth } from "./hooks/useAuth";
 import { CartProvider } from "@/context/CartContext";
 
@@ -33,6 +35,8 @@ interface User {
   username: string;
   email: string;
   role: "admin" | "kitchen" | "customer";
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Create auth context
@@ -281,6 +285,24 @@ function Router() {
         component={() => (
           <ProtectedRoute allowedRoles={["admin"]}>
             <QRCodePage />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/profile"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin", "kitchen", "customer"]}>
+            <ProfilePage />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/customer-analytics"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <CustomerAnalyticsPage />
           </ProtectedRoute>
         )}
       />
