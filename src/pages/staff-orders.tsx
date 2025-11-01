@@ -35,13 +35,15 @@ export default function StaffOrders() {
   });
 
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu"],
+    queryKey: ["/api/menu/all"],
   });
 
   const categories = ["All", "Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"];
 
   const filteredItems = menuItems?.filter(
-    (item) => selectedCategory === "All" || item.category === selectedCategory
+    (item) =>
+      item.available && // Only show available items for walk-in orders
+      (selectedCategory === "All" || item.category === selectedCategory)
   );
 
   const addToCart = (menuItem: MenuItem) => {
@@ -164,7 +166,7 @@ export default function StaffOrders() {
         queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
-        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       }
     };
 

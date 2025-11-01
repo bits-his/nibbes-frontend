@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Users,
   ShoppingCart,
-  DollarSign,
   TrendingUp,
   RefreshCw,
   Search,
@@ -79,6 +78,9 @@ const CustomerAnalyticsPage: React.FC = () => {
     to: "",
   })
 
+  const [totalRevenue, setTotalRevenue] = useState<number>(0)
+  const [totalOrders, setTotalOrders] = useState<number>(0)
+
   useEffect(() => {
     loadCustomerAnalytics()
   }, [])
@@ -104,6 +106,13 @@ const CustomerAnalyticsPage: React.FC = () => {
       if (response.ok) {
         const result = await response.json()
         setCustomers(result.data)
+        const revenue = result.data.reduce(
+          (sum, customer) => sum + Number.parseFloat(customer.totalSpent.toString()),
+          0,
+        )
+        setTotalRevenue(revenue)
+        const orders = result.data.reduce((sum, customer) => sum + customer.totalOrders, 0)
+        setTotalOrders(orders)
       } else {
         toast({
           title: "Error",
@@ -205,12 +214,12 @@ const CustomerAnalyticsPage: React.FC = () => {
 
   const sortedCustomers = [...filteredCustomers].sort((a, b) => b.totalOrders - a.totalOrders)
 
-  const totalRevenue = customers.reduce((sum, customer) => sum + Number.parseFloat(customer.totalSpent.toString()), 0)
-  const totalOrders = customers.reduce((sum, customer) => sum + customer.totalOrders, 0)
   const topCustomer =
     customers.length > 0
       ? customers.reduce((top, customer) => (customer.totalOrders > top.totalOrders ? customer : top), customers[0])
       : null
+
+  const topFiveCustomers = [...customers].sort((a, b) => b.totalOrders - a.totalOrders).slice(0, 5)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -334,7 +343,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 overflow-hidden">
+              {/* <Card className="border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 overflow-hidden">
                 <div className="h-1.5 bg-gradient-to-r from-purple-500 to-pink-500"></div>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
@@ -348,7 +357,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-slate-500 mt-2">Lifetime value</p>
                 </CardContent>
-              </Card>
+              </Card> */}
 
               <Card className="border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 overflow-hidden">
                 <div className="h-1.5 bg-gradient-to-r from-amber-500 to-orange-500"></div>
@@ -366,6 +375,62 @@ const CustomerAnalyticsPage: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="border border-slate-200 shadow-sm overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 pb-5">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-xl text-slate-900">Top Five Customers</CardTitle>
+                    <CardDescription className="text-slate-600 mt-1">
+                      Your best customers by order count
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {topFiveCustomers.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {topFiveCustomers.map((customer, index) => (
+                      <div
+                        key={customer.id}
+                        className="p-4 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all duration-200"
+                      >
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{customer.customerName}</p>
+                            <p className="text-xs text-slate-500 truncate">{customer.customerEmail}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Orders:</span>
+                            <span className="font-semibold text-slate-900">{customer.totalOrders}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Spent:</span>
+                            <span className="font-semibold text-slate-900">
+                              ₦
+                              {Number.parseFloat(customer.totalSpent.toString()).toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-600 font-medium">No customers available</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <Card className="border border-slate-200 shadow-sm overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 pb-5">

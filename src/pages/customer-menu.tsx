@@ -58,10 +58,7 @@ export default function CustomerMenu() {
       const data = JSON.parse(event.data);
       if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
-        queryClient.invalidateQueries({ queryKey: ["/api/menu"] }).then(() => {
-          // After invalidation, refetch the menu data to ensure immediate update
-          queryClient.fetchQuery({ queryKey: ["/api/menu"] });
-        });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       } else if (
         data.type === "order_update" ||
         data.type === "new_order" ||
@@ -90,7 +87,7 @@ export default function CustomerMenu() {
   const [showQRCode, setShowQRCode] = useState(false);
 
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu"],
+    queryKey: ["/api/menu/all"],
   });
 
   const categories = [
@@ -104,6 +101,7 @@ export default function CustomerMenu() {
 
   const filteredItems = menuItems?.filter(
     (item) =>
+      item.available && // Only show available items to customers
       (selectedCategory === "All" || item.category === selectedCategory) &&
       (searchQuery === "" ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -256,7 +254,7 @@ export default function CustomerMenu() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative h-[50vh] min-h-[300px] max-h-[600px] flex items-center justify-center overflow-hidden">
+      <section className="relative sm:h-[70vh] h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
           <img
             src={heroImage}
@@ -362,10 +360,14 @@ export default function CustomerMenu() {
                 {categories.map((category) => (
                   <Badge
                     key={category}
-                    variant={selectedCategory === category ? "default" : "secondary"}
+                    variant={
+                      selectedCategory === category ? "default" : "secondary"
+                    }
                     className="cursor-pointer whitespace-nowrap px-4 py-2 hover-elevate"
                     onClick={() => setSelectedCategory(category)}
-                    data-testid={`filter-${category.toLowerCase().replace(" ", "-")}`}
+                    data-testid={`filter-${category
+                      .toLowerCase()
+                      .replace(" ", "-")}`}
                   >
                     {category}
                   </Badge>
@@ -413,10 +415,14 @@ export default function CustomerMenu() {
                   {categories.map((category) => (
                     <Badge
                       key={category}
-                      variant={selectedCategory === category ? "default" : "secondary"}
+                      variant={
+                        selectedCategory === category ? "default" : "secondary"
+                      }
                       className="cursor-pointer whitespace-nowrap px-4 py-2 hover-elevate flex-shrink-0"
                       onClick={() => setSelectedCategory(category)}
-                      data-testid={`filter-mobile-${category.toLowerCase().replace(" ", "-")}`}
+                      data-testid={`filter-mobile-${category
+                        .toLowerCase()
+                        .replace(" ", "-")}`}
                     >
                       {category}
                     </Badge>
@@ -440,9 +446,8 @@ export default function CustomerMenu() {
               </Button>
             </div>
           </div>
-          </div>
         </div>
-     
+      </div>
 
       {/* Menu Grid */}
       <section id="menu" className="max-w-7xl mx-auto px-4 py-12">

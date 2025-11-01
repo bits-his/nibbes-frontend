@@ -315,7 +315,7 @@ export default function MenuManagement() {
     <div className="min-h-screen bg-background">
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="font-serif text-4xl font-bold">Menu Management</h1>
+          <h1 className="font-serif text-2xl font-bold sm:text-4xl">Menu Management</h1>
           <Button
             onClick={() => handleOpenDialog()}
             data-testid="button-add-item"
