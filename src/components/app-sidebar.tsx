@@ -8,6 +8,8 @@ import {
   ClipboardList,
   LogOut,
   LogIn,
+  User,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -70,7 +72,9 @@ const menuItems: MenuItem[] = [
     roles: ["admin", "kitchen"],
   },
   { title: "User Management", url: "/users", icon: Users, roles: ["admin"] },
+  { title: "Customer Analytics", url: "/customer-analytics", icon: BarChart3, roles: ["admin"] },
   { title: "QR Code", url: "/qr-code", icon: ClipboardList, roles: ["admin"] },
+  { title: "Profile", url: "/profile", icon: User, roles: ["admin", "kitchen", "customer"] },
 ];
 
 const getMenuItems = (user: User | null) =>

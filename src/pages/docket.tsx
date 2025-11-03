@@ -104,7 +104,7 @@ const getStatusBadge = (status: string) => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div className="flex items-center gap-2 sm:gap-3">
             <ClipboardList className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Order Docket</h1>
+            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Order Ducket</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-normal">
             <Badge variant="outline" className="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base whitespace-nowrap">
