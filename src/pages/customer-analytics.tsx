@@ -7,18 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Users,
-  ShoppingCart,
-  TrendingUp,
-  RefreshCw,
-  Search,
-  User,
-  Package,
-  Calendar,
-  ChevronRight,
-  Zap,
-} from "lucide-react"
+import { Users, ShoppingCart, RefreshCw, Search, User, Package, Calendar, ChevronRight, Zap, Star } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { toast } from "@/hooks/use-toast"
 
@@ -78,9 +67,6 @@ const CustomerAnalyticsPage: React.FC = () => {
     to: "",
   })
 
-  const [totalRevenue, setTotalRevenue] = useState<number>(0)
-  const [totalOrders, setTotalOrders] = useState<number>(0)
-
   useEffect(() => {
     loadCustomerAnalytics()
   }, [])
@@ -106,13 +92,6 @@ const CustomerAnalyticsPage: React.FC = () => {
       if (response.ok) {
         const result = await response.json()
         setCustomers(result.data)
-        const revenue = result.data.reduce(
-          (sum, customer) => sum + Number.parseFloat(customer.totalSpent.toString()),
-          0,
-        )
-        setTotalRevenue(revenue)
-        const orders = result.data.reduce((sum, customer) => sum + customer.totalOrders, 0)
-        setTotalOrders(orders)
       } else {
         toast({
           title: "Error",
@@ -214,6 +193,9 @@ const CustomerAnalyticsPage: React.FC = () => {
 
   const sortedCustomers = [...filteredCustomers].sort((a, b) => b.totalOrders - a.totalOrders)
 
+  // const totalRevenue = customers.reduce((sum, customer) => sum + Number.parseFloat(customer.totalSpent.toString()), 0)
+
+  const totalOrders = customers.reduce((sum, customer) => sum + customer.totalOrders, 0)
   const topCustomer =
     customers.length > 0
       ? customers.reduce((top, customer) => (customer.totalOrders > top.totalOrders ? customer : top), customers[0])
@@ -343,94 +325,50 @@ const CustomerAnalyticsPage: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* <Card className="border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+              {topCustomer && (
+                <Card className="border border-amber-300 hover:shadow-lg hover:border-amber-400 transition-all duration-300 overflow-hidden bg-gradient-to-br from-amber-50 to-yellow-50">
+                  <div className="h-1.5 bg-gradient-to-r from-amber-500 to-yellow-500"></div>
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+                        <Star className="h-5 w-5 text-amber-600 fill-amber-600" />
+                        Top Customer
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-2 rounded-lg bg-white border border-amber-200 text-center hover:shadow-md transition">
+                      <p className="font-bold text-slate-900 text-base">{topCustomer.customerName}</p>
+                      <p className="text-xs text-slate-500 mt-1">{topCustomer.totalOrders} orders</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card className="border border-amber-300 hover:shadow-lg hover:border-amber-400 transition-all duration-300 overflow-hidden bg-gradient-to-br from-amber-50 to-yellow-50">
+                <div className="h-1.5 bg-gradient-to-r from-amber-500 to-yellow-500"></div>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-sm font-semibold text-slate-600">Total Revenue</CardTitle>
-                    <DollarSign className="h-5 w-5 text-purple-500" />
+                    <CardTitle className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+                      <Star className="h-5 w-5 text-amber-600 fill-amber-600" />
+                      Top 5 Customers
+                    </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-slate-900">
-                    ₦{totalRevenue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">Lifetime value</p>
-                </CardContent>
-              </Card> */}
-
-              <Card className="border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-amber-500 to-orange-500"></div>
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-sm font-semibold text-slate-600">Top Customer</CardTitle>
-                    <TrendingUp className="h-5 w-5 text-amber-500" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">
-                    {topCustomer ? topCustomer.customerName : "N/A"}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">{topCustomer ? topCustomer.totalOrders : 0} orders</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="border border-slate-200 shadow-sm overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-r from-purple-500 to-pink-500"></div>
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 pb-5">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-xl text-slate-900">Top Five Customers</CardTitle>
-                    <CardDescription className="text-slate-600 mt-1">
-                      Your best customers by order count
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {topFiveCustomers.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {topFiveCustomers.map((customer, index) => (
+                  <div className="grid grid-cols-2 gap-2">
+                    {topFiveCustomers.map((customer) => (
                       <div
                         key={customer.id}
-                        className="p-4 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all duration-200"
+                        className="p-2 rounded-lg bg-white border border-amber-200 hover:shadow-md transition text-center"
                       >
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">{customer.customerName}</p>
-                            <p className="text-xs text-slate-500 truncate">{customer.customerEmail}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">Orders:</span>
-                            <span className="font-semibold text-slate-900">{customer.totalOrders}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">Spent:</span>
-                            <span className="font-semibold text-slate-900">
-                              ₦
-                              {Number.parseFloat(customer.totalSpent.toString()).toLocaleString("en-US", {
-                                maximumFractionDigits: 0,
-                              })}
-                            </span>
-                          </div>
-                        </div>
+                        <p className="font-semibold text-slate-900 text-sm truncate">{customer.customerName}</p>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                    <p className="text-slate-600 font-medium">No customers available</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
             <Card className="border border-slate-200 shadow-sm overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 pb-5">

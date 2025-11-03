@@ -23,11 +23,14 @@ import ResetPassword from "@/pages/reset-password";
 import QRCodePage from "@/pages/qr-code";
 import ProfilePage from "@/pages/profile";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
+import AnalyticsPage from "@/pages/analytics";
 import { useAuth } from "./hooks/useAuth";
 import { CartProvider } from "@/context/CartContext";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
+import InventoryPage from "@/pages/inventory";
+import CustomerAnalyticsDashboard from "@/pages/customer-analytics-enhanced";
 
 // Define user type
 interface User {
@@ -303,6 +306,33 @@ function Router() {
         component={() => (
           <ProtectedRoute allowedRoles={["admin"]}>
             <CustomerAnalyticsPage />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/dashboard/analytics"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AnalyticsPage />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/inventory"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+            <InventoryPage />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/dashboard/customers"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <CustomerAnalyticsDashboard />
           </ProtectedRoute>
         )}
       />
