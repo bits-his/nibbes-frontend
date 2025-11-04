@@ -514,7 +514,7 @@ export default function CustomerAnalyticsDashboard() {
                     </TableHeader>
                     <TableBody>
                       {ltvData?.slice(0, 5).map((customer, index) => (
-                        <TableRow key={index}>
+                        <TableRow key={customer.customerEmail || `ltv-customer-${index}`}>
                           <TableCell className="font-medium">{customer.customerName}</TableCell>
                           <TableCell>{customer.customerEmail}</TableCell>
                           <TableCell>{customer.totalOrders}</TableCell>
@@ -552,7 +552,7 @@ export default function CustomerAnalyticsDashboard() {
                       </TableHeader>
                       <TableBody>
                         {customerSegments.highValue.map((customer, index) => (
-                          <TableRow key={index}>
+                          <TableRow key={customer.customerEmail || `high-value-${index}`}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>

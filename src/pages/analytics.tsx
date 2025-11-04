@@ -36,6 +36,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import DrillDownModal from '@/components/drill-down-modal';
 
 
 interface WebSocketMessage {
@@ -257,7 +258,7 @@ export default function AnalyticsDashboard() {
           { key: 'method', label: 'Payment Method' },
           { key: 'count', label: 'Transaction Count' },
           { key: 'amount', label: 'Total Amount (₦)' },
-          { key: 'percentage', label: 'Percentage (%)', render: (value: number) => `${value.toFixed(1)}%` },
+          { key: 'percentage', label: 'Percentage (%)', render: (value: number) => `${(Number(value) || 0).toFixed(1)}%` },
         ];
         break;
       case 'inventory':
@@ -427,7 +428,7 @@ export default function AnalyticsDashboard() {
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${(Number(percent) * 100 || 0).toFixed(0)}%`}
                     >
                       {paymentMethodData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -482,7 +483,7 @@ export default function AnalyticsDashboard() {
                   </TableHeader>
                   <TableBody>
                     {dashboardData.inventory.lowStockItems.map((item, index) => (
-                      <TableRow key={index}>
+                      <TableRow key={`${item.name}-${index}`}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.quantity}</TableCell>
                         <TableCell>{item.minThreshold}</TableCell>
