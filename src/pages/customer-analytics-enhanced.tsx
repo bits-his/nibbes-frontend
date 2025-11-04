@@ -160,9 +160,9 @@ export default function CustomerAnalyticsDashboard() {
         
         // Fetch all required data in parallel
         const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
-        const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] = 
+        const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] =
           await Promise.all([
-            fetch(`${BACKEND_URL}/api/analytics/customers-insights?from=${from}&to=${to}`, {
+            fetch(`${BACKEND_URL}/api/analytics/customers-stats?from=${from}&to=${to}`, {
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
@@ -192,7 +192,7 @@ export default function CustomerAnalyticsDashboard() {
                 'Content-Type': 'application/json'
               }
             }),
-            fetch(`${BACKEND_URL}/api/analytics/customers-insights?from=${from}&to=${to}`, {
+            fetch(`${BACKEND_URL}/api/analytics/customers/insights?from=${from}&to=${to}`, {
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
@@ -514,7 +514,7 @@ export default function CustomerAnalyticsDashboard() {
                     </TableHeader>
                     <TableBody>
                       {ltvData?.slice(0, 5).map((customer, index) => (
-                        <TableRow key={index}>
+                        <TableRow key={customer.customerEmail || `ltv-customer-${index}`}>
                           <TableCell className="font-medium">{customer.customerName}</TableCell>
                           <TableCell>{customer.customerEmail}</TableCell>
                           <TableCell>{customer.totalOrders}</TableCell>
@@ -552,7 +552,7 @@ export default function CustomerAnalyticsDashboard() {
                       </TableHeader>
                       <TableBody>
                         {customerSegments.highValue.map((customer, index) => (
-                          <TableRow key={index}>
+                          <TableRow key={customer.customerEmail || `high-value-${index}`}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>

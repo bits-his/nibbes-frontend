@@ -323,7 +323,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                     onChange={(e) => {
                       setDateRange({ ...dateRange, from: e.target.value })
                       if (selectedCustomer) {
-                        setTimeout(() => handleCustomerSelect(selectedCustomer.analytics.customerEmail), 100)
+                        setTimeout(() => handleCustomerSelect(selectedCustomer.analytics?.customerEmail), 100)
                       }
                     }}
                   />
@@ -337,7 +337,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                     onChange={(e) => {
                       setDateRange({ ...dateRange, to: e.target.value })
                       if (selectedCustomer) {
-                        setTimeout(() => handleCustomerSelect(selectedCustomer.analytics.customerEmail), 100)
+                        setTimeout(() => handleCustomerSelect(selectedCustomer.analytics?.customerEmail), 100)
                       }
                     }}
                   />
@@ -601,14 +601,14 @@ const CustomerAnalyticsPage: React.FC = () => {
                   <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100">
                     <div className="flex items-start gap-4">
                       <div className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-2xl">
-                        {selectedCustomer.analytics.customerName.charAt(0).toUpperCase()}
+                        {(selectedCustomer.analytics?.customerName || 'U').charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
                         <CardTitle className="text-2xl text-slate-900">
-                          {selectedCustomer.analytics.customerName}
+                          {selectedCustomer.analytics?.customerName || 'Unknown Customer'}
                         </CardTitle>
                         <CardDescription className="text-slate-600">
-                          {selectedCustomer.analytics.customerEmail}
+                          {selectedCustomer.analytics?.customerEmail || 'No email'}
                         </CardDescription>
                       </div>
                     </div>
@@ -617,13 +617,13 @@ const CustomerAnalyticsPage: React.FC = () => {
                     <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                         <p className="text-slate-600 text-sm font-medium mb-1">Total Orders</p>
-                        <p className="text-3xl font-bold text-slate-900">{selectedCustomer.analytics.totalOrders}</p>
+                        <p className="text-3xl font-bold text-slate-900">{selectedCustomer.analytics?.totalOrders || 0}</p>
                       </div>
                       <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                         <p className="text-slate-600 text-sm font-medium mb-1">Total Spent</p>
                         <p className="text-3xl font-bold text-slate-900">
                           ₦
-                          {Number.parseFloat(selectedCustomer.analytics.totalSpent.toString()).toLocaleString("en-US", {
+                          {Number.parseFloat((selectedCustomer.analytics?.totalSpent || 0).toString()).toLocaleString("en-US", {
                             maximumFractionDigits: 0,
                           })}
                         </p>
@@ -633,18 +633,20 @@ const CustomerAnalyticsPage: React.FC = () => {
                         <p className="text-3xl font-bold text-slate-900">
                           ₦
                           {(
-                            Number.parseFloat(selectedCustomer.analytics.totalSpent.toString()) /
-                              selectedCustomer.analytics.totalOrders || 0
+                            Number.parseFloat((selectedCustomer.analytics?.totalSpent || 0).toString()) /
+                              (selectedCustomer.analytics?.totalOrders || 1) || 0
                           ).toLocaleString("en-US", { maximumFractionDigits: 0 })}
                         </p>
                       </div>
                       <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                         <p className="text-slate-600 text-sm font-medium mb-1">Last Order</p>
                         <p className="text-2xl font-bold text-slate-900">
-                          {new Date(selectedCustomer.analytics.lastOrderDate).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {selectedCustomer.analytics?.lastOrderDate
+                            ? new Date(selectedCustomer.analytics.lastOrderDate).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "N/A"}
                         </p>
                       </div>
                     </div>
@@ -656,7 +658,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                     <CardTitle className="text-slate-900">Favorite Items</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    {selectedCustomer.analytics.favoriteItems && selectedCustomer.analytics.favoriteItems.length > 0 ? (
+                    {selectedCustomer.analytics?.favoriteItems && selectedCustomer.analytics.favoriteItems.length > 0 ? (
                       <div className="space-y-3">
                         {selectedCustomer.analytics.favoriteItems.map((item, index) => (
                           <div
@@ -704,61 +706,69 @@ const CustomerAnalyticsPage: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {selectedCustomer.orders.map((order) => (
-                            <TableRow key={order.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                              <TableCell className="font-bold text-slate-900 py-4">#{order.orderNumber}</TableCell>
-                              <TableCell className="text-slate-600">
-                                {new Date(order.createdAt).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "2-digit",
-                                })}
-                              </TableCell>
-                              <TableCell className="text-right font-semibold text-slate-900">
-                                ₦{order.totalAmount}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  className={
-                                    order.status === "completed"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : order.status === "cancelled"
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-amber-100 text-amber-700"
-                                  }
-                                >
-                                  {order.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  className={
-                                    order.paymentStatus === "paid"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : order.paymentStatus === "failed"
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-slate-100 text-slate-700"
-                                  }
-                                >
-                                  {order.paymentStatus}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {order.orderItems.slice(0, 2).map((item, index) => (
-                                    <Badge key={index} variant="outline" className="text-xs bg-slate-50">
-                                      {item.menuItemName}
-                                    </Badge>
-                                  ))}
-                                  {order.orderItems.length > 2 && (
-                                    <Badge variant="outline" className="text-xs bg-slate-50">
-                                      +{order.orderItems.length - 2}
-                                    </Badge>
-                                  )}
-                                </div>
+                          {selectedCustomer.orders && selectedCustomer.orders.length > 0 ? (
+                            selectedCustomer.orders.map((order) => (
+                              <TableRow key={order.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                                <TableCell className="font-bold text-slate-900 py-4">#{order.orderNumber}</TableCell>
+                                <TableCell className="text-slate-600">
+                                  {new Date(order.createdAt).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "2-digit",
+                                  })}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold text-slate-900">
+                                  ₦{order.totalAmount}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    className={
+                                      order.status === "completed"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : order.status === "cancelled"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-amber-100 text-amber-700"
+                                    }
+                                  >
+                                    {order.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    className={
+                                      order.paymentStatus === "paid"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : order.paymentStatus === "failed"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-slate-100 text-slate-700"
+                                    }
+                                  >
+                                    {order.paymentStatus}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-1">
+                                    {order.orderItems?.slice(0, 2).map((item, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs bg-slate-50">
+                                        {item.menuItemName}
+                                      </Badge>
+                                    ))}
+                                    {(order.orderItems?.length || 0) > 2 && (
+                                      <Badge variant="outline" className="text-xs bg-slate-50">
+                                        +{(order.orderItems?.length || 0) - 2}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                                No orders found
                               </TableCell>
                             </TableRow>
-                          ))}
+                          )}
                         </TableBody>
                       </Table>
                     </div>
