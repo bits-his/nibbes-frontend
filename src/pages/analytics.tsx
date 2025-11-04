@@ -36,7 +36,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import DrillDownModal from '@/components/drill-down-modal';
+
 
 interface WebSocketMessage {
   event: string;

@@ -160,9 +160,9 @@ export default function CustomerAnalyticsDashboard() {
         
         // Fetch all required data in parallel
         const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
-        const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] = 
+        const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] =
           await Promise.all([
-            fetch(`${BACKEND_URL}/api/analytics/customers-insights?from=${from}&to=${to}`, {
+            fetch(`${BACKEND_URL}/api/analytics/customers-stats?from=${from}&to=${to}`, {
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
@@ -192,7 +192,7 @@ export default function CustomerAnalyticsDashboard() {
                 'Content-Type': 'application/json'
               }
             }),
-            fetch(`${BACKEND_URL}/api/analytics/customers-insights?from=${from}&to=${to}`, {
+            fetch(`${BACKEND_URL}/api/analytics/customers/insights?from=${from}&to=${to}`, {
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
