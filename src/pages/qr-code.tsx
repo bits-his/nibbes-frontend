@@ -150,7 +150,7 @@ export default function QRCodePage() {
     
     let displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      const localIP = '192.168.1.136'; // Replace with actual IP in your environment
+      const localIP = 'https://server.brainstorm.ng/nibbleskitchen/'; // Replace with actual IP in your environment
       displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
     }
     
