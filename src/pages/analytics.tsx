@@ -135,7 +135,7 @@ export default function AnalyticsDashboard() {
       
       try {
         const { from, to } = getDateRange();
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
         const response = await fetch(`${BACKEND_URL}/api/analytics/dashboard?from=${from}&to=${to}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,

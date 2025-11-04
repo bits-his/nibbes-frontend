@@ -60,7 +60,7 @@ export default function InventoryManagement() {
       setError(null)
 
       try {
-        const itemsResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/inventory`, {
+        const itemsResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
@@ -184,7 +184,7 @@ export default function InventoryManagement() {
 
   const handleAddItem = async (itemData: Omit<InventoryItem, "id" | "createdAt" | "updatedAt">) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/inventory`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -221,7 +221,7 @@ export default function InventoryManagement() {
 
   const handleEditItem = async (itemData: InventoryItem) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/inventory/${itemData.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory/${itemData.id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

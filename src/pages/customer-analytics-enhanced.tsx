@@ -159,7 +159,7 @@ export default function CustomerAnalyticsDashboard() {
         const { from, to } = getDateRange();
         
         // Fetch all required data in parallel
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
         const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] =
           await Promise.all([
             fetch(`${BACKEND_URL}/api/analytics/customers-stats?from=${from}&to=${to}`, {

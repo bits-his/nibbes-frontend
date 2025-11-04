@@ -93,7 +93,7 @@ export default function DrillDownModal({
           to: now.toISOString().split('T')[0]
         };
 
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
         
         switch (dataType) {
           case 'top-items':
