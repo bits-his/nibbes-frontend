@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users } from "lucide-react"
+import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
 
@@ -28,13 +29,24 @@ interface User {
   createdAt: string
 }
 
+interface Permission {
+  id: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
+  const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
+  const [permissionsLoading, setPermissionsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({})
 
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
@@ -44,6 +56,7 @@ export default function UserManagement() {
   const [editUsername, setEditUsername] = useState("")
   const [editEmail, setEditEmail] = useState("")
   const [editRole, setEditRole] = useState<"admin" | "kitchen" | "customer">("customer")
+  const [selectedUserPermissions, setSelectedUserPermissions] = useState<string[]>([])
 
   const filteredUsers = useMemo(() => {
     if (!searchTerm) return users
@@ -56,6 +69,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers()
+    fetchPermissions()
   }, [])
 
   const fetchUsers = async () => {
@@ -72,6 +86,38 @@ export default function UserManagement() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPermissions = async () => {
+    try {
+      setPermissionsLoading(true)
+      const response = await apiRequest("GET", "/api/users-permissions")
+      const data = await response.json()
+      setPermissions(data)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch permissions",
+        variant: "destructive",
+      })
+    } finally {
+      setPermissionsLoading(false)
+    }
+  }
+
+  const fetchUserPermissions = async (userId: string) => {
+    try {
+      const response = await apiRequest("GET", `/api/users/${userId}/permissions`)
+      const data = await response.json()
+      return data.map((perm: Permission) => perm.name)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to fetch permissions for user ${userId}`,
+        variant: "destructive",
+      })
+      return []
     }
   }
 
@@ -130,11 +176,15 @@ export default function UserManagement() {
     }
   }
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = async (user: User) => {
     setEditingUser(user)
     setEditUsername(user.username)
     setEditEmail(user.email)
     setEditRole(user.role)
+    
+    // Fetch user's current permissions
+    const userPerms = await fetchUserPermissions(user.id)
+    setSelectedUserPermissions(userPerms)
     setShowEditModal(true)
   }
 
@@ -150,6 +200,9 @@ export default function UserManagement() {
         role: editRole,
       })
 
+      // Update user permissions
+      await updatePermissions(editingUser.id, selectedUserPermissions)
+
       toast({
         title: "Success",
         description: "User updated successfully",
@@ -160,6 +213,7 @@ export default function UserManagement() {
       setEditUsername("")
       setEditEmail("")
       setEditRole("customer")
+      setSelectedUserPermissions([])
 
       fetchUsers()
     } catch (error: any) {
@@ -169,6 +223,56 @@ export default function UserManagement() {
         variant: "destructive",
       })
     }
+  }
+
+  const updatePermissions = async (userId: string, newPermissions: string[]) => {
+    if (!editingUser) return;
+
+    // Get current permissions for this user
+    const currentPermissions = await fetchUserPermissions(userId)
+
+    // Find permissions to add
+    const permissionsToAdd = newPermissions.filter(perm => !currentPermissions.includes(perm))
+
+    // Find permissions to remove
+    const permissionsToRemove = currentPermissions.filter(perm => !newPermissions.includes(perm))
+
+    // Add new permissions
+    for (const permissionName of permissionsToAdd) {
+      try {
+        await apiRequest("POST", `/api/users/${userId}/permissions`, {
+          permissionName
+        })
+      } catch (error) {
+        console.error(`Failed to add permission ${permissionName} to user ${userId}:`, error)
+      }
+    }
+
+    // Remove permissions
+    for (const permissionName of permissionsToRemove) {
+      try {
+        await apiRequest("DELETE", `/api/users/${userId}/permissions`, {
+          permissionName
+        })
+      } catch (error) {
+        console.error(`Failed to remove permission ${permissionName} from user ${userId}:`, error)
+      }
+    }
+  }
+
+  const handlePermissionChange = (permissionName: string) => {
+    setSelectedUserPermissions(prev => {
+      if (prev.includes(permissionName)) {
+        return prev.filter(p => p !== permissionName)
+      } else {
+        return [...prev, permissionName]
+      }
+    })
+  }
+
+  // Function to check if a permission is currently assigned to the user
+  const isPermissionSelected = (permissionName: string) => {
+    return selectedUserPermissions.includes(permissionName);
   }
 
   const getRoleBadgeColor = (role: string) => {
@@ -397,13 +501,13 @@ export default function UserManagement() {
 
         {/* Edit Modal */}
         <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl">Edit User</DialogTitle>
               <DialogDescription>Update user details and permissions</DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleUpdateUser} className="space-y-5">
+            <form onSubmit={handleUpdateUser} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="edit-username" className="text-slate-700 font-medium">
                   Username
@@ -449,7 +553,53 @@ export default function UserManagement() {
                 </Select>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              {/* Permissions Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-slate-600" />
+                  <Label className="text-slate-700 font-medium">
+                    Permissions
+                  </Label>
+                </div>
+                
+                {permissionsLoading ? (
+                  <div className="flex items-center justify-center h-24">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-slate-200 border-t-[#50BAA8] rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-slate-600 text-sm">Loading permissions...</p>
+                    </div>
+                  </div>
+                ) : permissions.length === 0 ? (
+                  <p className="text-slate-500 text-sm">No permissions available</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-2 border border-slate-200 rounded-md">
+                    {permissions.map((permission) => (
+                      <div key={permission.id} className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded">
+                        <Checkbox
+                          id={`perm-${permission.id}`}
+                          checked={isPermissionSelected(permission.name)}
+                          onCheckedChange={() => handlePermissionChange(permission.name)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label
+                            htmlFor={`perm-${permission.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {permission.name}
+                          </Label>
+                          {permission.description && (
+                            <p className="text-xs text-slate-500">
+                              {permission.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>
                   Cancel
                 </Button>

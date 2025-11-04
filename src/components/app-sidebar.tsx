@@ -10,6 +10,7 @@ import {
   LogIn,
   User,
   BarChart3,
+  Package,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,7 +73,10 @@ const menuItems: MenuItem[] = [
     roles: ["admin", "kitchen"],
   },
   { title: "User Management", url: "/users", icon: Users, roles: ["admin"] },
+  { title: "Inventory Management", url: "/inventory", icon: Package, roles: ["admin", "kitchen"] },
+  { title: "Analytics & Reports", url: "/dashboard/analytics", icon: BarChart3, roles: ["admin"] },
   { title: "Customer Analytics", url: "/customer-analytics", icon: BarChart3, roles: ["admin"] },
+  { title: "Customer Insights", url: "/dashboard/customers", icon: BarChart3, roles: ["admin"] },
   { title: "QR Code", url: "/qr-code", icon: ClipboardList, roles: ["admin"] },
   { title: "Profile", url: "/profile", icon: User, roles: ["admin", "kitchen", "customer"] },
 ];
