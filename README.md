@@ -24,7 +24,7 @@ Replace `http://localhost:5050` with your actual backend URL.
 
 ## Development
 
-To start the development server, run:
+To start the development server, run:   
 
 ```bash
 npm run dev

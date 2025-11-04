@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,11 @@ interface OrderItem {
   price: string
 }
 
+interface WebSocketMessage {
+  event: string;
+  data: any;
+}
+
 interface Order {
   id: string
   customerName: string
@@ -67,9 +72,102 @@ const CustomerAnalyticsPage: React.FC = () => {
     to: "",
   })
 
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  // Load customer analytics and set up WebSocket
   useEffect(() => {
-    loadCustomerAnalytics()
-  }, [])
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams()
+        if (dateRange.from) params.append("from", dateRange.from)
+        if (dateRange.to) params.append("to", dateRange.to)
+
+        const queryString = params.toString()
+        const url = `/api/analytics/customers${queryString ? `?${queryString}` : ""}`
+
+        console.log("API call to:", url)
+        const response = await apiRequest("GET", url)
+        console.log("API response:", response)
+
+        if (response.ok) {
+          const result = await response.json()
+          setCustomerAnalytics(result.data)
+        } else {
+          toast({
+            title: "Error",
+            description: `Failed to load customer analytics: ${response.status}`,
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error loading customer analytics:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load customer analytics. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    };
+
+    // Connect to WebSocket for real-time updates
+    const connectWebSocket = () => {
+      try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        
+        wsRef.current = new WebSocket(wsUrl);
+        
+        wsRef.current.onopen = () => {
+          console.log('Customer Analytics WebSocket connected');
+        };
+        
+        wsRef.current.onmessage = (event) => {
+          const message: WebSocketMessage = JSON.parse(event.data);
+          
+          switch(message.event) {
+            case 'customer-analytics-update':
+              setCustomerAnalytics(message.data.analytics);
+              break;
+            case 'customer-order-added':
+              // Reload analytics when new order is added
+              fetchData();
+              break;
+            case 'customer-changed':
+              // Reload when customer data changes
+              fetchData();
+              break;
+            default:
+              console.log('Received unknown event:', message.event);
+          }
+        };
+        
+        wsRef.current.onclose = () => {
+          console.log('Customer Analytics WebSocket disconnected');
+          // Attempt to reconnect after 5 seconds
+          setTimeout(connectWebSocket, 5000);
+        };
+        
+        wsRef.current.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+      } catch (error) {
+        console.error('Error connecting to Customer Analytics WebSocket:', error);
+      }
+    };
+
+    fetchData();
+    connectWebSocket();
+
+    // Cleanup function
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [dateRange]);
 
   const handleDateRangeChange = (from: string, to: string) => {
     setDateRange({ from, to })

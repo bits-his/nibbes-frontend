@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -414,7 +414,12 @@ export default function UserManagement() {
         {/* Users Table Card */}
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-200 bg-slate-50">
-            <CardTitle className="text-xl text-slate-900">Users List</CardTitle>
+            <CardTitle className="text-xl text-slate-900 flex items-center space-x-2">
+              Users List
+              {/* <Badge variant="" className="text-slate-700 ml-2">
+                {filteredUsers.length}
+              </Badge> */}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (

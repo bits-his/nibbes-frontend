@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -50,7 +50,12 @@ import {
   AlertCircle
 } from "lucide-react";
 
-// Mock data types
+interface WebSocketMessage {
+  event: string;
+  data: any;
+}
+
+// Data types
 interface CustomerSegment {
   customerEmail: string;
   customerName: string;
@@ -99,7 +104,6 @@ interface CustomerOverviewData {
   avgOrderFrequency: number;
 }
 
-// Mock data
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d', '#ffc658'];
 
 export default function CustomerAnalyticsDashboard() {
@@ -111,73 +115,194 @@ export default function CustomerAnalyticsDashboard() {
   const [insights, setInsights] = useState<ActionableInsight[] | null>(null);
   const [dateRange, setDateRange] = useState('30');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Mock fetch data
+  // Calculate date range based on selection
+  const getDateRange = () => {
+    const now = new Date();
+    let from = new Date();
+    
+    switch(dateRange) {
+      case '7':
+        from.setDate(now.getDate() - 7);
+        break;
+      case '30':
+        from.setDate(now.getDate() - 30);
+        break;
+      case '90':
+        from.setDate(now.getDate() - 90);
+        break;
+      case '365':
+        from.setDate(now.getDate() - 365);
+        break;
+      default:
+        from.setDate(now.getDate() - 30);
+        break;
+    }
+    
+    return {
+      from: from.toISOString().split('T')[0],
+      to: now.toISOString().split('T')[0]
+    };
+  };
+
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  // Fetch customer analytics data from API and set up WebSocket
   useEffect(() => {
-    // Simulate API calls
-    setTimeout(() => {
-      const mockOverview: CustomerOverviewData = {
-        totalCustomers: 1250,
-        newCustomers: 45,
-        activeCustomers: 890,
-        churnRate: 8.5,
-        avgOrderFrequency: 3.2
-      };
+    const fetchAllData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const { from, to } = getDateRange();
+        
+        // Fetch all required data in parallel
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] = 
+          await Promise.all([
+            fetch(`${BACKEND_URL}/api/analytics/customers-insights?from=${from}&to=${to}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }),
+            fetch(`${BACKEND_URL}/api/analytics/customers/segments?from=${from}&to=${to}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }),
+            fetch(`${BACKEND_URL}/api/analytics/customers/engagement?from=${from}&to=${to}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }),
+            fetch(`${BACKEND_URL}/api/analytics/customers/ltv?from=${from}&to=${to}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }),
+            fetch(`${BACKEND_URL}/api/analytics/customers/recommendations?from=${from}&to=${to}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }),
+            fetch(`${BACKEND_URL}/api/analytics/customers-insights?from=${from}&to=${to}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            })
+          ]);
 
-      const mockSegments = {
-        highValue: [
-          { customerEmail: 'john.doe@example.com', customerName: 'John Doe', totalOrders: 25, totalSpent: '45000.00', avgOrderValue: '1800.00', lastOrderDate: '2025-10-29', firstOrderDate: '2024-05-15' },
-          { customerEmail: 'jane.smith@example.com', customerName: 'Jane Smith', totalOrders: 18, totalSpent: '32000.00', avgOrderValue: '1777.78', lastOrderDate: '2025-10-28', firstOrderDate: '2024-03-22' },
-        ],
-        mediumValue: [
-          { customerEmail: 'mike.johnson@example.com', customerName: 'Mike Johnson', totalOrders: 12, totalSpent: '15000.00', avgOrderValue: '1250.00', lastOrderDate: '2025-10-27', firstOrderDate: '2024-08-10' },
-          { customerEmail: 'sarah.williams@example.com', customerName: 'Sarah Williams', totalOrders: 10, totalSpent: '12000.00', avgOrderValue: '1200.00', lastOrderDate: '2025-10-26', firstOrderDate: '2024-07-05' },
-        ],
-        lowValue: [
-          { customerEmail: 'david.brown@example.com', customerName: 'David Brown', totalOrders: 3, totalSpent: '3500.00', avgOrderValue: '1166.67', lastOrderDate: '2025-10-25', firstOrderDate: '2024-09-18' },
-        ],
-        newCustomers: [
-          { customerEmail: 'new.customer@example.com', customerName: 'New Customer', totalOrders: 1, totalSpent: '1800.00', avgOrderValue: '1800.00', lastOrderDate: '2025-10-29', firstOrderDate: '2025-10-29' },
-        ]
-      };
+        // Check responses
+        if (!overviewRes.ok) throw new Error(`Overview API failed: ${overviewRes.status}`);
+        if (!segmentsRes.ok) throw new Error(`Segments API failed: ${segmentsRes.status}`);
+        if (!engagementRes.ok) throw new Error(`Engagement API failed: ${engagementRes.status}`);
+        if (!ltvRes.ok) throw new Error(`LTV API failed: ${ltvRes.status}`);
+        if (!recommendationsRes.ok) throw new Error(`Recommendations API failed: ${recommendationsRes.status}`);
+        if (!insightsRes.ok) throw new Error(`Insights API failed: ${insightsRes.status}`);
 
-      const mockEngagement: CustomerEngagement[] = [
-        { dayOfWeek: 1, hourOfDay: 9, orderCount: 12, totalRevenue: '21600.00' },
-        { dayOfWeek: 1, hourOfDay: 12, orderCount: 25, totalRevenue: '45000.00' },
-        { dayOfWeek: 1, hourOfDay: 18, orderCount: 18, totalRevenue: '32400.00' },
-        { dayOfWeek: 2, hourOfDay: 9, orderCount: 8, totalRevenue: '14400.00' },
-        { dayOfWeek: 2, hourOfDay: 12, orderCount: 22, totalRevenue: '39600.00' },
-        { dayOfWeek: 2, hourOfDay: 18, orderCount: 15, totalRevenue: '27000.00' },
-        // More data points...
-      ];
+        // Parse responses
+        const overviewData = await overviewRes.json();
+        const segmentsData = await segmentsRes.json();
+        const engagementData = await engagementRes.json();
+        const ltvData = await ltvRes.json();
+        const recommendationsData = await recommendationsRes.json();
+        const insightsData = await insightsRes.json();
 
-      const mockLTV: CustomerLTV[] = [
-        { customerEmail: 'john.doe@example.com', customerName: 'John Doe', totalOrders: 25, totalSpent: '45000.00', avgOrderValue: '1800.00', estimatedLTV: '350000.00' },
-        { customerEmail: 'jane.smith@example.com', customerName: 'Jane Smith', totalOrders: 18, totalSpent: '32000.00', avgOrderValue: '1777.78', estimatedLTV: '280000.00' },
-      ];
+        // Calculate overview metrics from insights data
+        const overviewMetrics: CustomerOverviewData = {
+          totalCustomers: segmentsData.data?.highValue?.length + 
+                         segmentsData.data?.mediumValue?.length + 
+                         segmentsData.data?.lowValue?.length + 
+                         segmentsData.data?.newCustomers?.length || 0,
+          newCustomers: segmentsData.data?.newCustomers?.length || 0,
+          activeCustomers: segmentsData.data?.highValue?.length + 
+                         segmentsData.data?.mediumValue?.length + 
+                         segmentsData.data?.lowValue?.length || 0,
+          churnRate: engagementData.data?.churnCount || 0,
+          avgOrderFrequency: segmentsData.data?.highValue?.reduce((sum: number, cust: any) => sum + cust.totalOrders, 0) / 
+                           (segmentsData.data?.highValue?.length || 1) || 0
+        };
 
-      const mockRecommendations: MenuRecommendation[] = [
-        { item1: 'Jollof Rice', item2: 'Grilled Chicken', frequency: 45 },
-        { item1: 'Fried Rice', item2: 'Beef Pepper Soup', frequency: 38 },
-        { item1: 'Plantain', item2: 'Goat Pepper Soup', frequency: 32 },
-      ];
+        setCustomerOverview(overviewMetrics);
+        setCustomerSegments(segmentsData.data);
+        setEngagementData(engagementData.data?.engagementHeatmap || []);
+        setLtvData(ltvData.data);
+        setRecommendations(recommendationsData.data?.frequentlyBoughtTogether || []);
+        setInsights(insightsData.data);
+      } catch (err) {
+        console.error('Error fetching customer analytics data:', err);
+        setError('Failed to load customer analytics data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const mockInsights: ActionableInsight[] = [
-        { id: 1, title: 'Revenue Performance', description: 'Strong revenue growth this month', priority: 'high', action: 'Continue marketing efforts' },
-        { id: 2, title: 'Customer Churn', description: 'Identified 15 inactive customers', priority: 'medium', action: 'Launch re-engagement campaign' },
-        { id: 3, title: 'Peak Ordering', description: 'Most orders between 12-2 PM', priority: 'low', action: 'Optimize kitchen staff during this time' },
-        { id: 4, title: 'Top Performer', description: 'Jollof Rice is the most ordered item', priority: 'high', action: 'Ensure adequate ingredients stock' },
-      ];
+    // Connect to WebSocket for real-time updates
+    const connectWebSocket = () => {
+      try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        
+        wsRef.current = new WebSocket(wsUrl);
+        
+        wsRef.current.onopen = () => {
+          console.log('Customer Analytics WebSocket connected');
+        };
+        
+        wsRef.current.onmessage = (event) => {
+          const message: WebSocketMessage = JSON.parse(event.data);
+          
+          switch(message.event) {
+            case 'customer-analytics-update':
+              // Reload all data when there's an update
+              fetchAllData();
+              break;
+            case 'customer-order-updated':
+            case 'customer-new-order':
+              // Reload data when orders change
+              fetchAllData();
+              break;
+            case 'customer-segment-changed':
+              // Update segment data specifically
+              // In a real app you would only update specific data but for now we'll reload everything
+              fetchAllData();
+              break;
+            default:
+              console.log('Received unknown event:', message.event);
+          }
+        };
+        
+        wsRef.current.onclose = () => {
+          console.log('Customer Analytics WebSocket disconnected');
+          // Attempt to reconnect after 5 seconds
+          setTimeout(connectWebSocket, 5000);
+        };
+        
+        wsRef.current.onerror = (error) => {
+          console.error('Customer Analytics WebSocket error:', error);
+        };
+      } catch (error) {
+        console.error('Error connecting to Customer Analytics WebSocket:', error);
+      }
+    };
 
-      setCustomerOverview(mockOverview);
-      setCustomerSegments(mockSegments);
-      setEngagementData(mockEngagement);
-      setLtvData(mockLTV);
-      setRecommendations(mockRecommendations);
-      setInsights(mockInsights);
-      setLoading(false);
-    }, 1000);
+    fetchAllData();
+    connectWebSocket();
+
+    // Cleanup function
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
   }, [dateRange]);
 
   // Prepare engagement data for charts
