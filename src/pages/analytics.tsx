@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -38,7 +38,12 @@ import {
 } from 'recharts';
 import DrillDownModal from '@/components/drill-down-modal';
 
-// Mock data types
+interface WebSocketMessage {
+  event: string;
+  data: any;
+}
+
+// Data types
 interface KPIData {
   revenue: string;
   orders: number;
@@ -74,13 +79,13 @@ interface DashboardData {
   inventory: InventoryData;
 }
 
-// Mock data
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function AnalyticsDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [dateRange, setDateRange] = useState('7');
+  const [dateRange, setDateRange] = useState('30');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [drillDownModal, setDrillDownModal] = useState({
     isOpen: false,
     title: '',
@@ -89,62 +94,148 @@ export default function AnalyticsDashboard() {
     columns: []
   });
 
-  // Mock fetch dashboard data
+  // Calculate date range based on selection
+  const getDateRange = () => {
+    const now = new Date();
+    let from = new Date();
+    
+    switch(dateRange) {
+      case '7':
+        from.setDate(now.getDate() - 7);
+        break;
+      case '30':
+        from.setDate(now.getDate() - 30);
+        break;
+      case '90':
+        from.setDate(now.getDate() - 90);
+        break;
+      case '365':
+        from.setDate(now.getDate() - 365);
+        break;
+      default:
+        from.setDate(now.getDate() - 30);
+        break;
+    }
+    
+    return {
+      from: from.toISOString().split('T')[0],
+      to: now.toISOString().split('T')[0]
+    };
+  };
+
+  // WebSocket for real-time updates
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  // Fetch dashboard data from API and set up WebSocket
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const mockData: DashboardData = {
-        kpis: {
-          revenue: '15420.50',
-          orders: 127,
-          avgOrderValue: '121.42',
-          profitEstimate: '4626.15'
-        },
-        charts: {
-          paymentMethods: {
-            'Cash': 45,
-            'Interswitch': 67,
-            'POS': 15
-          },
-          topItems: [
-            { name: 'Jollof Rice', quantity: 89, revenue: 8900 },
-            { name: 'Fried Rice', quantity: 76, revenue: 7600 },
-            { name: 'Chicken Platter', quantity: 65, revenue: 9750 },
-            { name: 'Beef Pepper Soup', quantity: 54, revenue: 4320 },
-            { name: 'Plantain', quantity: 120, revenue: 2400 }
-          ]
-        },
-        inventory: {
-          totalItems: 24,
-          lowStockItems: [
-            { name: 'Rice', quantity: 3, minThreshold: 5 },
-            { name: 'Chicken', quantity: 2, minThreshold: 4 },
-            { name: 'Beef', quantity: 1, minThreshold: 3 },
-            { name: 'Palm Oil', quantity: 0, minThreshold: 2 }
-          ]
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const { from, to } = getDateRange();
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const response = await fetch(`${BACKEND_URL}/api/analytics/dashboard?from=${from}&to=${to}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API call failed: ${response.status}`);
         }
-      };
-      setDashboardData(mockData);
-      setLoading(false);
-    }, 1000);
+        
+        const result = await response.json();
+        setDashboardData(result.data);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Connect to WebSocket
+    const connectWebSocket = () => {
+      try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        
+        wsRef.current = new WebSocket(wsUrl);
+        
+        wsRef.current.onopen = () => {
+          console.log('Analytics WebSocket connected');
+        };
+        
+        wsRef.current.onmessage = (event) => {
+          const message: WebSocketMessage = JSON.parse(event.data);
+          
+          switch(message.event) {
+            case 'analytics-update':
+              setDashboardData(message.data.dashboardData);
+              break;
+            case 'sales-change':
+              // Update sales-related data
+              setDashboardData(prev => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  kpis: {
+                    ...prev.kpis,
+                    revenue: message.data.newRevenue,
+                    orders: message.data.newOrderCount,
+                    avgOrderValue: message.data.newAvgOrderValue
+                  }
+                };
+              });
+              break;
+            case 'inventory-change':
+              // Update inventory data
+              setDashboardData(prev => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  inventory: message.data.inventory
+                };
+              });
+              break;
+            default:
+              console.log('Received unknown event:', message.event);
+          }
+        };
+        
+        wsRef.current.onclose = () => {
+          console.log('Analytics WebSocket disconnected');
+          // Attempt to reconnect after 5 seconds
+          setTimeout(connectWebSocket, 5000);
+        };
+        
+        wsRef.current.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+      } catch (error) {
+        console.error('Error connecting to WebSocket:', error);
+      }
+    };
+
+    fetchData();
+    connectWebSocket();
+
+    // Cleanup function
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
   }, [dateRange]);
 
   const openDrillDown = (dataType: 'top-items' | 'sales-trends' | 'payment-breakdown' | 'customer-analytics' | 'inventory', title: string) => {
-    let data = [];
+    // Define columns for different data types
     let columns = [];
 
     switch(dataType) {
       case 'top-items':
-        data = [
-          { name: 'Jollof Rice', quantity: 89, revenue: 8900, avgOrderValue: 100, category: 'Rice' },
-          { name: 'Fried Rice', quantity: 76, revenue: 7600, avgOrderValue: 100, category: 'Rice' },
-          { name: 'Chicken Platter', quantity: 65, revenue: 9750, avgOrderValue: 150, category: 'Protein' },
-          { name: 'Beef Pepper Soup', quantity: 54, revenue: 4320, avgOrderValue: 80, category: 'Soup' },
-          { name: 'Plantain', quantity: 120, revenue: 2400, avgOrderValue: 20, category: 'Side' },
-          { name: 'Grilled Chicken', quantity: 45, revenue: 6750, avgOrderValue: 150, category: 'Protein' },
-          { name: 'Fish Pepper Soup', quantity: 38, revenue: 3800, avgOrderValue: 100, category: 'Soup' },
-          { name: 'Eba', quantity: 92, revenue: 4600, avgOrderValue: 50, category: 'Swallow' },
-        ];
         columns = [
           { key: 'name', label: 'Item Name' },
           { key: 'quantity', label: 'Quantity Sold' },
@@ -154,15 +245,6 @@ export default function AnalyticsDashboard() {
         ];
         break;
       case 'sales-trends':
-        data = [
-          { date: '2025-10-01', revenue: 45000, orders: 25, avgOrderValue: 1800 },
-          { date: '2025-10-02', revenue: 52000, orders: 28, avgOrderValue: 1857 },
-          { date: '2025-10-03', revenue: 48000, orders: 26, avgOrderValue: 1846 },
-          { date: '2025-10-04', revenue: 61000, orders: 32, avgOrderValue: 1906 },
-          { date: '2025-10-05', revenue: 70000, orders: 38, avgOrderValue: 1842 },
-          { date: '2025-10-06', revenue: 58000, orders: 30, avgOrderValue: 1933 },
-          { date: '2025-10-07', revenue: 65000, orders: 35, avgOrderValue: 1857 },
-        ];
         columns = [
           { key: 'date', label: 'Date' },
           { key: 'revenue', label: 'Revenue (₦)' },
@@ -171,14 +253,6 @@ export default function AnalyticsDashboard() {
         ];
         break;
       case 'payment-breakdown':
-        data = [
-          { method: 'Cash', count: 45, amount: 90000, percentage: 27.3 },
-          { method: 'Interswitch', count: 67, amount: 134000, percentage: 40.6 },
-          { method: 'POS', count: 15, amount: 30000, percentage: 9.1 },
-          { method: 'Mobile Money', count: 8, amount: 16000, percentage: 4.8 },
-          { method: 'Bank Transfer', count: 12, amount: 24000, percentage: 7.3 },
-          { method: 'Credit Card', count: 7, amount: 14000, percentage: 4.2 },
-        ];
         columns = [
           { key: 'method', label: 'Payment Method' },
           { key: 'count', label: 'Transaction Count' },
@@ -187,14 +261,6 @@ export default function AnalyticsDashboard() {
         ];
         break;
       case 'inventory':
-        data = [
-          { name: 'Rice', quantity: 3, minThreshold: 5, unit: 'kg', category: 'Grains', supplier: 'Golden Farms', pricePerUnit: 1200 },
-          { name: 'Chicken', quantity: 2, minThreshold: 4, unit: 'kg', category: 'Meat', supplier: 'Farm Fresh', pricePerUnit: 2500 },
-          { name: 'Beef', quantity: 1, minThreshold: 3, unit: 'kg', category: 'Meat', supplier: 'Premium Meats', pricePerUnit: 3000 },
-          { name: 'Palm Oil', quantity: 0, minThreshold: 2, unit: 'liters', category: 'Oil', supplier: 'Nigerian Oil', pricePerUnit: 1800 },
-          { name: 'Onions', quantity: 15, minThreshold: 5, unit: 'kg', category: 'Vegetables', supplier: 'Green Valley', pricePerUnit: 400 },
-          { name: 'Tomatoes', quantity: 8, minThreshold: 10, unit: 'kg', category: 'Vegetables', supplier: 'Market Vendor', pricePerUnit: 300 },
-        ];
         columns = [
           { key: 'name', label: 'Item Name' },
           { key: 'quantity', label: 'Current Stock' },
@@ -206,13 +272,6 @@ export default function AnalyticsDashboard() {
         ];
         break;
       case 'customer-analytics':
-        data = [
-          { name: 'John Doe', email: 'john@example.com', orders: 25, spent: 45000, lastOrder: '2025-10-29', frequency: 3.2 },
-          { name: 'Jane Smith', email: 'jane@example.com', orders: 18, spent: 32000, lastOrder: '2025-10-28', frequency: 2.1 },
-          { name: 'Mike Johnson', email: 'mike@example.com', orders: 12, spent: 15000, lastOrder: '2025-10-27', frequency: 1.5 },
-          { name: 'Sarah Williams', email: 'sarah@example.com', orders: 10, spent: 12000, lastOrder: '2025-10-26', frequency: 1.2 },
-          { name: 'David Brown', email: 'david@example.com', orders: 8, spent: 9800, lastOrder: '2025-10-25', frequency: 0.9 },
-        ];
         columns = [
           { key: 'name', label: 'Customer Name' },
           { key: 'email', label: 'Email' },
@@ -228,7 +287,6 @@ export default function AnalyticsDashboard() {
       isOpen: true,
       title,
       dataType,
-      data,
       columns
     });
   };

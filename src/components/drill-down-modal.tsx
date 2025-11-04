@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -52,71 +52,173 @@ interface DrillDownModalProps {
   onClose: () => void;
   title: string;
   dataType: 'top-items' | 'sales-trends' | 'payment-breakdown' | 'customer-analytics' | 'inventory';
-  data: any[];
   columns: { key: string; label: string; render?: (value: any) => React.ReactNode }[];
 }
-
-// Mock data for different drill-down types
-const mockTopItemsData = [
-  { name: 'Jollof Rice', quantity: 120, revenue: 240000, avgOrderValue: 2000, category: 'Rice' },
-  { name: 'Fried Rice', quantity: 95, revenue: 190000, avgOrderValue: 2000, category: 'Rice' },
-  { name: 'Grilled Chicken', quantity: 80, revenue: 120000, avgOrderValue: 1500, category: 'Protein' },
-  { name: 'Beef Pepper Soup', quantity: 75, revenue: 150000, avgOrderValue: 2000, category: 'Soup' },
-  { name: 'Plantain', quantity: 150, revenue: 30000, avgOrderValue: 200, category: 'Side' },
-];
-
-const mockSalesTrendsData = [
-  { date: '2025-10-01', revenue: 45000, orders: 25 },
-  { date: '2025-10-02', revenue: 52000, orders: 28 },
-  { date: '2025-10-03', revenue: 48000, orders: 26 },
-  { date: '2025-10-04', revenue: 61000, orders: 32 },
-  { date: '2025-10-05', revenue: 70000, orders: 38 },
-  { date: '2025-10-06', revenue: 58000, orders: 30 },
-  { date: '2025-10-07', revenue: 65000, orders: 35 },
-];
-
-const mockPaymentBreakdownData = [
-  { method: 'Cash', count: 45, amount: 90000 },
-  { method: 'Interswitch', count: 67, amount: 134000 },
-  { method: 'POS', count: 15, amount: 30000 },
-  { method: 'Mobile Money', count: 8, amount: 16000 },
-];
-
-const mockCustomerAnalyticsData = [
-  { name: 'John Doe', email: 'john@example.com', orders: 25, spent: 45000, frequency: 3.2 },
-  { name: 'Jane Smith', email: 'jane@example.com', orders: 18, spent: 32000, frequency: 2.1 },
-  { name: 'Mike Johnson', email: 'mike@example.com', orders: 12, spent: 15000, frequency: 1.5 },
-  { name: 'Sarah Williams', email: 'sarah@example.com', orders: 10, spent: 12000, frequency: 1.2 },
-  { name: 'David Brown', email: 'david@example.com', orders: 8, spent: 9800, frequency: 0.9 },
-];
-
-const mockInventoryData = [
-  { name: 'Rice', quantity: 3, minThreshold: 5, unit: 'kg', category: 'Grains', supplier: 'Golden Farms', pricePerUnit: 1200 },
-  { name: 'Chicken', quantity: 2, minThreshold: 4, unit: 'kg', category: 'Meat', supplier: 'Farm Fresh', pricePerUnit: 2500 },
-  { name: 'Beef', quantity: 1, minThreshold: 3, unit: 'kg', category: 'Meat', supplier: 'Premium Meats', pricePerUnit: 3000 },
-  { name: 'Palm Oil', quantity: 0, minThreshold: 2, unit: 'liters', category: 'Oil', supplier: 'Nigerian Oil', pricePerUnit: 1800 },
-  { name: 'Onions', quantity: 15, minThreshold: 5, unit: 'kg', category: 'Vegetables', supplier: 'Green Valley', pricePerUnit: 400 },
-];
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d', '#ffc658'];
 
 export default function DrillDownModal({ 
   isOpen, 
   onClose, 
   title, 
   dataType, 
-  data = [],
   columns 
 }: DrillDownModalProps) {
+  const [data, setData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
+  // Fetch data based on dataType
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        let url = '';
+        let response;
+        
+        // Get date range from local storage or default to last 30 days
+        const now = new Date();
+        const from = new Date();
+        from.setDate(now.getDate() - 30);
+        const dateRange = {
+          from: from.toISOString().split('T')[0],
+          to: now.toISOString().split('T')[0]
+        };
+
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        
+        switch (dataType) {
+          case 'top-items':
+            url = `${BACKEND_URL}/api/analytics/top-items/detailed?from=${dateRange.from}&to=${dateRange.to}&detailed=true`;
+            response = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            break;
+          case 'sales-trends':
+            url = `${BACKEND_URL}/api/analytics/sales-summary/detailed?from=${dateRange.from}&to=${dateRange.to}&detailed=true`;
+            response = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            break;
+          case 'payment-breakdown':
+            url = `${BACKEND_URL}/api/analytics/payment-breakdown?from=${dateRange.from}&to=${dateRange.to}`;
+            response = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            break;
+          case 'inventory':
+            url = `${BACKEND_URL}/api/inventory`;
+            response = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            break;
+          case 'customer-analytics':
+            url = `${BACKEND_URL}/api/analytics/customers/segments?from=${dateRange.from}&to=${dateRange.to}`;
+            response = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            break;
+          default:
+            throw new Error(`Unknown data type: ${dataType}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(`API call failed: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        // Transform the data based on the type
+        let transformedData = [];
+        let chartDataTransformed = [];
+
+        switch (dataType) {
+          case 'top-items':
+            transformedData = result.data?.topItems || [];
+            chartDataTransformed = result.data?.topItems?.map((item: any) => ({
+              name: item.name,
+              Quantity: item.quantity,
+              Revenue: item.revenue
+            })) || [];
+            break;
+          case 'sales-trends':
+            transformedData = result.data?.detailed?.dailyTrends || [];
+            chartDataTransformed = result.data?.detailed?.dailyTrends?.map((item: any) => ({
+              name: item.date.split('-')[2], // Just the day
+              Revenue: item.dailyRevenue,
+              Orders: item.orderCount
+            })) || [];
+            break;
+          case 'payment-breakdown':
+            transformedData = result.data || [];
+            chartDataTransformed = result.data?.map((item: any) => ({
+              name: item.method,
+              Count: item.count,
+              Amount: item.amount
+            })) || [];
+            break;
+          case 'inventory':
+            transformedData = result.data?.inventoryItems || [];
+            chartDataTransformed = result.data?.inventoryItems?.map((item: any) => ({
+              name: item.name,
+              Quantity: item.quantity,
+              'Min Threshold': item.minThreshold
+            })) || [];
+            break;
+          case 'customer-analytics':
+            transformedData = result.data?.highValue || [];
+            chartDataTransformed = result.data?.highValue?.map((item: any) => ({
+              name: item.customerName,
+              'Total Orders': item.totalOrders,
+              'Total Spent': item.totalSpent
+            })) || [];
+            break;
+          default:
+            transformedData = [];
+            chartDataTransformed = [];
+        }
+
+        setData(transformedData);
+        setChartData(chartDataTransformed);
+      } catch (err) {
+        console.error('Error fetching drill-down data:', err);
+        setError('Failed to load data. Please try again later.');
+        setData([]);
+        setChartData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [isOpen, dataType]);
+
   // Apply sorting
   const sortedData = React.useMemo(() => {
-    if (!sortConfig) return data;
+    if (!sortConfig || !data.length) return data;
     
     return [...data].sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -167,33 +269,35 @@ export default function DrillDownModal({
     onClose();
   };
 
-  // Prepare chart data based on data type
-  const getChartData = () => {
-    switch (dataType) {
-      case 'top-items':
-        return mockTopItemsData.map(item => ({
-          name: item.name,
-          Quantity: item.quantity,
-          Revenue: item.revenue
-        }));
-      case 'sales-trends':
-        return mockSalesTrendsData.map(item => ({
-          name: item.date.split('-')[2], // Just the day
-          Revenue: item.revenue,
-          Orders: item.orders
-        }));
-      case 'payment-breakdown':
-        return mockPaymentBreakdownData.map(item => ({
-          name: item.method,
-          Count: item.count,
-          Amount: item.amount
-        }));
-      default:
-        return data;
-    }
-  };
+  if (loading) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[70vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center h-64">
+            <p>Loading data...</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-  const chartData = getChartData();
+  if (error) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[70vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center h-64 text-red-500">
+            <p>{error}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -358,3 +462,5 @@ export default function DrillDownModal({
     </Dialog>
   );
 }
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d', '#ffc658'];

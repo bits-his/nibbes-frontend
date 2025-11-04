@@ -125,7 +125,7 @@ export default function QRCodePage() {
   //     displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
   //     if (hostname === 'localhost' || hostname === '127.0.0.1') {
   //       // Replace localhost with a generic local IP
-  //       const localIP = '192.168.1.137'; // This should be replaced with actual IP detection
+  //       const localIP = '192.168.1.136'; // This should be replaced with actual IP detection
   //       displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
   //     }
   //   }
@@ -150,7 +150,7 @@ export default function QRCodePage() {
     
     let displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      const localIP = '192.168.1.137'; // Replace with actual IP in your environment
+      const localIP = '192.168.1.136'; // Replace with actual IP in your environment
       displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
     }
     
