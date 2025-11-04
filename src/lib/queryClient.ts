@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Update backend URL - use Vite's environment variable or default to localhost:5050
+// Update backend URL - use Vite's environment variable or default to production URL
 export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
 
 async function throwIfResNotOk(res: Response) {

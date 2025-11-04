@@ -92,7 +92,7 @@ const CustomerAnalyticsPage: React.FC = () => {
 
         if (response.ok) {
           const result = await response.json()
-          setCustomerAnalytics(result.data)
+          setCustomers(result.data || [])
         } else {
           toast({
             title: "Error",
