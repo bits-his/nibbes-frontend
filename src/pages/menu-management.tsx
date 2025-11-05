@@ -53,8 +53,7 @@ export default function MenuManagement() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
