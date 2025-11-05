@@ -200,7 +200,7 @@ const getStatusBadge = (status: string) => {
                       <Button
                         className="w-full"
                         size="lg"
-                        onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "preparing" })}
+                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "preparing" })}
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-start-${order.id}`}
                       >
@@ -211,7 +211,7 @@ const getStatusBadge = (status: string) => {
                       <Button
                         className="w-full"
                         size="lg"
-                        onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "ready" })}
+                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-ready-${order.id}`}
                       >
@@ -223,7 +223,7 @@ const getStatusBadge = (status: string) => {
                         className="w-full"
                         size="lg"
                         variant="secondary"
-                        onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "completed" })}
+                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "completed" })}
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-complete-${order.id}`}
                       >

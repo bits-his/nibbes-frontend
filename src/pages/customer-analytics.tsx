@@ -126,10 +126,10 @@ const CustomerAnalyticsPage: React.FC = () => {
         
         wsRef.current.onmessage = (event) => {
           const message: WebSocketMessage = JSON.parse(event.data);
-          
+
           switch(message.event) {
             case 'customer-analytics-update':
-              setCustomerAnalytics(message.data.analytics);
+              setCustomers(message.data.analytics || []);
               break;
             case 'customer-order-added':
               // Reload analytics when new order is added

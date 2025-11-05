@@ -122,9 +122,9 @@ export default function ForgotPassword() {
               
               <div className="mt-4 text-center text-sm text-muted-foreground">
                 Remember your password?{' '}
-                <Button 
-                  type="button" 
-                  variant="link" 
+                <Button
+                  type="button"
+                  variant="ghost"
                   className="p-0 h-auto"
                   onClick={() => setLocation('/login')}
                 >
@@ -199,9 +199,9 @@ export default function ForgotPassword() {
               </Button>
               
               <div className="mt-4 text-center text-sm text-muted-foreground">
-                <Button 
-                  type="button" 
-                  variant="link" 
+                <Button
+                  type="button"
+                  variant="ghost"
                   className="p-0 h-auto"
                   onClick={() => {
                     setShowPasswordInputs(false);

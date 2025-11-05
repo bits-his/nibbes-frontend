@@ -181,7 +181,7 @@ export default function MenuManagement() {
       });
       // Reset image states when editing an existing item
       setImageFile(null);
-      setImagePreviewUrl(item.imageUrl);
+      setImagePreviewUrl(item.imageUrl || null);
     } else {
       setEditingItem(null);
       form.reset({
@@ -296,8 +296,8 @@ export default function MenuManagement() {
       imageUrl: currentImageUrl, // Use the current value from the form
     };
 
-    if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data: finalValues });
+    if (editingItem && editingItem.id !== undefined) {
+      updateMutation.mutate({ id: String(editingItem.id), data: finalValues });
     } else {
       createMutation.mutate(finalValues);
     }
@@ -627,8 +627,8 @@ export default function MenuManagement() {
               type="button"
               variant="destructive"
               onClick={() => {
-                if (itemToDelete) {
-                  deleteMutation.mutate(itemToDelete.id);
+                if (itemToDelete && itemToDelete.id !== undefined) {
+                  deleteMutation.mutate(String(itemToDelete.id));
                   setDeleteDialogOpen(false);
                   setItemToDelete(null);
                 }

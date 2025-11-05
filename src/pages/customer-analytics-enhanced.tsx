@@ -80,6 +80,7 @@ interface CustomerLTV {
   totalSpent: string;
   avgOrderValue: string;
   estimatedLTV: string;
+  lastOrderDate: string;
 }
 
 interface MenuRecommendation {

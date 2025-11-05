@@ -87,11 +87,15 @@ export default function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState('30');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [drillDownModal, setDrillDownModal] = useState({
+  const [drillDownModal, setDrillDownModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    dataType: 'top-items' | 'sales-trends' | 'payment-breakdown' | 'customer-analytics' | 'inventory';
+    columns: { key: string; label: string; render?: (value: any) => React.ReactNode }[];
+  }>({
     isOpen: false,
     title: '',
-    dataType: 'top-items' as 'top-items' | 'sales-trends' | 'payment-breakdown' | 'customer-analytics' | 'inventory',
-    data: [],
+    dataType: 'top-items',
     columns: []
   });
 
@@ -522,7 +526,6 @@ export default function AnalyticsDashboard() {
         onClose={() => setDrillDownModal({...drillDownModal, isOpen: false})}
         title={drillDownModal.title}
         dataType={drillDownModal.dataType}
-        data={drillDownModal.data}
         columns={drillDownModal.columns}
       />
     </div>

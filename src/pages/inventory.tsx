@@ -88,7 +88,7 @@ export default function InventoryManagement() {
 
         const outOfStockItems = inventoryItems.filter((item: InventoryItem) => item.quantity === 0).length
 
-        const categories = [...new Set(inventoryItems.map((item: InventoryItem) => item.category))] as string[]
+        const categories = Array.from(new Set(inventoryItems.map((item: InventoryItem) => item.category))) as string[]
 
         setInventorySummary({
           totalItems,
@@ -396,7 +396,7 @@ export default function InventoryManagement() {
                 <Package className="h-5 w-5 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900">₦{new Intl.NumberFormat('en-NZ', { minimumFractionDigits: 2 }).format(Number.parseFloat(inventorySummary?.totalValue || 0))}</div>
+                <div className="text-3xl font-bold text-slate-900">₦{new Intl.NumberFormat('en-NZ', { minimumFractionDigits: 2 }).format(Number.parseFloat(inventorySummary?.totalValue || '0'))}</div>
                 <p className="text-xs text-slate-500 mt-1">Current inventory value</p>
               </CardContent>
             </Card>
