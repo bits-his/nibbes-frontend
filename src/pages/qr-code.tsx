@@ -27,20 +27,9 @@ export default function QRCodePage() {
       // Use the custom URL if provided
       displayUrl = customUrl;
     } else {
-      // Use the backend URL for production instead of the frontend URL
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
-      // Determine if it's a local development URL
-      const isLocalBackend = backendUrl.includes('localhost') || 
-                            backendUrl.includes('192.168') || 
-                            backendUrl.includes('127.0.0.1');
-      
-      if (isLocalBackend) {
-        // For local development, use the actual backend IP
-        displayUrl = backendUrl;
-      } else {
-        // For production, use the backend URL directly
-        displayUrl = backendUrl;
-      }
+      // Use the current origin (frontend URL) for the QR code instead of the backend URL
+      // This will use the netlify URL when deployed
+      displayUrl = window.location.origin;
     }
     
     setIpAddress(displayUrl);
@@ -111,26 +100,8 @@ export default function QRCodePage() {
   // const handleRefresh = async () => {
   //   await getActualIP();
     
-  //   // Refresh the QR code with current settings
-  //   let displayUrl: string;
-    
-  //   if (isUsingCustomUrl && customUrl) {
-  //     // Use the custom URL if provided
-  //     displayUrl = customUrl;
-  //   } else {
-  //     // Get the current origin (protocol + host) and generate QR code
-  //     const protocol = window.location.protocol;
-  //     const hostname = window.location.hostname;
-  //     const port = window.location.port;
-      
-  //     // If running on localhost, show the actual server IP instead of localhost
-  //     displayUrl = protocol + '//' + hostname + (port ? ':' + port : '');
-  //     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-  //       // Replace localhost with a generic local IP
-  //       const localIP = '192.168.1.136'; // This should be replaced with actual IP detection
-  //       displayUrl = protocol + '//' + localIP + (port ? ':' + port : '');
-  //     }
-  //   }
+  //   // Refresh the QR code with the current origin (frontend URL)
+  //   let displayUrl = window.location.origin;
     
   //   setIpAddress(displayUrl);
     
@@ -145,19 +116,8 @@ export default function QRCodePage() {
   const handleRefresh = async () => {
     await getActualIP();
     
-    // Refresh the QR code with the backend URL
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
-    // Determine if it's a local development URL
-    const isLocalBackend = backendUrl.includes('localhost') || 
-                          backendUrl.includes('192.168') || 
-                          backendUrl.includes('127.0.0.1');
-    
-    let displayUrl = backendUrl;
-    if (isLocalBackend) {
-      displayUrl = backendUrl;
-    } else {
-      displayUrl = backendUrl;
-    }
+    // Refresh the QR code with the current origin (frontend URL)
+    const displayUrl = window.location.origin;
     
     setIpAddress(displayUrl);
     

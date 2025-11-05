@@ -235,7 +235,7 @@ export default function UserManagement() {
     const permissionsToAdd = newPermissions.filter(perm => !currentPermissions.includes(perm))
 
     // Find permissions to remove
-    const permissionsToRemove = currentPermissions.filter(perm => !newPermissions.includes(perm))
+    const permissionsToRemove = currentPermissions.filter((perm: string) => !newPermissions.includes(perm))
 
     // Add new permissions
     for (const permissionName of permissionsToAdd) {

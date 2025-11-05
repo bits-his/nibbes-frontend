@@ -87,11 +87,15 @@ export default function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState('30');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [drillDownModal, setDrillDownModal] = useState({
+  const [drillDownModal, setDrillDownModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    dataType: 'top-items' | 'sales-trends' | 'payment-breakdown' | 'customer-analytics' | 'inventory';
+    columns: { key: string; label: string; render?: (value: any) => React.ReactNode }[];
+  }>({
     isOpen: false,
     title: '',
-    dataType: 'top-items' as 'top-items' | 'sales-trends' | 'payment-breakdown' | 'customer-analytics' | 'inventory',
-    data: [],
+    dataType: 'top-items',
     columns: []
   });
 
@@ -135,7 +139,7 @@ export default function AnalyticsDashboard() {
       
       try {
         const { from, to } = getDateRange();
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
         const response = await fetch(`${BACKEND_URL}/api/analytics/dashboard?from=${from}&to=${to}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -160,8 +164,7 @@ export default function AnalyticsDashboard() {
     // Connect to WebSocket
     const connectWebSocket = () => {
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
         
         wsRef.current = new WebSocket(wsUrl);
         
@@ -522,7 +525,6 @@ export default function AnalyticsDashboard() {
         onClose={() => setDrillDownModal({...drillDownModal, isOpen: false})}
         title={drillDownModal.title}
         dataType={drillDownModal.dataType}
-        data={drillDownModal.data}
         columns={drillDownModal.columns}
       />
     </div>

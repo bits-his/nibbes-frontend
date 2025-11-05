@@ -42,8 +42,7 @@ export default function OrderManagement() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
@@ -302,7 +301,10 @@ const getStatusBadge = (status: string) => {
                     initialFocus
                     mode="range"
                     defaultMonth={dateRange.from || undefined}
-                    selected={dateRange}
+                    selected={{
+                      from: dateRange.from || undefined,
+                      to: dateRange.to || undefined
+                    }}
                     onSelect={(range) => {
                       if (range) {
                         // If range is provided (even if same date for both from and to)
@@ -385,7 +387,7 @@ const getStatusBadge = (status: string) => {
                             <Select
                               value={order.status}
                               onValueChange={(status) =>
-                                updateStatusMutation.mutate({ orderId: order.id, status })
+                                updateStatusMutation.mutate({ orderId: String(order.id), status })
                               }
                             >
                               <SelectTrigger className="w-32" data-testid={`select-status-${order.id}`}>

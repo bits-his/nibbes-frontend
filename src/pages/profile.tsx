@@ -23,7 +23,7 @@ import {
   Bell,
   Palette
 } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, BACKEND_URL } from '@/lib/queryClient';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -119,27 +119,25 @@ const ProfilePage: React.FC = () => {
     setIsSaving(true);
     
     try {
-      const response = await apiRequest('/api/auth/me', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          phone: formData.phone
-        })
+      const response = await apiRequest('PATCH', '/api/auth/me', {
+        username: formData.username,
+        email: formData.email,
+        phone: formData.phone
       });
 
       if (response.ok) {
+        const data = await response.json();
         const updatedProfile = {
           ...profile,
-          username: response.user.username,
-          email: response.user.email,
-          phone: response.user.phone,
-          updatedAt: response.user.updatedAt
+          username: data.user.username,
+          email: data.user.email,
+          phone: data.user.phone,
+          updatedAt: data.user.updatedAt
         };
         setProfile(updatedProfile);
-        
+
         login(updatedProfile, localStorage.getItem('token') || '');
-        
+
         toast({
           title: 'Profile Updated',
           description: 'Your profile has been updated successfully.',
@@ -147,9 +145,10 @@ const ProfilePage: React.FC = () => {
         });
         setIsEditing(false);
       } else {
+        const errorData = await response.json();
         toast({
           title: 'Update Failed',
-          description: response.error || 'Failed to update profile',
+          description: errorData.error || 'Failed to update profile',
           variant: 'destructive',
         });
       }
@@ -177,12 +176,9 @@ const ProfilePage: React.FC = () => {
     setIsSaving(true);
     
     try {
-      const response = await apiRequest('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
+      const response = await apiRequest('POST', '/api/auth/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
       });
 
       if (response.ok) {
@@ -194,9 +190,10 @@ const ProfilePage: React.FC = () => {
         setShowChangePassword(false);
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
+        const errorData = await response.json();
         toast({
           title: 'Update Failed',
-          description: response.error || 'Failed to update password',
+          description: errorData.error || 'Failed to update password',
           variant: 'destructive',
         });
       }
@@ -231,13 +228,17 @@ const ProfilePage: React.FC = () => {
     formData.append('avatar', file);
 
     try {
-      const response = await apiRequest('/api/auth/avatar', {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BACKEND_URL}/api/auth/avatar`, {
         method: 'POST',
-        body: formData
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+        credentials: 'include'
       });
 
       if (response.ok) {
-        setProfile(prev => prev ? { ...prev, avatar: response.avatarUrl } : null);
+        const data = await response.json();
+        setProfile(prev => prev ? { ...prev, avatar: data.avatarUrl } : null);
         toast({
           title: 'Avatar Updated',
           description: 'Your profile picture has been updated.',

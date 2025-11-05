@@ -153,9 +153,9 @@ export default function ResetPassword() {
             </Button>
             
             <div className="mt-4 text-center text-sm text-muted-foreground">
-              <Button 
-                type="button" 
-                variant="link" 
+              <Button
+                type="button"
+                variant="ghost"
                 className="p-0 h-auto"
                 onClick={() => setLocation('/login')}
               >

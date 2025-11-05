@@ -60,7 +60,7 @@ export default function InventoryManagement() {
       setError(null)
 
       try {
-        const itemsResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/inventory`, {
+        const itemsResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
@@ -88,7 +88,7 @@ export default function InventoryManagement() {
 
         const outOfStockItems = inventoryItems.filter((item: InventoryItem) => item.quantity === 0).length
 
-        const categories = [...new Set(inventoryItems.map((item: InventoryItem) => item.category))] as string[]
+        const categories = Array.from(new Set(inventoryItems.map((item: InventoryItem) => item.category))) as string[]
 
         setInventorySummary({
           totalItems,
@@ -108,8 +108,7 @@ export default function InventoryManagement() {
     // Connect to WebSocket for real-time inventory updates
     const connectWebSocket = () => {
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
         
         wsRef.current = new WebSocket(wsUrl);
         
@@ -184,7 +183,7 @@ export default function InventoryManagement() {
 
   const handleAddItem = async (itemData: Omit<InventoryItem, "id" | "createdAt" | "updatedAt">) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/inventory`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -221,7 +220,7 @@ export default function InventoryManagement() {
 
   const handleEditItem = async (itemData: InventoryItem) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/inventory/${itemData.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory/${itemData.id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -396,7 +395,7 @@ export default function InventoryManagement() {
                 <Package className="h-5 w-5 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900">₦{new Intl.NumberFormat('en-NZ', { minimumFractionDigits: 2 }).format(Number.parseFloat(inventorySummary?.totalValue || 0))}</div>
+                <div className="text-3xl font-bold text-slate-900">₦{new Intl.NumberFormat('en-NZ', { minimumFractionDigits: 2 }).format(Number.parseFloat(inventorySummary?.totalValue || '0'))}</div>
                 <p className="text-xs text-slate-500 mt-1">Current inventory value</p>
               </CardContent>
             </Card>

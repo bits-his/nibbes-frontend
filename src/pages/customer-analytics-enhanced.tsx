@@ -80,6 +80,7 @@ interface CustomerLTV {
   totalSpent: string;
   avgOrderValue: string;
   estimatedLTV: string;
+  lastOrderDate: string;
 }
 
 interface MenuRecommendation {
@@ -159,7 +160,7 @@ export default function CustomerAnalyticsDashboard() {
         const { from, to } = getDateRange();
         
         // Fetch all required data in parallel
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
         const [overviewRes, segmentsRes, engagementRes, ltvRes, recommendationsRes, insightsRes] =
           await Promise.all([
             fetch(`${BACKEND_URL}/api/analytics/customers-stats?from=${from}&to=${to}`, {
@@ -248,8 +249,7 @@ export default function CustomerAnalyticsDashboard() {
     // Connect to WebSocket for real-time updates
     const connectWebSocket = () => {
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
         
         wsRef.current = new WebSocket(wsUrl);
         

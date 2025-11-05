@@ -3,6 +3,9 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // Update backend URL - use Vite's environment variable or default to production URL
 export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
 
+// WebSocket URL - use Vite's environment variable or default to production WebSocket URL
+export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

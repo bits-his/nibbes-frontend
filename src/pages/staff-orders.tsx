@@ -60,7 +60,7 @@ export default function StaffOrders() {
     });
   };
 
-  const updateQuantity = (menuItemId: string, delta: number) => {
+  const updateQuantity = (menuItemId: number, delta: number) => {
     setCart((prev) =>
       prev
         .map((item) =>
@@ -72,11 +72,11 @@ export default function StaffOrders() {
     );
   };
 
-  const removeFromCart = (menuItemId: string) => {
+  const removeFromCart = (menuItemId: number) => {
     setCart((prev) => prev.filter((item) => item.menuItem.id !== menuItemId));
   };
 
-  const updateInstructions = (menuItemId: string, instructions: string) => {
+  const updateInstructions = (menuItemId: number, instructions: string) => {
     setCart((prev) =>
       prev.map((item) =>
         item.menuItem.id === menuItemId
@@ -147,8 +147,7 @@ export default function StaffOrders() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
@@ -320,7 +319,7 @@ export default function StaffOrders() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={() => removeFromCart(item.menuItem.id)}
+                            onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
                             data-testid={`button-remove-${item.menuItem.id}`}
                           >
                             <X className="w-4 h-4" />
@@ -334,7 +333,7 @@ export default function StaffOrders() {
                               size="icon"
                               variant="outline"
                               className="h-8 w-8"
-                              onClick={() => updateQuantity(item.menuItem.id, -1)}
+                              onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
                               data-testid={`button-decrease-${item.menuItem.id}`}
                             >
                               <Minus className="w-3 h-3" />
@@ -347,7 +346,7 @@ export default function StaffOrders() {
                               size="icon"
                               variant="outline"
                               className="h-8 w-8"
-                              onClick={() => updateQuantity(item.menuItem.id, 1)}
+                              onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
                               data-testid={`button-increase-${item.menuItem.id}`}
                             >
                               <Plus className="w-3 h-3" />
@@ -361,7 +360,7 @@ export default function StaffOrders() {
                         <Textarea
                           placeholder="Special instructions"
                           value={item.specialInstructions || ""}
-                          onChange={(e) => updateInstructions(item.menuItem.id, e.target.value)}
+                          onChange={(e) => item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)}
                           className="text-sm"
                           rows={1}
                           data-testid={`input-instructions-${item.menuItem.id}`}

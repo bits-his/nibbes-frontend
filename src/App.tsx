@@ -38,6 +38,10 @@ interface User {
   username: string;
   email: string;
   role: "admin" | "kitchen" | "customer";
+  phone?: string;
+  avatar?: string;
+  notificationsEnabled?: boolean;
+  theme?: 'light' | 'dark' | 'system';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -346,7 +350,7 @@ function Router() {
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
-  const mainRef = useRef<HTMLMainElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     // Scroll to top of the main element whenever the location changes
