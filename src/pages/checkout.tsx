@@ -13,6 +13,7 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { CartItem } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { getSession } from "@/utils/session";
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
@@ -71,7 +72,7 @@ export default function Checkout() {
     resolver: zodResolver(checkoutFormSchema),
     defaultValues: {
       customerName: user?.username || "",
-      customerPhone: "",
+      customerPhone: user?.phone || "",
     },
   });
 
@@ -79,12 +80,23 @@ export default function Checkout() {
     // Wait for auth loading to complete
     if (loading) return; // Don't run this effect until loading is complete
     
-    // Check if user is authenticated
-    if (!user) {
+    // Use session utility to check current session
+    const session = getSession();
+    
+    // Check if there's a cart in localStorage
+    const savedCart = localStorage.getItem("cart");
+    if (!savedCart) {
+      // If no cart exists, redirect to home
+      setLocation("/");
+      return;
+    }
+    
+    // Only redirect to login if no user and no guest session exists
+    if (session.type === 'none') {
       // Save current cart to localStorage before redirecting
-      const savedCart = localStorage.getItem("cart");
-      if (savedCart) {
-        localStorage.setItem("pendingCheckoutCart", savedCart);
+      const cartToSave = localStorage.getItem("cart");
+      if (cartToSave) {
+        localStorage.setItem("pendingCheckoutCart", cartToSave);
       }
       
       // Redirect to login with a return URL to checkout
@@ -92,11 +104,9 @@ export default function Checkout() {
       return;
     }
     
-    const savedCart = localStorage.getItem("cart");
+    // Load the cart items
     if (savedCart) {
       setCart(JSON.parse(savedCart));
-    } else {
-      setLocation("/");
     }
     
     // Get location data from localStorage
@@ -110,11 +120,16 @@ export default function Checkout() {
       }
     }
     
-    // Prefill form with user data if available
-    if (user) {
+    // Prefill form with user data if available (only for logged-in users, not guests)
+    if (session.type === 'user' && user) {
       form.setValue("customerName", user.username || user.email); // Use username or email as name
       // Phone number is not available in user profile, so leave it empty for user to input
+    } else if (session.type === 'guest') {
+      // For guests, clear any pre-filled values and let them enter information manually
+      form.setValue("customerName", "");
+      form.setValue("customerPhone", "");
     }
+    // For guests, we don't prefill name or phone - they need to enter manually
   }, [user, loading, setLocation, form]);
 
   const subtotal = cart.reduce(
@@ -151,7 +166,9 @@ export default function Checkout() {
   });
 
   const onSubmit = (values: CheckoutFormValues) => {
-    const orderData = {
+    const session = getSession();
+
+    let orderData: any = {
       customerName: values.customerName,
       customerPhone: values.customerPhone,
       orderType: "online",
@@ -170,6 +187,15 @@ export default function Checkout() {
         specialInstructions: item.specialInstructions,
       })),
     };
+
+    // Add the appropriate ID based on session type
+    if (session.type === 'user') {
+      // For logged-in users, include userId
+      orderData.userId = session.id;
+    } else if (session.type === 'guest') {
+      // For guests, include guestId
+      orderData.guestId = session.id;
+    }
 
     createOrderMutation.mutate(orderData);
   };
@@ -212,7 +238,6 @@ export default function Checkout() {
                             <Input
                               placeholder="Enter your full name"
                               {...field}
-                              readOnly={!!user} // Read-only when user is authenticated
                               data-testid="input-name"
                             />
                           </FormControl>

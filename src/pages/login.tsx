@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { v4 as uuidv4 } from 'uuid';
 import { useState } from "react"
 import { useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,24 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login", { email, password })
       const data = await response.json()
 
+      // Check if there's a guest session that needs to be archived
+      const guestSession = localStorage.getItem('guestSession');
+      if (guestSession) {
+        try {
+          const sessionData = JSON.parse(guestSession);
+          if (sessionData.isGuest && sessionData.guestId) {
+            // Move the guestId to archivedGuestId
+            localStorage.setItem('archivedGuestId', sessionData.guestId);
+          }
+        } catch (parseError) {
+          console.error('Error parsing guest session:', parseError);
+        }
+        
+        // Remove guest session data after archiving
+        localStorage.removeItem('guestSession');
+      }
+
+      // Proceed with normal login
       login(data.user, data.token)
 
       switch (data.user.role) {
@@ -82,6 +100,26 @@ export default function Login() {
       const loginButton = document.querySelector('button[type="submit"]') as HTMLButtonElement
       if (loginButton) loginButton.focus()
     }, 100)
+  }
+
+  const handleContinueAsGuest = async () => {
+    try {
+      // Generate a unique guest ID
+      const guestId = uuidv4();
+      
+      // Store guest session in localStorage
+      localStorage.setItem('guestSession', JSON.stringify({
+        isGuest: true,
+        guestId,
+        timestamp: new Date().toISOString()
+      }));
+      
+      // Redirect to menu page
+      setLocation("/");
+    } catch (error) {
+      console.error("Error starting guest session:", error);
+      setError("Failed to start guest session. Please try again.");
+    }
   }
 
   return (
@@ -191,6 +229,15 @@ export default function Login() {
                 onClick={() => setLocation("/forgot-password")}
               >
                 Forgot your password?
+              </Button>
+
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full h-10 transition-all duration-200 hover:bg-secondary/80"
+                onClick={handleContinueAsGuest}
+              >
+                Continue as Guest
               </Button>
             </div>
           </CardFooter>

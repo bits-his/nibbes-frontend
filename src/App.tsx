@@ -222,11 +222,7 @@ function Router() {
       <Route path="/" component={CustomerMenu} />
       <Route
         path="/checkout"
-        component={() => (
-          <ProtectedRoute allowedRoles={["customer", "admin"]}>
-            <Checkout />
-          </ProtectedRoute>
-        )}
+        component={Checkout}
       />
       <Route
         path="/order-status"
@@ -281,11 +277,7 @@ function Router() {
       />
       <Route
         path="/docket"
-        component={() => (
-          <ProtectedRoute allowedRoles={["customer", "admin"]}>
-            <DucketDisplay />
-          </ProtectedRoute>
-        )}
+        component={DucketDisplay}
       />
       <Route
         path="/qr-code"
