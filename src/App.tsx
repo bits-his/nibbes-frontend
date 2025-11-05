@@ -38,6 +38,10 @@ interface User {
   username: string;
   email: string;
   role: "admin" | "kitchen" | "customer";
+  phone?: string;
+  avatar?: string;
+  notificationsEnabled?: boolean;
+  theme?: 'light' | 'dark' | 'system';
   createdAt?: string;
   updatedAt?: string;
 }
