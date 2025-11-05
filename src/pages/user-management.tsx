@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge } from "lucide-react"
+import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge, UserRound, ChefHat, UserCheck2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -43,6 +43,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [permissionsLoading, setPermissionsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState<string>("all") // Added role filter
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -59,11 +60,35 @@ export default function UserManagement() {
   const [selectedUserPermissions, setSelectedUserPermissions] = useState<string[]>([])
 
   const filteredUsers = useMemo(() => {
-    if (!searchTerm) return users
+    let result = users;
 
-    const term = searchTerm.toLowerCase()
-    return users.filter((user) => user.username.toLowerCase().includes(term) || user.email.toLowerCase().includes(term))
-  }, [users, searchTerm])
+    // Apply role filter
+    if (roleFilter !== "all") {
+      result = result.filter(user => user.role === roleFilter);
+    }
+
+    // Apply search term filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter((user) => user.username.toLowerCase().includes(term) || user.email.toLowerCase().includes(term));
+    }
+
+    return result;
+  }, [users, searchTerm, roleFilter])
+
+  // Calculate user statistics
+  const userStats = useMemo(() => {
+    const adminCount = users.filter(user => user.role === "admin").length;
+    const kitchenCount = users.filter(user => user.role === "kitchen").length;
+    const customerCount = users.filter(user => user.role === "customer").length;
+    
+    return {
+      total: users.length,
+      admin: adminCount,
+      kitchen: kitchenCount,
+      customer: customerCount
+    };
+  }, [users])
 
   const { toast } = useToast()
 
@@ -302,8 +327,67 @@ export default function UserManagement() {
           <p className="text-slate-600 ml-11">Manage users, roles, and permissions across your system</p>
         </div>
 
-        {/* Search and Action Bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
+        {/* User Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Total Users</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1">{userStats.total}</p>
+                </div>
+                <div className="p-3 bg-slate-100 rounded-full">
+                  <Users className="w-6 h-6 text-slate-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Admins</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-1">{userStats.admin}</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <UserRound className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Kitchen</p>
+                  <p className="text-3xl font-bold text-[#50BAA8] mt-1">{userStats.kitchen}</p>
+                </div>
+                <div className="p-3 bg-[#50BAA8]/10 rounded-full">
+                  <ChefHat className="w-6 h-6 text-[#50BAA8]" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Customers</p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">{userStats.customer}</p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <UserCheck2 className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search, Role Filter, and Action Bar */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-8">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
             <Input
@@ -313,6 +397,21 @@ export default function UserManagement() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-11 bg-white border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
             />
+          </div>
+
+          {/* Role Filter */}
+          <div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full lg:w-[180px] h-11 border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20">
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="kitchen">Kitchen</SelectItem>
+                <SelectItem value="customer">Customer</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
@@ -415,10 +514,11 @@ export default function UserManagement() {
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-200 bg-slate-50">
             <CardTitle className="text-xl text-slate-900 flex items-center space-x-2">
-              Users List
-              {/* <Badge variant="" className="text-slate-700 ml-2">
-                {filteredUsers.length}
-              </Badge> */}
+              <span>Users List</span>
+              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full border border-slate-200 text-slate-700 bg-slate-50">
+                {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} 
+                {roleFilter !== 'all' && ` (${roleFilter})`}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
