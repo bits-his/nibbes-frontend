@@ -115,8 +115,7 @@ const CustomerAnalyticsPage: React.FC = () => {
     // Connect to WebSocket for real-time updates
     const connectWebSocket = () => {
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}/ws`;
+        const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
         
         wsRef.current = new WebSocket(wsUrl);
         
