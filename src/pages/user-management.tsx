@@ -101,7 +101,7 @@ export default function UserManagement() {
     try {
       setLoading(true)
       const response = await apiRequest("GET", "/api/users")
-      const data = await response.json()
+      const data = await response.json(); const permissionsArray = Array.isArray(data) ? data : (data.permissions || [])
       setUsers(data)
     } catch (error: any) {
       toast({
@@ -117,9 +117,9 @@ export default function UserManagement() {
   const fetchPermissions = async () => {
     try {
       setPermissionsLoading(true)
-      const response = await apiRequest("GET", "/api/users-permissions")
-      const data = await response.json()
-      setPermissions(data)
+      const response = await apiRequest("GET", "/api/permissions")
+      const data = await response.json(); const permissionsArray = Array.isArray(data) ? data : (data.permissions || [])
+      setPermissions(permissionsArray)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -133,8 +133,8 @@ export default function UserManagement() {
 
   const fetchUserPermissions = async (userId: string) => {
     try {
-      const response = await apiRequest("GET", `/api/users/${userId}/permissions`)
-      const data = await response.json()
+      const response = await apiRequest("GET", `/api/permissions/user/${userId}`)
+      const data = await response.json(); const permissionsArray = Array.isArray(data) ? data : (data.permissions || [])
       return data.map((perm: Permission) => perm.name)
     } catch (error: any) {
       toast({
@@ -265,7 +265,7 @@ export default function UserManagement() {
     // Add new permissions
     for (const permissionName of permissionsToAdd) {
       try {
-        await apiRequest("POST", `/api/users/${userId}/permissions`, {
+        await apiRequest("POST", `/api/permissions/user/${userId}`, {
           permissionName
         })
       } catch (error) {
@@ -276,7 +276,7 @@ export default function UserManagement() {
     // Remove permissions
     for (const permissionName of permissionsToRemove) {
       try {
-        await apiRequest("DELETE", `/api/users/${userId}/permissions`, {
+        await apiRequest("DELETE", `/api/permissions/user/${userId}`, {
           permissionName
         })
       } catch (error) {

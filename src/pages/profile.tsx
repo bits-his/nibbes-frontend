@@ -664,7 +664,7 @@ const ProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600">Receive updates about your orders and account</p>
                     </div>
                   </div>
-                  <Switch 
+                  {/* <Switch 
                     checked={profile.notificationsEnabled} 
                     onCheckedChange={(checked) => setProfile(prev => prev ? {...prev, notificationsEnabled: checked} : null)}
                   />
@@ -678,7 +678,7 @@ const ProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600">Switch between light and dark themes</p>
                     </div>
                   </div>
-                  <Switch />
+                  <Switch /> */}
                 </div>
               </div>
             </CardContent>

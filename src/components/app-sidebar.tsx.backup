@@ -11,7 +11,6 @@ import {
   User,
   BarChart3,
   Package,
-  Store,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,7 +25,6 @@ import {
 } from "@/components/ui/sidebar";
 import React from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/queryClient";
 
 interface User {
   id: string;
@@ -40,7 +38,6 @@ interface MenuItem {
   url: string;
   icon: React.ElementType;
   roles: string[];
-  permissions?: string[]; // Optional permissions required
 }
 
 const menuItems: MenuItem[] = [
@@ -48,162 +45,60 @@ const menuItems: MenuItem[] = [
     title: "Customer Menu",
     url: "/",
     icon: Home,
-    roles: ["admin", "customer", "kitchen"],
-    permissions: ["create_orders"],
+    roles: ["admin", "customer"],
   },
-  { 
-    title: "Docket Display", 
-    url: "/docket", 
-    icon: Users, 
-    roles: ["customer", "admin"],
-    permissions: ["create_orders"],
-  },
+  { title: "Docket Display", url: "/docket", icon: Users, roles: ["customer"] },
   {
     title: "Kitchen Display",
     url: "/kitchen",
     icon: ChefHat,
-    roles: ["kitchen", "admin"],
-    permissions: ["manage_orders"],
+    roles: ["kitchen"],
   },
   {
     title: "Walk-in Orders",
     url: "/staff",
     icon: Users,
     roles: ["admin", "kitchen"],
-    permissions: ["create_orders", "manage_orders"],
   },
   {
     title: "Order Management",
     url: "/orders",
     icon: LayoutDashboard,
     roles: ["admin"],
-    permissions: ["manage_orders"],
   },
   {
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
     roles: ["admin", "kitchen"],
-    permissions: ["manage_menu"],
   },
-  { 
-    title: "User Management", 
-    url: "/users", 
-    icon: Users, 
-    roles: ["admin"],
-    permissions: ["manage_users"],
-  },
-  { 
-    title: "Sales Inventory", 
-    url: "/inventory", 
-    icon: Package, 
-    roles: ["admin", "kitchen"],
-    permissions: ["manage_inventory"],
-  },
-  { 
-    title: "Store Management", 
-    url: "/store-management", 
-    icon: Store, 
-    roles: ["admin", "kitchen"],
-    permissions: ["manage_store"],
-  },
-  { 
-    title: "Analytics & Reports", 
-    url: "/dashboard/analytics", 
-    icon: BarChart3, 
-    roles: ["admin"],
-    permissions: ["view_analytics"],
-  },
-  { 
-    title: "Customer Analytics", 
-    url: "/customer-analytics", 
-    icon: BarChart3, 
-    roles: ["admin"],
-    permissions: ["view_analytics"],
-  },
-  { 
-    title: "Customer Insights", 
-    url: "/dashboard/customers", 
-    icon: BarChart3, 
-    roles: ["admin"],
-    permissions: ["view_analytics"],
-  },
-  { 
-    title: "QR Code", 
-    url: "/qr-code", 
-    icon: ClipboardList, 
-    roles: ["admin"],
-    permissions: ["create_orders"],
-  },
-  { 
-    title: "Profile", 
-    url: "/profile", 
-    icon: User, 
-    roles: ["admin", "kitchen", "customer"] 
-  },
+  { title: "User Management", url: "/users", icon: Users, roles: ["admin"] },
+  { title: "Sales Inventory", url: "/inventory", icon: Package, roles: ["admin", "kitchen"] },
+  { title: "Analytics & Reports", url: "/dashboard/analytics", icon: BarChart3, roles: ["admin"] },
+  { title: "Customer Analytics", url: "/customer-analytics", icon: BarChart3, roles: ["admin"] },
+  { title: "Customer Insights", url: "/dashboard/customers", icon: BarChart3, roles: ["admin"] },
+  { title: "QR Code", url: "/qr-code", icon: ClipboardList, roles: ["admin"] },
+  { title: "Profile", url: "/profile", icon: User, roles: ["admin", "kitchen", "customer"] },
 ];
+
+const getMenuItems = (user: User | null) =>
+  user
+    ? menuItems.filter((item) => item.roles.includes(user.role))
+    : menuItems.filter((item) => item.roles.includes("customer"));
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const [loading, setLoading] = React.useState(true);
-  const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
   const [selectedUrl, setSelectedUrl] = React.useState(location);
   
-  // Fetch user permissions
-  React.useEffect(() => {
-    const fetchPermissions = async () => {
-      if (user) {
-        try {
-          const response = await apiRequest("GET", "/api/permissions/me");
-          const data = await response.json();
-          const perms = data.permissions?.map((p: any) => p.name) || [];
-          setUserPermissions(perms);
-        } catch (error) {
-          console.error("Failed to fetch permissions:", error);
-          setUserPermissions([]);
-        }
-      }
-      setLoading(false);
-    };
-
-    fetchPermissions();
-  }, [user]);
-
+  React.useEffect(() => setLoading(false), []);
   React.useEffect(() => {
     setSelectedUrl(location);
   }, [location]);
 
-  // Filter menu items by role AND permissions
-  const getMenuItems = (user: User | null, permissions: string[]) => {
-    if (!user) {
-      return menuItems.filter((item) => item.roles.includes("customer"));
-    }
-
-    // Admin sees everything
-    if (user.role === "admin") {
-      return menuItems;
-    }
-
-    return menuItems.filter((item) => {
-      // Check if user's role is allowed
-      if (!item.roles.includes(user.role)) {
-        return false;
-      }
-
-      // If item has permission requirements, check them
-      if (item.permissions && item.permissions.length > 0) {
-        // User needs at least one of the required permissions
-        return item.permissions.some(perm => permissions.includes(perm));
-      }
-
-      // No permission requirements, just role is enough
-      return true;
-    });
-  };
-
-  const availableMenuItems = getMenuItems(user, userPermissions);
+  const availableMenuItems = getMenuItems(user);
 
   const handleLogout = () => {
     logout();
@@ -265,11 +160,6 @@ export function AppSidebar() {
                   <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">
                     {user.role}
                   </p>
-                  {userPermissions.length > 0 && (
-                    <p className="text-[#50BAA8]/50 text-xs mt-1">
-                      {userPermissions.length} permissions
-                    </p>
-                  )}
                 </div>
               </div>
             )}

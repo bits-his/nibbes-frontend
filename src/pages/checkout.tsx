@@ -13,6 +13,7 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { CartItem } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { getGuestSession, clearGuestSession } from "@/lib/guestSession";
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
@@ -79,8 +80,9 @@ export default function Checkout() {
     // Wait for auth loading to complete
     if (loading) return; // Don't run this effect until loading is complete
     
-    // Check if user is authenticated
-    if (!user) {
+    // Check if user is authenticated OR has guest session
+    const guestSession = getGuestSession();
+    if (!user && !guestSession) {
       // Save current cart to localStorage before redirecting
       const savedCart = localStorage.getItem("cart");
       if (savedCart) {
@@ -110,10 +112,13 @@ export default function Checkout() {
       }
     }
     
-    // Prefill form with user data if available
+    // Prefill form with user data or guest data if available
     if (user) {
       form.setValue("customerName", user.username || user.email); // Use username or email as name
       // Phone number is not available in user profile, so leave it empty for user to input
+    } else if (guestSession) {
+      form.setValue("customerName", guestSession.guestName);
+      form.setValue("customerPhone", guestSession.guestPhone);
     }
   }, [user, loading, setLocation, form]);
 
@@ -151,10 +156,19 @@ export default function Checkout() {
   });
 
   const onSubmit = (values: CheckoutFormValues) => {
+    const guestSession = getGuestSession();
+    
     const orderData = {
       customerName: values.customerName,
       customerPhone: values.customerPhone,
       orderType: "online",
+      // Include guest session data if available
+      ...(guestSession && {
+        guestId: guestSession.guestId,
+        guestName: guestSession.guestName,
+        guestPhone: guestSession.guestPhone,
+        guestEmail: guestSession.guestEmail,
+      }),
       // Include location data if available
       ...(locationData && {
         location: {

@@ -318,7 +318,7 @@ export default function CustomerAnalyticsDashboard() {
       dayOfWeekRevenue[dataPoint.dayOfWeek] += parseFloat(dataPoint.totalRevenue);
     });
     
-    return Object.keys(dayOfWeekCounts).map(day => ({
+    return Object.keys(dayOfWeekCounts || {}).map(day => ({
       day: parseInt(day),
       dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][parseInt(day) - 1],
       orderCount: dayOfWeekCounts[parseInt(day)],
@@ -517,8 +517,8 @@ export default function CustomerAnalyticsDashboard() {
                         <TableRow key={customer.customerEmail || `ltv-customer-${index}`}>
                           <TableCell className="font-medium">{customer.customerName}</TableCell>
                           <TableCell>{customer.customerEmail}</TableCell>
-                          <TableCell>{customer.totalOrders}</TableCell>
-                          <TableCell>₦{customer.totalSpent}</TableCell>
+                          <TableCell>{customer.orderCount}</TableCell>
+                          <TableCell>₦{customer?.totalSpent}</TableCell>
                           <TableCell>₦{customer.estimatedLTV}</TableCell>
                           <TableCell>{customer.lastOrderDate}</TableCell>
                         </TableRow>
@@ -551,14 +551,20 @@ export default function CustomerAnalyticsDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {customerSegments.highValue.map((customer, index) => (
+                        {customerSegments.highValue && customerSegments.highValue.length > 0 ? customerSegments.highValue.map((customer, index) => (
                           <TableRow key={customer.customerEmail || `high-value-${index}`}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
-                            <TableCell>{customer.totalOrders}</TableCell>
+                            <TableCell>{customer.orderCount}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>
                             <TableCell>₦{customer.avgOrderValue}</TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                              No high value customers
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -581,14 +587,20 @@ export default function CustomerAnalyticsDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {customerSegments.mediumValue.map((customer, index) => (
+                        {customerSegments.mediumValue && customerSegments.mediumValue.length > 0 ? customerSegments.mediumValue.map((customer, index) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>
                             <TableCell>₦{customer.avgOrderValue}</TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                              No medium value customers
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -613,14 +625,20 @@ export default function CustomerAnalyticsDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {customerSegments.lowValue.map((customer, index) => (
+                        {customerSegments.lowValue && customerSegments.lowValue.length > 0 ? customerSegments.lowValue.map((customer, index) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>
                             <TableCell>₦{customer.avgOrderValue}</TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                              No low value customers
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -643,14 +661,20 @@ export default function CustomerAnalyticsDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {customerSegments.newCustomers.map((customer, index) => (
+                        {customerSegments.newCustomers && customerSegments.newCustomers.length > 0 ? customerSegments.newCustomers.map((customer, index) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>
                             <TableCell>{customer.firstOrderDate}</TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                              No new customers
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -779,14 +803,20 @@ export default function CustomerAnalyticsDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {ltvData.slice(0, 5).map((customer, index) => (
+                        {ltvData && ltvData.length > 0 ? ltvData.slice(0, 5).map((customer, index) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
                             <TableCell>₦{customer.totalSpent}</TableCell>
                             <TableCell>₦{customer.estimatedLTV}</TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                              No customer LTV data available
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -851,7 +881,7 @@ export default function CustomerAnalyticsDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recommendations.map((combo, index) => (
+                      {recommendations && recommendations.length > 0 ? recommendations.map((combo, index) => (
                         <TableRow key={index}>
                           <TableCell className="font-medium">{combo.item1}</TableCell>
                           <TableCell>{combo.item2}</TableCell>
@@ -860,7 +890,13 @@ export default function CustomerAnalyticsDashboard() {
                             <Badge variant="secondary">Bundle Offer</Badge>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                            No recommendation data available
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -907,39 +943,45 @@ export default function CustomerAnalyticsDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {insights.map((insight) => (
-                      <div 
-                        key={insight.id} 
-                        className={`p-4 rounded-lg border-l-4 ${
-                          insight.priority === 'high' 
-                            ? 'border-red-500 bg-red-50' 
-                            : insight.priority === 'medium' 
-                              ? 'border-yellow-500 bg-yellow-50' 
-                              : 'border-green-500 bg-green-50'
-                        }`}
-                      >
-                        <div className="flex items-start">
-                          <div className="mr-3">
-                            {insight.priority === 'high' ? (
-                              <AlertCircle className="h-5 w-5 text-red-500" />
-                            ) : (
-                              <Target className="h-5 w-5 text-green-500" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{insight.title}</h3>
-                            <p className="text-sm text-gray-600">{insight.description}</p>
-                            {insight.action && (
-                              <div className="mt-2">
-                                <Badge variant="outline" className="text-xs">
-                                  Action: {insight.action}
-                                </Badge>
-                              </div>
-                            )}
+                    {insights && insights.length > 0 ? (
+                      insights.map((insight) => (
+                        <div 
+                          key={insight.id} 
+                          className={`p-4 rounded-lg border-l-4 ${
+                            insight.priority === 'high' 
+                              ? 'border-red-500 bg-red-50' 
+                              : insight.priority === 'medium' 
+                                ? 'border-yellow-500 bg-yellow-50' 
+                                : 'border-green-500 bg-green-50'
+                          }`}
+                        >
+                          <div className="flex items-start">
+                            <div className="mr-3">
+                              {insight.priority === 'high' ? (
+                                <AlertCircle className="h-5 w-5 text-red-500" />
+                              ) : (
+                                <Target className="h-5 w-5 text-green-500" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold">{insight.title}</h3>
+                              <p className="text-sm text-gray-600">{insight.description}</p>
+                              {insight.action && (
+                                <div className="mt-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    Action: {insight.action}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No actionable insights available
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>

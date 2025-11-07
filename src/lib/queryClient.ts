@@ -1,10 +1,14 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Update backend URL - use Vite's environment variable or default to production URL
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+// Local Development Backend (currently active)
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.1.136:5050';
 
-// WebSocket URL - use Vite's environment variable or default to production WebSocket URL
-export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+// WebSocket URL for local development
+export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://192.168.1.136:5050/ws';
+
+// Online Production Backend (for switching - uncomment to use)
+// export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+// export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

@@ -171,6 +171,25 @@ export default function Login() {
             <div className="space-y-3 pt-2">
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-px bg-border"></div>
+                <span className="text-xs text-muted-foreground font-medium">Quick Checkout</span>
+                <div className="flex-1 h-px bg-border"></div>
+              </div>
+
+              <Button
+                type="button"
+                variant="default"
+                className="w-full h-11 font-semibold transition-all duration-200 hover:shadow-md bg-primary/90 hover:bg-primary"
+                onClick={() => setLocation("/guest-checkout")}
+              >
+                Continue as Guest
+              </Button>
+
+              <p className="text-xs text-center text-muted-foreground">
+                No account needed. Create one later to track orders.
+              </p>
+
+              <div className="flex items-center gap-2 pt-2">
+                <div className="flex-1 h-px bg-border"></div>
                 <span className="text-xs text-muted-foreground font-medium">New to Nibbles?</span>
                 <div className="flex-1 h-px bg-border"></div>
               </div>

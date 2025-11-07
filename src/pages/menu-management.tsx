@@ -98,6 +98,7 @@ export default function MenuManagement() {
       category: "Main Course",
       imageUrl: "",
       available: true,
+      quantity: "",
     },
   });
 
@@ -177,6 +178,7 @@ export default function MenuManagement() {
         category: item.category,
         imageUrl: item.imageUrl, // For existing items, we have an image URL
         available: item.available,
+        quantity: item.quantity || "",
       });
       // Reset image states when editing an existing item
       setImageFile(null);
@@ -190,6 +192,7 @@ export default function MenuManagement() {
         category: "Main Course",
         imageUrl: "", // Empty string for new items
         available: true,
+      quantity: "",
       });
       // Reset image states for new item
       setImageFile(null);
@@ -290,10 +293,16 @@ export default function MenuManagement() {
     }
 
     // Create or update menu item with the image URL from Cloudinary
+    const quantity = form.getValues('quantity');
+    console.log('Quantity from form:', quantity);
+    
     const finalValues = {
       ...values,
       imageUrl: currentImageUrl, // Use the current value from the form
+      quantity: quantity || undefined, // Explicitly include quantity
     };
+    
+    console.log('Final values being sent:', JSON.stringify(finalValues));
 
     if (editingItem && editingItem.id !== undefined) {
       updateMutation.mutate({ id: String(editingItem.id), data: finalValues });
@@ -453,7 +462,7 @@ export default function MenuManagement() {
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="price"
@@ -467,6 +476,26 @@ export default function MenuManagement() {
                           placeholder="0.00"
                           {...field}
                           data-testid="input-price"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="20"
+                          {...field}
+                          data-testid="input-quantity"
                         />
                       </FormControl>
                       <FormMessage />

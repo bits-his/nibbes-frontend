@@ -20,17 +20,20 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import GuestCheckout from "@/pages/guest-checkout";
 import QRCodePage from "@/pages/qr-code";
 import ProfilePage from "@/pages/profile";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import AnalyticsPage from "@/pages/analytics";
 import { useAuth } from "./hooks/useAuth";
 import { CartProvider } from "@/context/CartContext";
+import { getGuestSession } from "@/lib/guestSession";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
 import InventoryPage from "@/pages/inventory";
 import CustomerAnalyticsDashboard from "@/pages/customer-analytics-enhanced";
+import StoreManagement from "@/pages/store-management";
 
 // Define user type
 interface User {
@@ -214,20 +217,21 @@ function Router() {
         )}
       />
       <Route
+        path="/guest-checkout"
+        component={() => (
+          <PublicRoute>
+            <GuestCheckout />
+          </PublicRoute>
+        )}
+      />
+      <Route
         path="/unauthorized"
         component={() => <div className="p-6">Unauthorized Access</div>}
       />
 
       {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
-      <Route
-        path="/checkout"
-        component={() => (
-          <ProtectedRoute allowedRoles={["customer", "admin"]}>
-            <Checkout />
-          </ProtectedRoute>
-        )}
-      />
+      <Route path="/checkout" component={Checkout} />
       <Route
         path="/order-status"
         component={() => (
@@ -279,14 +283,7 @@ function Router() {
           </ProtectedRoute>
         )}
       />
-      <Route
-        path="/docket"
-        component={() => (
-          <ProtectedRoute allowedRoles={["customer", "admin"]}>
-            <DucketDisplay />
-          </ProtectedRoute>
-        )}
-      />
+      <Route path="/docket" component={DucketDisplay} />
       <Route
         path="/qr-code"
         component={() => (
@@ -331,6 +328,16 @@ function Router() {
           </ProtectedRoute>
         )}
       />
+
+      
+      <Route
+        path="/store-management"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+            <StoreManagement />
+          </ProtectedRoute>
+        )}
+      />
       
       <Route
         path="/dashboard/customers"
@@ -350,6 +357,7 @@ function Router() {
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
+  const guestSession = getGuestSession();
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -362,12 +370,13 @@ function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [location]);
 
-  // Don't show sidebar on login, signup, forgot password, and reset password pages
+  // Don't show sidebar on login, signup, forgot password, reset password, and guest checkout pages
   const showSidebar =
     location !== "/login" &&
     location !== "/signup" &&
     location !== "/forgot-password" &&
     location !== "/reset-password" &&
+    location !== "/guest-checkout" &&
     location !== "/unauthorized";
 
   return (
@@ -385,7 +394,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-[#50BAA8] font-medium">
-                {user ? user.email || user.username : "Guest"}
+                {user ? (user.email || user.username) : guestSession ? `${guestSession.guestName} (Guest)` : "Guest"}
               </div>
               <div className="text-[#50BAA8]">
                 <svg

@@ -86,17 +86,18 @@ export default function OrderManagement() {
         const fromDate = new Date(dateRange.from);
         fromDate.setHours(0, 0, 0, 0);
         params.append('from', fromDate.toISOString());
-      }
-      if (dateRange.to) {
-        // Set time to end of the day (23:59:59.999)
-        const toDate = new Date(dateRange.to);
+
+        // If no 'to' date is set, use the same date as 'from' (single day selection)
+        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
         toDate.setHours(23, 59, 59, 999);
         params.append('to', toDate.toISOString());
+
+        console.log(`📅 Frontend fetching orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
       }
-      
+
       const queryString = params.toString();
       const url = queryString ? `/api/orders?${queryString}` : '/api/orders';
-      
+
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -117,17 +118,16 @@ export default function OrderManagement() {
         const fromDate = new Date(dateRange.from);
         fromDate.setHours(0, 0, 0, 0);
         params.append('from', fromDate.toISOString());
-      }
-      if (dateRange.to) {
-        // Set time to end of the day (23:59:59.999)
-        const toDate = new Date(dateRange.to);
+
+        // If no 'to' date is set, use the same date as 'from' (single day selection)
+        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
         toDate.setHours(23, 59, 59, 999);
         params.append('to', toDate.toISOString());
       }
-      
+
       const queryString = params.toString();
       const url = queryString ? `/api/orders/stats?${queryString}` : '/api/orders/stats';
-      
+
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -297,6 +297,22 @@ const getStatusBadge = (status: string) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
+                  <div className="p-3 border-b">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        const today = new Date();
+                        setDateRange({
+                          from: new Date(today.setHours(0, 0, 0, 0)),
+                          to: new Date(today.setHours(23, 59, 59, 999))
+                        });
+                      }}
+                    >
+                      Reset to Today
+                    </Button>
+                  </div>
                   <Calendar
                     initialFocus
                     mode="range"

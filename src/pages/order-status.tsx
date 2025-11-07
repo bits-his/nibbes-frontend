@@ -101,6 +101,24 @@ export default function OrderStatus() {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    const statusColors: Record<string, string> = {
+      pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+      preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
+      ready: "px-6 py-3 capitalize",
+      completed: "bg-red-200 px-6 py-3 capitalize text-red-800",
+      cancelled: "bg-black-200 px-6 py-3 capitalize text-black-800",
+    };
+
+    const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3";
+
+    return (
+      <Badge variant="default" className={config}>
+        {status}
+      </Badge>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
@@ -137,9 +155,9 @@ export default function OrderStatus() {
                 <div className="flex items-center gap-4 p-6 bg-muted rounded-lg">
                   {getStatusIcon(order.status)}
                   <div className="flex-1">
-                    <Badge variant="default" className="mb-2 capitalize">
-                      {order.status}
-                    </Badge>
+                    <div className="mb-2">
+                      {getStatusBadge(order.status)}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {getStatusMessage(order.status)}
                     </p>
