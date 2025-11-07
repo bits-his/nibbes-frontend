@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,11 +24,17 @@ interface StoreItem {
   category: string
 }
 
+interface WebSocketMessage {
+  type: string;
+  data: any;
+}
+
 export default function StoreManagement() {
   const [items, setItems] = useState<StoreItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const { toast } = useToast()
+  const wsRef = useRef<WebSocket | null>(null);
 
   const [formData, setFormData] = useState({
     itemCode: "",
@@ -41,6 +46,58 @@ export default function StoreManagement() {
     costPrice: 0,
     category: "",
   })
+
+  // Set up WebSocket to receive real-time updates for store items
+  useEffect(() => {
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log("Store Management WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const message: WebSocketMessage = JSON.parse(event.data);
+      
+      switch(message.type) {
+        case 'inventory_update':
+        case 'store_item_update':
+        case 'stock_movement':
+        case 'order_completed':
+          // Refresh store items when inventory changes
+          fetchItems();
+          break;
+        default:
+          console.log('Store Management WebSocket received unknown event:', message.type);
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("Store Management WebSocket error:", error);
+    };
+
+    socket.onclose = () => {
+      console.log("Store Management WebSocket disconnected");
+      // Attempt to reconnect after 5 seconds
+      setTimeout(() => {
+        if (typeof document !== 'undefined' && !document.hidden) {
+          // Only reconnect if the page is visible to the user
+          const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+          const newSocket = new WebSocket(wsUrl);
+          wsRef.current = newSocket;
+        }
+      }, 5000);
+    };
+
+    wsRef.current = socket;
+
+    // Cleanup function to close the WebSocket connection
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchItems()
