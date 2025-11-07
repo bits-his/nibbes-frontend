@@ -60,10 +60,11 @@ interface CustomerSegment {
   customerEmail: string;
   customerName: string;
   totalOrders: number;
+  orderCount: number;
   totalSpent: string;
   avgOrderValue: string;
-  lastOrderDate: string;
-  firstOrderDate: string;
+  lastOrderDate: string | null;
+  firstOrderDate: string | null;
 }
 
 interface CustomerEngagement {
@@ -77,10 +78,11 @@ interface CustomerLTV {
   customerEmail: string;
   customerName: string;
   totalOrders: number;
+  orderCount: number;
   totalSpent: string;
   avgOrderValue: string;
   estimatedLTV: string;
-  lastOrderDate: string;
+  lastOrderDate: string | null;
 }
 
 interface MenuRecommendation {

@@ -18,8 +18,10 @@ interface CustomerAnalytics {
   orderCount: number
   totalSpent: string
   avgOrderValue: string
-  lastOrderDate: string
-  firstOrderDate: string
+  lastOrderDate: string | null
+  firstOrderDate: string | null
+  favoriteItems?: Array<{name: string, orderCount: number, totalQuantity: number}>;
+  totalOrders?: number
 }
 
 interface OrderItem {
@@ -253,7 +255,11 @@ const CustomerAnalyticsPage: React.FC = () => {
     }
   }
 
-  const handleCustomerSelect = async (email: string) => {
+  const handleCustomerSelect = async (email: string | null) => {
+    if (!email) {
+      return; // Early return if email is null
+    }
+    
     try {
       const params = new URLSearchParams()
 
@@ -602,18 +608,22 @@ const CustomerAnalyticsPage: React.FC = () => {
                               )}
                             </TableCell>
                             <TableCell className="text-slate-600 text-sm">
-                              {new Date(customer.lastOrderDate).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
+                              {customer.lastOrderDate 
+                                ? new Date(customer.lastOrderDate).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : "N/A"}
                             </TableCell>
                             <TableCell className="text-center">
                               <Button
                                 size="sm"
                                 className="bg-teal-600 hover:bg-teal-700 text-white transition group"
                                 onClick={() => {
-                                  handleCustomerSelect(customer.customerEmail)
-                                  setActiveTab("details")
+                                  if (customer.customerEmail) {
+                                    handleCustomerSelect(customer.customerEmail)
+                                    setActiveTab("details")
+                                  }
                                 }}
                               >
                                 <span className="flex items-center gap-1">
