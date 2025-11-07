@@ -98,7 +98,7 @@ export default function MenuManagement() {
       category: "Main Course",
       imageUrl: "",
       available: true,
-      quantity: "",
+      quantity: undefined,
     },
   });
 
@@ -176,9 +176,9 @@ export default function MenuManagement() {
         description: item.description,
         price: item.price,
         category: item.category,
-        imageUrl: item.imageUrl, // For existing items, we have an image URL
+        imageUrl: item.imageUrl || "", // For existing items, we have an image URL
         available: item.available,
-        quantity: item.quantity || "",
+        quantity: item.quantity,
       });
       // Reset image states when editing an existing item
       setImageFile(null);
@@ -192,7 +192,7 @@ export default function MenuManagement() {
         category: "Main Course",
         imageUrl: "", // Empty string for new items
         available: true,
-      quantity: "",
+        quantity: undefined,
       });
       // Reset image states for new item
       setImageFile(null);
@@ -293,13 +293,9 @@ export default function MenuManagement() {
     }
 
     // Create or update menu item with the image URL from Cloudinary
-    const quantity = form.getValues('quantity');
-    console.log('Quantity from form:', quantity);
-    
     const finalValues = {
       ...values,
       imageUrl: currentImageUrl, // Use the current value from the form
-      quantity: quantity || undefined, // Explicitly include quantity
     };
     
     console.log('Final values being sent:', JSON.stringify(finalValues));
@@ -492,9 +488,10 @@ export default function MenuManagement() {
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.01"
+                          step="1"
                           placeholder="20"
-                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
                           data-testid="input-quantity"
                         />
                       </FormControl>
