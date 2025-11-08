@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge, UserRound, ChefHat, UserCheck2 } from "lucide-react"
+import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge, UserRound, ChefHat, UserCheck2, Shield } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -37,6 +37,15 @@ interface Permission {
   updatedAt: string
 }
 
+interface Role {
+  id: string
+  roleName: string
+  description: string
+  permissions: string // JSON string
+  createdAt: string
+  updatedAt: string
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -58,6 +67,16 @@ export default function UserManagement() {
   const [editEmail, setEditEmail] = useState("")
   const [editRole, setEditRole] = useState<"admin" | "kitchen" | "customer">("customer")
   const [selectedUserPermissions, setSelectedUserPermissions] = useState<string[]>([])
+
+  // Roles management state
+  const [roles, setRoles] = useState<Role[]>([])
+  const [showRolesDialog, setShowRolesDialog] = useState(false)
+  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
+  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [roleName, setRoleName] = useState("")
+  const [roleDescription, setRoleDescription] = useState("")
+  const [selectedRolePermissions, setSelectedRolePermissions] = useState<string[]>([])
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -313,6 +332,135 @@ export default function UserManagement() {
     }
   }
 
+  // Roles management functions
+  const fetchRoles = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/roles")
+      const data = await response.json()
+      setRoles(data)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch roles",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreateRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    try {
+      await apiRequest("POST", "/api/roles", {
+        roleName,
+        description: roleDescription,
+        permissions: selectedRolePermissions,
+      })
+
+      toast({
+        title: "Success",
+        description: "Role created successfully",
+      })
+
+      setRoleName("")
+      setRoleDescription("")
+      setSelectedRolePermissions([])
+      setShowAddRoleDialog(false)
+      fetchRoles()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditRole = async (role: Role) => {
+    setEditingRole(role)
+    setRoleName(role.roleName)
+    setRoleDescription(role.description)
+
+    // Parse permissions JSON string
+    try {
+      const perms = JSON.parse(role.permissions)
+      setSelectedRolePermissions(perms)
+    } catch {
+      setSelectedRolePermissions([])
+    }
+
+    setShowEditRoleDialog(true)
+  }
+
+  const handleUpdateRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!editingRole) return
+
+    try {
+      await apiRequest("PATCH", `/api/roles/${editingRole.id}`, {
+        roleName,
+        description: roleDescription,
+        permissions: selectedRolePermissions,
+      })
+
+      toast({
+        title: "Success",
+        description: "Role updated successfully",
+      })
+
+      setShowEditRoleDialog(false)
+      setEditingRole(null)
+      setRoleName("")
+      setRoleDescription("")
+      setSelectedRolePermissions([])
+      fetchRoles()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteRole = async (roleId: string) => {
+    if (!window.confirm("Are you sure you want to delete this role?")) {
+      return
+    }
+
+    try {
+      await apiRequest("DELETE", `/api/roles/${roleId}`)
+
+      toast({
+        title: "Success",
+        description: "Role deleted successfully",
+      })
+
+      fetchRoles()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRolePermissionChange = (permissionName: string) => {
+    setSelectedRolePermissions(prev => {
+      if (prev.includes(permissionName)) {
+        return prev.filter(p => p !== permissionName)
+      } else {
+        return [...prev, permissionName]
+      }
+    })
+  }
+
+  const isRolePermissionSelected = (permissionName: string) => {
+    return selectedRolePermissions.includes(permissionName)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -323,9 +471,22 @@ export default function UserManagement() {
               <Users className="w-6 h-6 text-[#50BAA8]" />
             </div>
             <h1 className="text-4xl font-bold text-slate-900">User Management</h1>
+          
+          <Button
+            onClick={() => {
+              fetchRoles()
+              setShowRolesDialog(true)
+            }}
+            variant="outline"
+            className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
+          >
+            <Shield className="w-5 h-5" />
+            Roles
+          </Button>
           </div>
           <p className="text-slate-600 ml-11">Manage users, roles, and permissions across your system</p>
         </div>
+
 
         {/* User Statistics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
@@ -710,6 +871,294 @@ export default function UserManagement() {
                 </Button>
                 <Button type="submit" className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white">
                   Update User
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Roles Management Dialog */}
+        <Dialog open={showRolesDialog} onOpenChange={setShowRolesDialog}>
+          <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl flex items-center gap-2">
+                <Shield className="w-6 h-6 text-[#50BAA8]" />
+                Roles Management
+              </DialogTitle>
+              <DialogDescription>Create and manage custom roles with specific permissions</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => {
+                    setRoleName("")
+                    setRoleDescription("")
+                    setSelectedRolePermissions([])
+                    setShowAddRoleDialog(true)
+                  }}
+                  className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Role
+                </Button>
+              </div>
+
+              {roles.length === 0 ? (
+                <div className="text-center py-12">
+                  <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-600 font-medium">No roles created yet</p>
+                  <p className="text-slate-500 text-sm">Create your first custom role to get started</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50">
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Role Name</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Description</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Permissions</th>
+                        <th className="text-right py-3 px-4 font-semibold text-slate-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roles.map((role) => {
+                        let permCount = 0
+                        try {
+                          const perms = JSON.parse(role.permissions)
+                          permCount = perms.length
+                        } catch {
+                          permCount = 0
+                        }
+
+                        return (
+                          <tr key={role.id} className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className="py-3 px-4">
+                              <span className="font-medium text-slate-900">{role.roleName}</span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 text-sm max-w-xs truncate">
+                              {role.description}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#50BAA8]/10 text-[#50BAA8]">
+                                {permCount} permissions
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditRole(role)}
+                                  className="border-slate-200 hover:bg-slate-100"
+                                >
+                                  <Edit2 className="w-3 h-3 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteRole(role.id)}
+                                  className="border-red-200 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Role Dialog */}
+        <Dialog open={showAddRoleDialog} onOpenChange={setShowAddRoleDialog}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Create New Role</DialogTitle>
+              <DialogDescription>Define a custom role with specific permissions</DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleCreateRole} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="role-name" className="text-slate-700 font-medium">
+                  Role Name
+                </Label>
+                <Input
+                  id="role-name"
+                  value={roleName}
+                  onChange={(e) => setRoleName(e.target.value)}
+                  placeholder="e.g., Driver, Manager, Cashier"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role-description" className="text-slate-700 font-medium">
+                  Description
+                </Label>
+                <Input
+                  id="role-description"
+                  value={roleDescription}
+                  onChange={(e) => setRoleDescription(e.target.value)}
+                  placeholder="Brief description of this role"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-slate-600" />
+                  <Label className="text-slate-700 font-medium">
+                    Permissions
+                  </Label>
+                </div>
+
+                {permissionsLoading ? (
+                  <div className="flex items-center justify-center h-24">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-slate-200 border-t-[#50BAA8] rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-slate-600 text-sm">Loading permissions...</p>
+                    </div>
+                  </div>
+                ) : permissions.length === 0 ? (
+                  <p className="text-slate-500 text-sm">No permissions available</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-4 border border-slate-200 rounded-md bg-slate-50">
+                    {permissions.map((permission) => (
+                      <div key={permission.id} className="flex items-center space-x-2 p-2 hover:bg-white rounded">
+                        <Checkbox
+                          id={`role-perm-${permission.id}`}
+                          checked={isRolePermissionSelected(permission.name)}
+                          onCheckedChange={() => handleRolePermissionChange(permission.name)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label
+                            htmlFor={`role-perm-${permission.id}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {permission.name}
+                          </Label>
+                          {permission.description && (
+                            <p className="text-xs text-slate-500">
+                              {permission.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowAddRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white">
+                  Create Role
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Role Dialog */}
+        <Dialog open={showEditRoleDialog} onOpenChange={setShowEditRoleDialog}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Edit Role</DialogTitle>
+              <DialogDescription>Update role details and permissions</DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleUpdateRole} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="edit-role-name" className="text-slate-700 font-medium">
+                  Role Name
+                </Label>
+                <Input
+                  id="edit-role-name"
+                  value={roleName}
+                  onChange={(e) => setRoleName(e.target.value)}
+                  placeholder="e.g., Driver, Manager, Cashier"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-role-description" className="text-slate-700 font-medium">
+                  Description
+                </Label>
+                <Input
+                  id="edit-role-description"
+                  value={roleDescription}
+                  onChange={(e) => setRoleDescription(e.target.value)}
+                  placeholder="Brief description of this role"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-slate-600" />
+                  <Label className="text-slate-700 font-medium">
+                    Permissions
+                  </Label>
+                </div>
+
+                {permissionsLoading ? (
+                  <div className="flex items-center justify-center h-24">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-slate-200 border-t-[#50BAA8] rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-slate-600 text-sm">Loading permissions...</p>
+                    </div>
+                  </div>
+                ) : permissions.length === 0 ? (
+                  <p className="text-slate-500 text-sm">No permissions available</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-4 border border-slate-200 rounded-md bg-slate-50">
+                    {permissions.map((permission) => (
+                      <div key={permission.id} className="flex items-center space-x-2 p-2 hover:bg-white rounded">
+                        <Checkbox
+                          id={`edit-role-perm-${permission.id}`}
+                          checked={isRolePermissionSelected(permission.name)}
+                          onCheckedChange={() => handleRolePermissionChange(permission.name)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label
+                            htmlFor={`edit-role-perm-${permission.id}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {permission.name}
+                          </Label>
+                          {permission.description && (
+                            <p className="text-xs text-slate-500">
+                              {permission.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowEditRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white">
+                  Update Role
                 </Button>
               </div>
             </form>

@@ -115,6 +115,9 @@ export default function CustomerAnalyticsDashboard() {
   const [engagementData, setEngagementData] = useState<CustomerEngagement[] | null>(null);
   const [ltvData, setLtvData] = useState<CustomerLTV[] | null>(null);
   const [recommendations, setRecommendations] = useState<MenuRecommendation[] | null>(null);
+  const [seasonalTrends, setSeasonalTrends] = useState<any[] | null>(null);
+  const [retentionData, setRetentionData] = useState<any | null>(null);
+  const [revenueByHour, setRevenueByHour] = useState<any[] | null>(null);
   const [insights, setInsights] = useState<ActionableInsight[] | null>(null);
   const [dateRange, setDateRange] = useState('30');
   const [loading, setLoading] = useState(true);
@@ -239,6 +242,42 @@ export default function CustomerAnalyticsDashboard() {
         setEngagementData(engagementData.data?.engagementHeatmap || []);
         setLtvData(ltvData.data);
         setRecommendations(recommendationsData.data?.frequentlyBoughtTogether || []);
+        setSeasonalTrends(recommendationsData.data?.seasonalTrends || []);
+
+        // Calculate revenue by hour from engagement data
+        const hourlyRevenue: Map<number, number> = new Map();
+        const engagementHeatmap = engagementData.data?.engagementHeatmap || [];
+
+        engagementHeatmap.forEach((item: any) => {
+          const hour = parseInt(item.hourOfDay);
+          const revenue = parseFloat(item.totalRevenue) || 0;
+          hourlyRevenue.set(hour, (hourlyRevenue.get(hour) || 0) + revenue);
+        });
+
+        // Convert to array and sort by hour
+        const revenueByHourData = Array.from(hourlyRevenue.entries())
+          .map(([hour, revenue]) => ({
+            hourOfDay: hour,
+            revenue: Math.round(revenue)
+          }))
+          .sort((a, b) => a.hourOfDay - b.hourOfDay);
+
+        setRevenueByHour(revenueByHourData);
+
+        // Calculate retention data from engagement
+        const totalCustomers = overviewMetrics.totalCustomers;
+        const activeCustomers = overviewMetrics.activeCustomers;
+        const newCustomers = overviewMetrics.newCustomers;
+        const churnedCustomers = engagementData.data?.churnCount || 0;
+        const inactiveCustomers = totalCustomers - activeCustomers - newCustomers - churnedCustomers;
+
+        setRetentionData([
+          { name: 'Active Customers', value: activeCustomers },
+          { name: 'New Customers', value: newCustomers },
+          { name: 'Inactive Customers', value: Math.max(0, inactiveCustomers) },
+          { name: 'Churned Customers', value: churnedCustomers }
+        ]);
+
         setInsights(insightsData.data);
       } catch (err) {
         console.error('Error fetching customer analytics data:', err);
@@ -518,11 +557,17 @@ export default function CustomerAnalyticsDashboard() {
                       {ltvData?.slice(0, 5).map((customer, index) => (
                         <TableRow key={customer.customerEmail || `ltv-customer-${index}`}>
                           <TableCell className="font-medium">{customer.customerName}</TableCell>
-                          <TableCell>{customer.customerEmail}</TableCell>
-                          <TableCell>{customer.orderCount}</TableCell>
-                          <TableCell>₦{customer?.totalSpent}</TableCell>
-                          <TableCell>₦{customer.estimatedLTV}</TableCell>
-                          <TableCell>{customer.lastOrderDate}</TableCell>
+                          <TableCell>{customer.customerEmail || 'N/A'}</TableCell>
+                          <TableCell>{customer.totalOrders || customer.orderCount}</TableCell>
+                          <TableCell>₦{parseInt(customer?.totalSpent || '0').toLocaleString()}</TableCell>
+                          <TableCell>₦{parseInt(customer.estimatedLTV || '0').toLocaleString()}</TableCell>
+                          <TableCell>
+                            {customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : 'N/A'}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -556,9 +601,9 @@ export default function CustomerAnalyticsDashboard() {
                         {customerSegments.highValue && customerSegments.highValue.length > 0 ? customerSegments.highValue.map((customer, index) => (
                           <TableRow key={customer.customerEmail || `high-value-${index}`}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
-                            <TableCell>{customer.orderCount}</TableCell>
-                            <TableCell>₦{customer.totalSpent}</TableCell>
-                            <TableCell>₦{customer.avgOrderValue}</TableCell>
+                            <TableCell>{customer.totalOrders}</TableCell>
+                            <TableCell>₦{parseInt(customer.totalSpent || '0').toLocaleString()}</TableCell>
+                            <TableCell>₦{parseInt(customer.avgOrderValue || '0').toLocaleString()}</TableCell>
                           </TableRow>
                         )) : (
                           <TableRow>
@@ -593,8 +638,8 @@ export default function CustomerAnalyticsDashboard() {
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
-                            <TableCell>₦{customer.totalSpent}</TableCell>
-                            <TableCell>₦{customer.avgOrderValue}</TableCell>
+                            <TableCell>₦{parseInt(customer.totalSpent || '0').toLocaleString()}</TableCell>
+                            <TableCell>₦{parseInt(customer.avgOrderValue || '0').toLocaleString()}</TableCell>
                           </TableRow>
                         )) : (
                           <TableRow>
@@ -631,8 +676,8 @@ export default function CustomerAnalyticsDashboard() {
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
-                            <TableCell>₦{customer.totalSpent}</TableCell>
-                            <TableCell>₦{customer.avgOrderValue}</TableCell>
+                            <TableCell>₦{parseInt(customer.totalSpent || '0').toLocaleString()}</TableCell>
+                            <TableCell>₦{parseInt(customer.avgOrderValue || '0').toLocaleString()}</TableCell>
                           </TableRow>
                         )) : (
                           <TableRow>
@@ -667,8 +712,12 @@ export default function CustomerAnalyticsDashboard() {
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
                             <TableCell>{customer.totalOrders}</TableCell>
-                            <TableCell>₦{customer.totalSpent}</TableCell>
-                            <TableCell>{customer.firstOrderDate}</TableCell>
+                            <TableCell>₦{parseInt(customer.totalSpent || '0').toLocaleString()}</TableCell>
+                            <TableCell>{customer.firstOrderDate ? new Date(customer.firstOrderDate).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : 'N/A'}</TableCell>
                           </TableRow>
                         )) : (
                           <TableRow>
@@ -738,21 +787,34 @@ export default function CustomerAnalyticsDashboard() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Revenue by Hour</CardTitle>
+                    <p className="text-sm text-muted-foreground">Total revenue aggregated by hour of day</p>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart
-                        data={engagementData.slice(0, 12)}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="hourOfDay" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => [`₦${value}`, 'Revenue']} />
-                        <Legend />
-                        <Bar dataKey="revenue" name="Revenue (₦)" fill="#82ca9d" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {revenueByHour && revenueByHour.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart
+                          data={revenueByHour}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="hourOfDay"
+                            label={{ value: 'Hour of Day', position: 'insideBottom', offset: -5 }}
+                          />
+                          <YAxis label={{ value: 'Revenue (₦)', angle: -90, position: 'insideLeft' }} />
+                          <Tooltip
+                            formatter={(value: any) => [`₦${value.toLocaleString()}`, 'Revenue']}
+                            labelFormatter={(hour) => `${hour}:00`}
+                          />
+                          <Legend />
+                          <Bar dataKey="revenue" name="Revenue (₦)" fill="#82ca9d" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No hourly revenue data available
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -799,22 +861,32 @@ export default function CustomerAnalyticsDashboard() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Customer</TableHead>
+                          <TableHead>Email</TableHead>
                           <TableHead>Total Orders</TableHead>
                           <TableHead>Total Spent</TableHead>
                           <TableHead>LTV Estimate</TableHead>
+                          <TableHead>Last Order</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {ltvData && ltvData.length > 0 ? ltvData.slice(0, 5).map((customer, index) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium">{customer.customerName}</TableCell>
-                            <TableCell>{customer.totalOrders}</TableCell>
-                            <TableCell>₦{customer.totalSpent}</TableCell>
-                            <TableCell>₦{customer.estimatedLTV}</TableCell>
+                            <TableCell>{customer.customerEmail || 'N/A'}</TableCell>
+                            <TableCell>{customer.totalOrders || customer.orderCount}</TableCell>
+                            <TableCell>₦{parseInt(customer.totalSpent || '0').toLocaleString()}</TableCell>
+                            <TableCell>₦{parseInt(customer.estimatedLTV || '0').toLocaleString()}</TableCell>
+                            <TableCell>
+                              {customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString('en-GB', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              }) : 'N/A'}
+                            </TableCell>
                           </TableRow>
                         )) : (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-4 text-gray-500">
+                            <TableCell colSpan={6} className="text-center py-4 text-gray-500">
                               No customer LTV data available
                             </TableCell>
                           </TableRow>
@@ -829,35 +901,31 @@ export default function CustomerAnalyticsDashboard() {
                     <CardTitle>Customer Retention Analysis</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Active Customers', value: 890 },
-                            { name: 'New Customers', value: 45 },
-                            { name: 'Inactive Customers', value: 185 },
-                            { name: 'Churned Customers', value: 130 }
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={true}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {[
-                            { name: 'Active Customers', value: 890 },
-                            { name: 'New Customers', value: 45 },
-                            { name: 'Inactive Customers', value: 185 },
-                            { name: 'Churned Customers', value: 130 }
-                          ].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => [`${value}`, 'Customers']} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    {retentionData && retentionData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={retentionData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {retentionData.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => [`${value}`, 'Customers']} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No retention data available
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -907,29 +975,46 @@ export default function CustomerAnalyticsDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Seasonal Trends</CardTitle>
-                  <p className="text-sm text-muted-foreground">Menu items performance by season</p>
+                  <p className="text-sm text-muted-foreground">Menu items performance by month</p>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart
-                      data={[
-                        { month: 'Jan', 'Jollof Rice': 120, 'Fried Rice': 95, 'Grilled Chicken': 80 },
-                        { month: 'Feb', 'Jollof Rice': 140, 'Fried Rice': 110, 'Grilled Chicken': 90 },
-                        { month: 'Mar', 'Jollof Rice': 110, 'Fried Rice': 85, 'Grilled Chicken': 70 },
-                        { month: 'Apr', 'Jollof Rice': 160, 'Fried Rice': 130, 'Grilled Chicken': 100 },
-                      ]}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="Jollof Rice" name="Jollof Rice" fill="#8884d8" />
-                      <Bar dataKey="Fried Rice" name="Fried Rice" fill="#82ca9d" />
-                      <Bar dataKey="Grilled Chicken" name="Grilled Chicken" fill="#ffc658" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {seasonalTrends && seasonalTrends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={400}>
+                      <BarChart
+                        data={(() => {
+                          // Transform seasonal data into chart format
+                          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                          const monthlyData: any = {};
+
+                          seasonalTrends.forEach((item: any) => {
+                            const monthNum = parseInt(item.month);
+                            const monthName = monthNames[monthNum - 1];
+
+                            if (!monthlyData[monthName]) {
+                              monthlyData[monthName] = { month: monthName };
+                            }
+                            monthlyData[monthName][item.menuItemName] = parseInt(item.totalQuantity);
+                          });
+
+                          return Object.values(monthlyData);
+                        })()}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        {seasonalTrends && Array.from(new Set(seasonalTrends.map((item: any) => item.menuItemName))).slice(0, 5).map((itemName: any, index: number) => (
+                          <Bar key={itemName} dataKey={itemName} name={itemName} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No seasonal trend data available
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

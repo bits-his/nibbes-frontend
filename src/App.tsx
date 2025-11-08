@@ -28,6 +28,7 @@ import AnalyticsPage from "@/pages/analytics";
 import { useAuth } from "./hooks/useAuth";
 import { CartProvider } from "@/context/CartContext";
 import { getGuestSession } from "@/lib/guestSession";
+import { InstallPWA } from "@/components/InstallPWA";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
@@ -442,6 +443,7 @@ function App() {
               </Layout>
             </SidebarProvider>
             <Toaster />
+            <InstallPWA />
           </TooltipProvider>
         </CartProvider>
       </AuthProvider>

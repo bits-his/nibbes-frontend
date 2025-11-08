@@ -470,62 +470,75 @@ export default function CustomerMenu() {
               const isInCart = cart.some(
                 (cartItem) => cartItem.menuItem.id === item.id
               );
+              const cartItem = cart.find((cartItem) => cartItem.menuItem.id === item.id);
               return (
                 <Card
                   key={item.id}
-                  className={`overflow-hidden hover-elevate transition-all cursor-pointer ${
+                  className={`overflow-hidden hover-elevate transition-all ${
                     isInCart ? "ring-2 ring-primary" : ""
                   }`}
-                  onClick={() => {
-                    if (item.available) {
-                      addToCart(item);
-                    }
-                  }}
                   data-testid={`card-menu-item-${item.id}`}
                 >
-                  <div className="aspect-square overflow-hidden relative">
+                  <div className="aspect-[4/3] sm:aspect-square overflow-hidden relative">
                     <img
                       src={item.imageUrl}
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />
                     {isInCart && (
-                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-                        <Plus className="w-4 h-4" />
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full px-2 py-1 text-sm font-semibold">
+                        {cartItem?.quantity}
                       </div>
                     )}
                   </div>
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1">
+                      <h3 className="text-base sm:text-lg font-semibold mb-1">
                         {item.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                         {item.description}
                       </p>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xl font-bold">
+                    <div className="flex items-center justify-between gap-2 sm:gap-4">
+                      <span className="text-lg sm:text-xl font-bold">
                         ₦{parseFloat(item.price).toLocaleString()}
                       </span>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent the card click event from firing when button is clicked
-                          addToCart(item);
-                        }}
-                        disabled={!item.available}
-                        data-testid={`button-add-${item.id}`}
-                        variant={isInCart ? "secondary" : "default"}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        {isInCart
-                          ? `Added (${
-                              cart.find(
-                                (cartItem) => cartItem.menuItem.id === item.id
-                              )?.quantity
-                            })`
-                          : "Add to Cart"}
-                      </Button>
+                      {isInCart ? (
+                        <div className="flex items-center gap-2 border rounded-lg">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => item.id && removeFromCart(item.id)}
+                            data-testid={`button-minus-${item.id}`}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </Button>
+                          <span className="font-semibold min-w-[20px] text-center">
+                            {cartItem?.quantity}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => addToCart(item)}
+                            data-testid={`button-plus-${item.id}`}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => addToCart(item)}
+                          disabled={!item.available}
+                          data-testid={`button-add-${item.id}`}
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add
+                        </Button>
+                      )}
                     </div>
                     {!item.available && (
                       <Badge

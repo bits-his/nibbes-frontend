@@ -49,97 +49,98 @@ const menuItems: MenuItem[] = [
     url: "/",
     icon: Home,
     roles: ["admin", "customer", "kitchen"],
-    permissions: ["create_orders"],
+    permissions: ["customer_menu"],
   },
-  { 
-    title: "Docket Display", 
-    url: "/docket", 
-    icon: Users, 
+  {
+    title: "Docket Display", // Will be dynamic based on user role
+    url: "/docket",
+    icon: ClipboardList,
     roles: ["customer", "admin"],
-    permissions: ["create_orders"],
+    permissions: ["docket_display"],
   },
   {
     title: "Kitchen Display",
     url: "/kitchen",
     icon: ChefHat,
     roles: ["kitchen", "admin"],
-    permissions: ["manage_orders"],
+    permissions: ["kitchen_display"],
   },
   {
     title: "Walk-in Orders",
     url: "/staff",
     icon: Users,
     roles: ["admin", "kitchen"],
-    permissions: ["create_orders", "manage_orders"],
+    permissions: ["walk_in_orders"],
   },
   {
     title: "Order Management",
     url: "/orders",
     icon: LayoutDashboard,
     roles: ["admin"],
-    permissions: ["manage_orders"],
+    permissions: ["order_management"],
   },
   {
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
     roles: ["admin", "kitchen"],
-    permissions: ["manage_menu"],
+    permissions: ["menu_management"],
   },
-  { 
-    title: "User Management", 
-    url: "/users", 
-    icon: Users, 
+  {
+    title: "User Management",
+    url: "/users",
+    icon: Users,
     roles: ["admin"],
-    permissions: ["manage_users"],
+    permissions: ["user_management"],
   },
-  { 
-    title: "Sales Inventory", 
-    url: "/inventory", 
-    icon: Package, 
+  {
+    title: "Sales Inventory",
+    url: "/inventory",
+    icon: Package,
     roles: ["admin", "kitchen"],
-    permissions: ["manage_inventory"],
+    permissions: ["sales_inventory"],
   },
-  { 
-    title: "Store Management", 
-    url: "/store-management", 
-    icon: Store, 
+  {
+    title: "Store Management",
+    url: "/store-management",
+    icon: Store,
     roles: ["admin", "kitchen"],
-    permissions: ["manage_store"],
+    permissions: ["store_management"],
   },
-  { 
-    title: "Analytics & Reports", 
-    url: "/dashboard/analytics", 
-    icon: BarChart3, 
+  {
+    title: "Analytics & Reports",
+    url: "/dashboard/analytics",
+    icon: BarChart3,
     roles: ["admin"],
-    permissions: ["view_analytics"],
+    permissions: ["analytics_reports"],
   },
-  { 
-    title: "Customer Analytics", 
-    url: "/customer-analytics", 
-    icon: BarChart3, 
+  {
+    title: "Customer Analytics",
+    url: "/customer-analytics",
+    icon: BarChart3,
     roles: ["admin"],
-    permissions: ["view_analytics"],
+    permissions: ["customer_analytics"],
   },
-  { 
-    title: "Customer Insights", 
-    url: "/dashboard/customers", 
-    icon: BarChart3, 
+  {
+    title: "Customer Insights",
+    url: "/dashboard/customers",
+    icon: BarChart3,
     roles: ["admin"],
-    permissions: ["view_analytics"],
+    permissions: ["customer_insights"],
   },
-  { 
-    title: "QR Code", 
-    url: "/qr-code", 
-    icon: ClipboardList, 
+  {
+    title: "QR Code",
+    url: "/qr-code",
+    icon: ClipboardList,
     roles: ["admin"],
-    permissions: ["create_orders"],
+    permissions: ["qr_code"],
   },
-  { 
-    title: "Profile", 
-    url: "/profile", 
-    icon: User, 
-    roles: ["admin", "kitchen", "customer"] 
+  {
+    title: "Profile",
+    url: "/profile",
+    icon: User,
+    roles: ["admin", "kitchen", "customer"],
+    permissions: ["profile"],
   },
 ];
 
@@ -175,17 +176,13 @@ export function AppSidebar() {
     setSelectedUrl(location);
   }, [location]);
 
-  // Filter menu items by role AND permissions
+  // Filter menu items by permissions only (permissions control what users see)
   const getMenuItems = (user: User | null, permissions: string[]) => {
     if (!user) {
       return menuItems.filter((item) => item.roles.includes("customer"));
     }
 
-    // Admin sees everything
-    if (user.role === "admin") {
-      return menuItems;
-    }
-
+    // All users (including admin) are controlled by their permissions
     return menuItems.filter((item) => {
       // Check if user's role is allowed
       if (!item.roles.includes(user.role)) {
@@ -201,6 +198,19 @@ export function AppSidebar() {
       // No permission requirements, just role is enough
       return true;
     });
+  };
+
+  // Get dynamic title based on user role
+  const getMenuItemTitle = (item: MenuItem, userRole: string | undefined) => {
+    // Special case for Docket Display - show different names for different roles
+    if (item.url === "/docket") {
+      if (userRole === "admin") {
+        return "Docket Display";
+      } else {
+        return "My Orders";
+      }
+    }
+    return item.title;
   };
 
   const availableMenuItems = getMenuItems(user, userPermissions);
@@ -308,7 +318,7 @@ export function AppSidebar() {
                           <span className={`font-medium transition-all duration-200 ${
                             isActive ? "text-white" : "text-/90"
                           }`}>
-                            {item.title}
+                            {getMenuItemTitle(item, user?.role)}
                           </span>
                           
                           {/* Active indicator dot */}
