@@ -100,13 +100,13 @@ const menuItems: MenuItem[] = [
     roles: ["admin", "kitchen"],
     permissions: ["sales_inventory"],
   },
-  {
-    title: "Store Management",
-    url: "/store-management",
-    icon: Store,
-    roles: ["admin", "kitchen"],
-    permissions: ["store_management"],
-  },
+  // {
+  //   title: "Store Management",
+  //   url: "/store-management",
+  //   icon: Store,
+  //   roles: ["admin", "kitchen"],
+  //   permissions: ["store_management"],
+  // },
   {
     title: "Analytics & Reports",
     url: "/dashboard/analytics",
