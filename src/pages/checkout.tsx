@@ -27,34 +27,34 @@ const checkoutFormSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>
 
-function StepIndicator({ currentStep }: { currentStep: number }) {
-  const steps = ["Contact", "Delivery", "Payment"]
-  return (
-    <div className="flex items-center justify-between mb-8">
-      {steps.map((step, index) => (
-        <div key={index} className="flex items-center">
-          <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-              index < currentStep
-                ? "bg-accent -foreground"
-                : index === currentStep
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {index < currentStep ? <Check className="w-5 h-5" /> : index + 1}
-          </div>
-          <span className={`ml-2 font-medium ${index <= currentStep ? "text-foreground" : "text-muted-foreground"}`}>
-            {step}
-          </span>
-          {index < steps.length - 1 && (
-            <div className={`w-12 h-0.5 mx-2 ${index < currentStep ? "bg-accent" : "bg-muted"}`} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
+// function StepIndicator({ currentStep }: { currentStep: number }) {
+//   const steps = ["Contact", "Delivery", "Payment"]
+//   return (
+//     <div className="flex items-center justify-between mb-8">
+//       {steps.map((step, index) => (
+//         <div key={index} className="flex items-center">
+//           <div
+//             className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
+//               index < currentStep
+//                 ? "bg-accent -foreground"
+//                 : index === currentStep
+//                   ? "bg-primary text-primary-foreground"
+//                   : "bg-muted text-muted-foreground"
+//             }`}
+//           >
+//             {index < currentStep ? <Check className="w-5 h-5" /> : index + 1}
+//           </div>
+//           <span className={`ml-2 font-medium ${index <= currentStep ? "text-foreground" : "text-muted-foreground"}`}>
+//             {step}
+//           </span>
+//           {index < steps.length - 1 && (
+//             <div className={`w-12 h-0.5 mx-2 ${index < currentStep ? "bg-accent" : "bg-muted"}`} />
+//           )}
+//         </div>
+//       ))}
+//     </div>
+//   )
+// }
 
 function CartSummaryHeader({ itemCount, subtotal }: { itemCount: number; subtotal: number }) {
   return (
@@ -260,7 +260,7 @@ export default function Checkout() {
           <p className="text-muted-foreground">Secure checkout • Fast delivery • Real-time tracking</p>
         </div>
 
-        <StepIndicator currentStep={currentStep} />
+        {/* <StepIndicator currentStep={currentStep} /> */}
 
         <CartSummaryHeader itemCount={cart.length} subtotal={subtotal} />
 

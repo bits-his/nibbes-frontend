@@ -120,10 +120,38 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     initializeUser();
   }, []);
 
-  const login = (userData: User, token: string) => {
-    setUser(userData);
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(userData));
+  const login = async (userData: User, token: string) => {
+    try {
+      // Update token first
+      localStorage.setItem("token", token);
+      
+      // Fetch user permissions and update the user data before storing
+      const response = await fetch('/api/permissions/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const permissionNames = data.permissions?.map((p: any) => p.name) || [];
+        
+        // Update user with permissions
+        const userWithPermissions = { ...userData, permissions: permissionNames };
+        setUser(userWithPermissions);
+        localStorage.setItem("user", JSON.stringify(userWithPermissions));
+      } else {
+        // If permission fetch fails, still store the user without permissions
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+      }
+    } catch (error) {
+      console.error("Error fetching permissions on login:", error);
+      // If there's an error, still store the user without permissions
+      setUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData));
+    }
   };
 
   const logout = () => {
