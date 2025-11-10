@@ -32,7 +32,7 @@ interface User {
   id: string;
   username: string;
   email: string;
-  role: "admin" | "kitchen" | "customer";
+  role: string; // Allow any role string
 }
 
 interface MenuItem {
@@ -182,21 +182,36 @@ export function AppSidebar() {
       return menuItems.filter((item) => item.roles.includes("customer"));
     }
 
-    // All users (including admin) are controlled by their permissions
+    // For custom roles (not in the predefined roles), allow access based on permissions only
+    const predefinedRoles = ["admin", "kitchen", "customer"];
+    const isPredefinedRole = predefinedRoles.includes(user.role);
+
     return menuItems.filter((item) => {
-      // Check if user's role is allowed
-      if (!item.roles.includes(user.role)) {
-        return false;
-      }
+      // If user has a predefined role, check both role and permissions
+      if (isPredefinedRole) {
+        // Check if user's role is allowed
+        if (!item.roles.includes(user.role)) {
+          return false;
+        }
 
-      // If item has permission requirements, check them
-      if (item.permissions && item.permissions.length > 0) {
-        // User needs at least one of the required permissions
-        return item.permissions.some(perm => permissions.includes(perm));
-      }
+        // If item has permission requirements, check them
+        if (item.permissions && item.permissions.length > 0) {
+          // User needs at least one of the required permissions
+          return item.permissions.some(perm => permissions.includes(perm));
+        }
 
-      // No permission requirements, just role is enough
-      return true;
+        // No permission requirements, just role is enough
+        return true;
+      } else {
+        // For custom roles, only check permissions
+        if (item.permissions && item.permissions.length > 0) {
+          // User needs at least one of the required permissions
+          return item.permissions.some(perm => permissions.includes(perm));
+        }
+        
+        // If no permissions required, allow access by default for custom roles
+        return true;
+      }
     });
   };
 
@@ -270,7 +285,7 @@ export function AppSidebar() {
               <div className="px-4 py-3 mb-2">
                 <div className="text-center">
                   <p className="font-semibold text-[#50BAAB] text-sm truncate">
-                    {user.email}
+                    {user.username || user.email}
                   </p>
                   <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">
                     {user.role}

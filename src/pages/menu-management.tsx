@@ -44,11 +44,13 @@ export default function MenuManagement() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // WebSocket connection for real-time updates
@@ -88,6 +90,29 @@ export default function MenuManagement() {
       socket.close();
     };
   }, []);
+
+  // Fetch categories when component mounts
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/menu/categories");
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      // Default to existing categories if API fails
+      setCategories([
+        "Main Course",
+        "Appetizer",
+        "Dessert",
+        "Drinks",
+        "Snacks",
+      ]);
+    }
+  };
 
   const form = useForm<MenuFormValues>({
     resolver: zodResolver(menuItemFormSchema),
@@ -307,26 +332,85 @@ export default function MenuManagement() {
     }
   };
 
-  const categories = [
-    "Main Course",
-    "Appetizer",
-    "Dessert",
-    "Drinks",
-    "Snacks",
-  ];
+  // Category management functions
+  const [newCategory, setNewCategory] = useState("");
+
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a category name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await apiRequest("POST", "/api/menu/categories", { 
+        name: newCategory.trim() 
+      });
+      
+      toast({
+        title: "Success",
+        description: "Category added successfully.",
+      });
+      
+      setNewCategory("");
+      fetchCategories(); // Refresh the categories list
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add category.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (categoryName: string) => {
+    try {
+      await apiRequest("DELETE", `/api/menu/categories`, { 
+        name: categoryName 
+      });
+      
+      toast({
+        title: "Success",
+        description: "Category deleted successfully.",
+      });
+      
+      fetchCategories(); // Refresh the categories list
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete category.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-screen-xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="font-serif text-2xl font-bold sm:text-4xl">Menu Management</h1>
-          <Button
-            onClick={() => handleOpenDialog()}
-            data-testid="button-add-item"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Menu Item
-          </Button>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="font-serif text-2xl font-bold sm:text-4xl">Menu Management</h1>
+            <p className="text-muted-foreground">Add, edit, and manage menu items and categories</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCategoryDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Category
+            </Button>
+            <Button
+              onClick={() => handleOpenDialog()}
+              data-testid="button-add-item"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Menu Item
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -663,6 +747,47 @@ export default function MenuManagement() {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Category Management Dialog */}
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Menu Categories</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="New category name"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+              />
+              <Button onClick={handleAddCategory} disabled={!newCategory.trim()}>
+                Add
+              </Button>
+            </div>
+            
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {categories.map((category, index) => (
+                <div 
+                  key={index} 
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                >
+                  <span className="font-medium">{category}</span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteCategory(category)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -26,6 +26,7 @@ import ProfilePage from "@/pages/profile";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import AnalyticsPage from "@/pages/analytics";
 import { useAuth } from "./hooks/useAuth";
+import { useAutoLogout } from "./hooks/useAutoLogout";
 import { CartProvider } from "@/context/CartContext";
 import { getGuestSession } from "@/lib/guestSession";
 import { InstallPWA } from "@/components/InstallPWA";
@@ -41,7 +42,8 @@ interface User {
   id: string;
   username: string;
   email: string;
-  role: "admin" | "kitchen" | "customer";
+  role: string; // Allow any role string
+  permissions?: string[]; // Add permissions array
   phone?: string;
   avatar?: string;
   notificationsEnabled?: boolean;
@@ -75,18 +77,47 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
 
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-      } catch (e) {
-        // If there's an error parsing, clear the stored data
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+    const initializeUser = async () => {
+      if (token && userData) {
+        try {
+          let parsedUser = JSON.parse(userData);
+          
+          // If the user doesn't have permissions loaded, fetch them
+          if (!parsedUser.permissions || parsedUser.permissions.length === 0) {
+            // Fetch user permissions and update the user object
+            try {
+              const response = await fetch('/api/permissions/me', {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                }
+              });
+              if (response.ok) {
+                const data = await response.json();
+                const permissionNames = data.permissions?.map((p: any) => p.name) || [];
+                
+                // Update user with permissions
+                parsedUser = { ...parsedUser, permissions: permissionNames };
+                localStorage.setItem("user", JSON.stringify(parsedUser));
+              }
+            } catch (error) {
+              console.error("Error fetching permissions:", error);
+            }
+          }
+          
+          setUser(parsedUser);
+        } catch (e) {
+          // If there's an error parsing, clear the stored data
+          console.error("Error parsing user data:", e);
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setUser(null);
+        }
       }
-    }
+      
+      setLoading(false);
+    };
 
-    setLoading(false);
+    initializeUser();
   }, []);
 
   const login = (userData: User, token: string) => {
@@ -104,6 +135,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem('location'); // Clear location data as well
   };
 
+  // Use auto logout hook
+  useAutoLogout(!!user);
+
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
@@ -115,21 +149,62 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 const ProtectedRoute: React.FC<{
   children: React.ReactNode;
   allowedRoles?: string[];
-}> = ({ children, allowedRoles }) => {
+  requiredPermissions?: string[]; // New: Check for required permissions
+}> = ({ children, allowedRoles, requiredPermissions }) => {
   const [location, setLocation] = useLocation();
   const { user, loading } = React.useContext(AuthContext);
 
+  // Predefined roles that use the old role-based system
+  const predefinedRoles = ["admin", "kitchen", "customer"];
+  const isPredefinedRole = user && predefinedRoles.includes(user.role);
+
+  // Check if user has required permissions
+  const hasRequiredPermissions = () => {
+    if (!requiredPermissions || requiredPermissions.length === 0) {
+      return true; // No permissions required
+    }
+
+    // Check permissions from user object (could be loaded on login or separately)
+    if (user && user.permissions) {
+      return requiredPermissions.some(perm => 
+        user.permissions && user.permissions.includes(perm)
+      );
+    }
+    
+    return false; // No permissions available
+  };
+
+  // Check if user has required roles (for backward compatibility)
+  const hasRequiredRoles = () => {
+    if (!allowedRoles || allowedRoles.length === 0) {
+      return true; // No roles required
+    }
+    
+    return user && allowedRoles.includes(user.role);
+  };
+
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        // Redirect to login if not authenticated
-        setLocation("/login");
-      } else if (allowedRoles && !allowedRoles.includes(user.role)) {
-        // Redirect to unauthorized page if user doesn't have required role
+    if (!loading && user) {
+      let hasAccess = false;
+
+      if (requiredPermissions && requiredPermissions.length > 0) {
+        // For permission-based access (new approach)
+        hasAccess = hasRequiredPermissions();
+      } else if (isPredefinedRole) {
+        // For predefined roles, check both role and permissions if needed
+        hasAccess = hasRequiredRoles();
+      } else {
+        // For custom roles, if no specific permissions required, allow access
+        hasAccess = true;
+      }
+
+      if (!hasAccess) {
         setLocation("/unauthorized");
       }
+    } else if (!loading && !user) {
+      setLocation("/login");
     }
-  }, [user, loading, allowedRoles, setLocation]);
+  }, [user, loading, requiredPermissions, allowedRoles, isPredefinedRole, setLocation]);
 
   if (loading) {
     return (
@@ -143,7 +218,14 @@ const ProtectedRoute: React.FC<{
     return null; // Redirect happens in useEffect
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  // Check permissions if required
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    if (!hasRequiredPermissions()) {
+      return null; // Redirect happens in useEffect
+    }
+  } 
+  // For predefined roles, check roles as fallback
+  else if (isPredefinedRole && allowedRoles && !hasRequiredRoles()) {
     return null; // Redirect happens in useEffect
   }
 
@@ -236,18 +318,17 @@ function Router() {
       <Route
         path="/order-status"
         component={() => (
-          <ProtectedRoute allowedRoles={["customer", "admin"]}>
+          <ProtectedRoute requiredPermissions={["customer_menu", "docket_display"]}>
             <OrderStatus />
           </ProtectedRoute>
         )}
       />
 
-      {/* Protected routes with role checks inside the components or via ProtectedRoute */}
-      {/* Admins can access all pages, other roles only specific pages */}
+      {/* Protected routes with permission checks */}
       <Route
         path="/kitchen"
         component={() => (
-          <ProtectedRoute allowedRoles={["kitchen", "admin"]}>
+          <ProtectedRoute requiredPermissions={["kitchen_display"]}>
             <KitchenDisplay />
           </ProtectedRoute>
         )}
@@ -255,7 +336,7 @@ function Router() {
       <Route
         path="/staff"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["walk_in_orders"]}>
             <StaffOrders />
           </ProtectedRoute>
         )}
@@ -263,7 +344,7 @@ function Router() {
       <Route
         path="/orders"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["order_management"]}>
             <OrderManagement />
           </ProtectedRoute>
         )}
@@ -271,7 +352,7 @@ function Router() {
       <Route
         path="/menu"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
             <MenuManagement />
           </ProtectedRoute>
         )}
@@ -279,16 +360,23 @@ function Router() {
       <Route
         path="/users"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["user_management"]}>
             <UserManagement />
           </ProtectedRoute>
         )}
       />
-      <Route path="/docket" component={DucketDisplay} />
+      <Route
+        path="/docket"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["docket_display"]}>
+            <DucketDisplay />
+          </ProtectedRoute>
+        )}
+      />
       <Route
         path="/qr-code"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["qr_code"]}>
             <QRCodePage />
           </ProtectedRoute>
         )}
@@ -297,7 +385,7 @@ function Router() {
       <Route
         path="/profile"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen", "customer"]}>
+          <ProtectedRoute requiredPermissions={["profile"]}>
             <ProfilePage />
           </ProtectedRoute>
         )}
@@ -306,7 +394,7 @@ function Router() {
       <Route
         path="/customer-analytics"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["customer_analytics"]}>
             <CustomerAnalyticsPage />
           </ProtectedRoute>
         )}
@@ -315,7 +403,7 @@ function Router() {
       <Route
         path="/dashboard/analytics"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["analytics_reports"]}>
             <AnalyticsPage />
           </ProtectedRoute>
         )}
@@ -324,7 +412,7 @@ function Router() {
       <Route
         path="/inventory"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["sales_inventory"]}>
             <InventoryPage />
           </ProtectedRoute>
         )}
@@ -334,7 +422,7 @@ function Router() {
       <Route
         path="/store-management"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["store_management"]}>
             <StoreManagement />
           </ProtectedRoute>
         )}
@@ -343,7 +431,7 @@ function Router() {
       <Route
         path="/dashboard/customers"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["customer_insights"]}>
             <CustomerAnalyticsDashboard />
           </ProtectedRoute>
         )}
@@ -395,7 +483,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-[#50BAA8] font-medium">
-                {user ? (user.email || user.username) : guestSession ? `${guestSession.guestName} (Guest)` : "Guest"}
+                {user ? (user.username || user.email) : guestSession ? `${guestSession.guestName} (Guest)` : "Guest"}
               </div>
               <div className="text-[#50BAA8]">
                 <svg

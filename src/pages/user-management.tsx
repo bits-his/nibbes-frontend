@@ -25,7 +25,7 @@ interface User {
   id: string
   username: string
   email: string
-  role: "admin" | "kitchen" | "customer"
+  role: string  // Role will be a string since it can come from API
   createdAt: string
 }
 
@@ -61,11 +61,11 @@ export default function UserManagement() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"admin" | "kitchen" | "customer">("customer")
+  const [role, setRole] = useState<string>("customer")
   const [showPassword, setShowPassword] = useState(false)
   const [editUsername, setEditUsername] = useState("")
   const [editEmail, setEditEmail] = useState("")
-  const [editRole, setEditRole] = useState<"admin" | "kitchen" | "customer">("customer")
+  const [editRole, setEditRole] = useState<string>("customer")
   const [selectedUserPermissions, setSelectedUserPermissions] = useState<string[]>([])
 
   // Roles management state
@@ -100,12 +100,14 @@ export default function UserManagement() {
     const adminCount = users.filter(user => user.role === "admin").length;
     const kitchenCount = users.filter(user => user.role === "kitchen").length;
     const customerCount = users.filter(user => user.role === "customer").length;
+    const customRoleCount = users.filter(user => !["admin", "kitchen", "customer"].includes(user.role)).length;
     
     return {
       total: users.length,
       admin: adminCount,
       kitchen: kitchenCount,
-      customer: customerCount
+      customer: customerCount,
+      customRoles: customRoleCount
     };
   }, [users])
 
@@ -114,6 +116,7 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers()
     fetchPermissions()
+    fetchRoles()
   }, [])
 
   const fetchUsers = async () => {
@@ -328,7 +331,7 @@ export default function UserManagement() {
       case "customer":
         return "bg-green-500/15 text-green-600 border border-green-200"
       default:
-        return "bg-gray-500/15 text-gray-600 border border-gray-200"
+        return "bg-purple-500/15 text-purple-600 border border-purple-200" // For custom roles
     }
   }
 
@@ -489,7 +492,7 @@ export default function UserManagement() {
 
 
         {/* User Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 mb-8">
           <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -545,6 +548,20 @@ export default function UserManagement() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Custom Roles</p>
+                  <p className="text-3xl font-bold text-purple-600 mt-1">{userStats.customRoles}</p>
+                </div>
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <Shield className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search, Role Filter, and Action Bar */}
@@ -568,9 +585,11 @@ export default function UserManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="kitchen">Kitchen</SelectItem>
-                <SelectItem value="customer">Customer</SelectItem>
+                {roles.map((roleItem) => (
+                  <SelectItem key={roleItem.id} value={roleItem.roleName}>
+                    {roleItem.roleName}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -651,9 +670,11 @@ export default function UserManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="kitchen">Kitchen</SelectItem>
-                      <SelectItem value="customer">Customer</SelectItem>
+                      {roles.map((roleItem) => (
+                        <SelectItem key={roleItem.id} value={roleItem.roleName}>
+                          {roleItem.roleName}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -812,9 +833,11 @@ export default function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="kitchen">Kitchen</SelectItem>
-                    <SelectItem value="customer">Customer</SelectItem>
+                    {roles.map((roleItem) => (
+                      <SelectItem key={roleItem.id} value={roleItem.roleName}>
+                        {roleItem.roleName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

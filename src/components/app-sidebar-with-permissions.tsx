@@ -260,7 +260,7 @@ export function AppSidebar() {
               <div className="px-4 py-3 mb-2">
                 <div className="text-center">
                   <p className="font-semibold text-[#50BAAB] text-sm truncate">
-                    {user.email}
+                    {user.username || user.email}
                   </p>
                   <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">
                     {user.role}
