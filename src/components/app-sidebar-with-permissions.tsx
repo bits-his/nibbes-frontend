@@ -32,7 +32,8 @@ interface User {
   id: string;
   username: string;
   email: string;
-  role: "admin" | "kitchen" | "customer";
+  role: string;
+  permissions?: string[];
 }
 
 interface MenuItem {

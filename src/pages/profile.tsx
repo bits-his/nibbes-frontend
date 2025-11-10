@@ -33,7 +33,8 @@ interface UserProfile {
   id: string;
   username: string;
   email: string;
-  role: 'admin' | 'kitchen' | 'customer';
+  role: string;
+  permissions?: string[];
   createdAt: string;
   updatedAt: string;
   phone?: string;

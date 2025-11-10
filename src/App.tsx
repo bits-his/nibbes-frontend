@@ -70,7 +70,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Check if user is already logged in (from localStorage)
@@ -180,7 +180,7 @@ const ProtectedRoute: React.FC<{
       return true; // No roles required
     }
     
-    return user && allowedRoles.includes(user.role);
+    return user ? allowedRoles.includes(user.role) : false;
   };
 
   useEffect(() => {
