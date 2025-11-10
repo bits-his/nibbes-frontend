@@ -593,6 +593,17 @@ export default function UserManagement() {
               </SelectContent>
             </Select>
           </div>
+          <Button
+            onClick={() => {
+              fetchRoles()
+              setShowRolesDialog(true)
+            }}
+            variant="outline"
+            className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
+          >
+            <Shield className="w-5 h-5" />
+            Roles
+          </Button>
 
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
             <DialogTrigger asChild>
