@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 
-const AUTO_LOGOUT_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export const useAutoLogout = (isLoggedIn: boolean) => {
   const [, setLocation] = useLocation();
@@ -9,46 +9,50 @@ export const useAutoLogout = (isLoggedIn: boolean) => {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    let timeoutId: NodeJS.Timeout;
+    // Check if session start time exists, if not set it
+    const sessionStartTime = localStorage.getItem('sessionStartTime');
+    if (!sessionStartTime) {
+      localStorage.setItem('sessionStartTime', Date.now().toString());
+    }
 
-    const resetTimer = () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+    const checkSessionTimeout = () => {
+      const startTime = localStorage.getItem('sessionStartTime');
+      if (!startTime) return;
+
+      const elapsed = Date.now() - parseInt(startTime, 10);
+      if (elapsed >= SESSION_DURATION) {
+        // Session has exceeded 24 hours, log out
+        handleLogout();
       }
-
-      timeoutId = setTimeout(() => {
-        // Clear stored user data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('cart');
-        localStorage.removeItem('pendingCheckoutCart');
-        localStorage.removeItem('location');
-
-        // Navigate to login page
-        setLocation('/login');
-        
-        // Show a notification about auto logout
-        alert('Your session has expired. Please log in again.');
-      }, AUTO_LOGOUT_TIME);
     };
 
-    // Reset the timer on page load
-    resetTimer();
+    const handleLogout = () => {
+      // Clear stored user data
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('sessionStartTime');
+      localStorage.removeItem('cart');
+      localStorage.removeItem('pendingCheckoutCart');
+      localStorage.removeItem('location');
 
-    // Add event listeners to reset the timer on user activity
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'focus'];
-    events.forEach(event => {
-      window.addEventListener(event, resetTimer, true);
-    });
+      // Navigate to login page
+      setLocation('/login');
+
+      // Show a notification about auto logout
+      alert('Your session has expired. Please log in again.');
+    };
+
+    // Check session timeout immediately
+    checkSessionTimeout();
+
+    // Set up interval to check session timeout every minute
+    const intervalId = setInterval(checkSessionTimeout, 60000); // Check every minute
 
     // Cleanup function
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (intervalId) {
+        clearInterval(intervalId);
       }
-      events.forEach(event => {
-        window.removeEventListener(event, resetTimer, true);
-      });
     };
   }, [isLoggedIn, setLocation]);
 };
