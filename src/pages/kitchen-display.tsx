@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Clock, ChefHat } from "lucide-react";
+import { Clock, ChefHat, Search } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
@@ -12,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 export default function KitchenDisplay() {
   const { toast } = useToast();
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active"],
@@ -19,7 +21,7 @@ export default function KitchenDisplay() {
       const response = await apiRequest('GET', '/api/orders/active');
       const data = await response.json();
       // Sort orders by createdAt in descending order (newest first)
-      return data.sort((a: OrderWithItems, b: OrderWithItems) => 
+      return data.sort((a: OrderWithItems, b: OrderWithItems) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     },
@@ -39,7 +41,7 @@ export default function KitchenDisplay() {
       const data = JSON.parse(event.data);
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
-        
+
         if (data.type === "new_order") {
           toast({
             title: "New Order!",
@@ -101,7 +103,14 @@ const getStatusBadge = (status: string) => {
   );
 };
 
-  const activeOrders = orders?.filter((order) => 
+  // Filter orders based on search term
+  const filteredOrders = orders?.filter((order) => {
+    if (!searchTerm) return true; // If no search term, show all orders
+    // Check if the search term matches the order number (case insensitive)
+    return order.orderNumber.toString().toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
+
+  const activeOrders = filteredOrders?.filter((order) =>
     order.status !== "completed" && order.status !== "cancelled"
   );
 
@@ -114,6 +123,16 @@ const getStatusBadge = (status: string) => {
             <h1 className="font-serif text-4xl font-bold">Kitchen Display</h1>
           </div>
           <div className="flex items-center gap-4">
+            {/* Search Input - Added between "Kitchen Display" and "Active Orders" */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by order number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2"
+              />
+            </div>
             <Badge variant="outline" className="px-4 py-2 text-base">
               Active Orders: {activeOrders?.length || 0}
             </Badge>
