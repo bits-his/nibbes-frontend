@@ -337,7 +337,7 @@ export default function Checkout() {
                   : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
               }`}
             onClick={() => {
-              form.setValue("orderType", type);
+              form.setValue("orderType", type as "delivery" | "pickup");
               setCurrentStep(1);
             }}
           >
