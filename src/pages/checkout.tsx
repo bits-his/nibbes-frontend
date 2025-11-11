@@ -317,62 +317,42 @@ export default function Checkout() {
                 </Card>
 
                 {/* Order Type Selection Card */}
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <CardTitle className="text-lg">2. Delivery Method</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="orderType"
-                        render={({ field }) => (
-                          <>
-                            <FormItem>
-                              <FormControl>
-                                <button
-                                  type="button"
-                                  className={`w-full p-4 rounded-lg border-2 text-center transition-all font-semibold ${
-                                    field.value === "delivery"
-                                      ? "border-accent bg-accent/10 "
-                                      : "border-border/50 bg-muted/30 text-foreground hover:border-border"
-                                  }`}
-                                  onClick={() => {
-                                    field.onChange("delivery")
-                                    setCurrentStep(1)
-                                  }}
-                                >
-                                  <div className="font-semibold text-base">🚗 Delivery</div>
-                                  <div className="text-sm text-muted-foreground mt-1">To your location</div>
-                                </button>
-                              </FormControl>
-                            </FormItem>
-                            <FormItem>
-                              <FormControl>
-                                <button
-                                  type="button"
-                                  className={`w-full p-4 rounded-lg border-2 text-center transition-all font-semibold ${
-                                    field.value === "pickup"
-                                      ? "border-accent bg-accent/10 "
-                                      : "border-border/50 bg-muted/30 text-foreground hover:border-border"
-                                  }`}
-                                  onClick={() => {
-                                    field.onChange("pickup")
-                                    setCurrentStep(1)
-                                  }}
-                                >
-                                  <div className="font-semibold text-base">🏪 Pickup</div>
-                                  <div className="text-sm text-muted-foreground mt-1">At our location</div>
-                                </button>
-                              </FormControl>
-                            </FormItem>
-                          </>
-                        )}
-                      />
-                    </div>
-                    <FormMessage />
-                  </CardContent>
-                </Card>
+{/* Order Type Selection Card */}
+<Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+  <CardHeader className="bg-muted/30 border-b border-border/30">
+    <CardTitle className="text-lg">2. Delivery Method</CardTitle>
+  </CardHeader>
+  <CardContent className="pt-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {["pickup", "delivery"].map((type) => {
+        const isActive = form.watch("orderType") === type;
+        return (
+          <button
+            key={type}
+            type="button"
+            className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+              ${
+                isActive
+                  ? "border-[#50BAAB] bg-[#50BAAB]/10 text-foreground shadow-md"
+                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
+              }`}
+            onClick={() => {
+              form.setValue("orderType", type);
+              setCurrentStep(1);
+            }}
+          >
+            <div className="font-semibold text-base capitalize">{type}</div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {type === "pickup" ? "At our location" : "To your location"}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+    <FormMessage />
+  </CardContent>
+</Card>
+
 
                 {/* Location Information Card */}
                 {locationData && form.watch("orderType") === "delivery" && (
