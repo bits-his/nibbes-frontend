@@ -275,7 +275,7 @@ export function AppSidebar() {
                 <img
                   src="/nibbles.jpg"
                   alt="Nibbles Logo"
-                  className="relative h-30 w-30 rounded-full object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
+                  className="relative h-30 w-20 rounded-full object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
             </SidebarGroupLabel>

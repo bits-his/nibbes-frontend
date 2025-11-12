@@ -77,7 +77,7 @@
   --chart-5: 28 68% 35%;
 
   --font-sans: Inter, system-ui, -apple-system, sans-serif;
-  --font-serif: Poppins, Georgia, serif;
+  --font-serif: "Inria Serif", Georgia, serif;
   --font-mono: Menlo, Monaco, monospace;
   --radius: .5rem; /* 8px */
   --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.03);
@@ -211,7 +211,7 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-serif antialiased bg-background text-foreground;
   }
   
   html {
