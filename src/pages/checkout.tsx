@@ -352,9 +352,7 @@ export default function Checkout() {
     <FormMessage />
   </CardContent>
 </Card>
-
-
-                {/* Location Information Card */}
+                {/* Location Information Cards Part */}
                 {locationData && form.watch("orderType") === "delivery" && (
                   <Card className="border-accent/30 bg-accent/5 shadow-sm">
                     <CardHeader className="bg-accent/10 border-b border-accent/20">
