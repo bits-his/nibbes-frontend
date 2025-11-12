@@ -1,7 +1,7 @@
 {
-  "name": "Nibbles Kitchen - Food Order Management",
-  "short_name": "Nibbles Kitchen",
-  "description": "Order delicious meals from Nibbles Kitchen. Manage your orders, browse menu, and enjoy seamless food ordering experience.",
+  "name": "Nibbles - Food Order Management",
+  "short_name": "Nibbles",
+  "description": "Order delicious meals from Nibbles. Manage your orders, browse menu, and enjoy seamless food ordering experience.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Download, Utensils } from 'lucide-react'; // Added Utensils for logo example
 
-// Placeholder for a small logo (e.g., a simplified Nibbles Kitchen icon)
+// Placeholder for a small logo (e.g., a simplified Nibbles icon)
 // In a real app, you would import a small PNG/SVG or use a dedicated component.
 const LOGO_BASE64 = 'data:image/png;base64,...'; // Replace with an actual base64 image string
 
@@ -63,7 +63,7 @@ export default function QRCodePage() {
       // Add title
       pdf.setFontSize(18);
       pdf.setTextColor(40, 40, 40); // Dark text color
-      pdf.text('Nibbles Kitchen', pdfWidth / 2, 20, { align: 'center' });
+      pdf.text('Nibbles', pdfWidth / 2, 20, { align: 'center' });
       pdf.setFontSize(12);
       pdf.text('Scan this Unique QR Code to access the menu', pdfWidth / 2, 30, { align: 'center' });
       
@@ -94,7 +94,7 @@ export default function QRCodePage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-serif text-[#50BAA8]">Nibbles Kitchen</CardTitle>
+          <CardTitle className="text-2xl font-serif text-[#50BAA8]">Nibbles</CardTitle>
           <CardDescription>Scan this **uniquely styled** QR code to access the menu directly</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center space-y-6">
@@ -343,7 +343,7 @@ export default function QRCodePage() {
       
 //       pdf.setFontSize(22);
 //       pdf.setTextColor('#fcae47'); 
-//       pdf.text('Nibbles Kitchen', pdfWidth / 2, 25, { align: 'center' });
+//       pdf.text('Nibbles', pdfWidth / 2, 25, { align: 'center' });
       
 //       pdf.setFontSize(14);
 //       pdf.setTextColor(60, 60, 60);
@@ -370,7 +370,7 @@ export default function QRCodePage() {
 //       <Card className="w-full max-w-lg bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl">
 //         <CardHeader className="text-center p-6">
 //           <CardTitle className="text-3xl font-serif text-transparent bg-clip-text bg-gradient-to-r from-[#fcae47] to-[#50BAA8]">
-//             Nibbles Kitchen
+//             Nibbles
 //           </CardTitle>
 //           <CardDescription className="text-md text-gray-700">
 //             Immerse yourself! Scan this intensely beautiful QR code for our menu.
@@ -386,7 +386,7 @@ export default function QRCodePage() {
 //               className={`block max-w-full h-auto transition-opacity duration-500 ${isDrawing ? 'opacity-0' : 'opacity-100'}`}
 //               style={{ width: `${QR_SIZE}px`, height: `${QR_SIZE}px` }} 
 //               role="img" 
-//               aria-label="Enchanted QR Code for Nibbles Kitchen Menu"
+//               aria-label="Enchanted QR Code for Nibbles Menu"
 //             />
             
 //             {/* Show loading overlay when isDrawing is true */}

@@ -1,8 +1,8 @@
-# Nibbles Kitchen Order Management System
+# Nibbles Order Management System
 
 ## Overview
 
-Nibbles Kitchen Order Management System is a complete, production-ready full-stack web application for managing restaurant orders, menu items, and kitchen operations. The system serves multiple user roles including customers placing online orders, staff taking walk-in orders, kitchen staff viewing active orders, and managers overseeing operations and menu management.
+Nibbles Order Management System is a complete, production-ready full-stack web application for managing restaurant orders, menu items, and kitchen operations. The system serves multiple user roles including customers placing online orders, staff taking walk-in orders, kitchen staff viewing active orders, and managers overseeing operations and menu management.
 
 The application features real-time order updates via WebSocket connections, a comprehensive menu management system, Interswitch payment processing integration, and distinct interfaces optimized for different user workflows (customer ordering vs. operational staff views).
 

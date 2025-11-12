@@ -95,7 +95,7 @@ export default function OrderStatus() {
       case "ready":
         return "Your order is ready for pickup!";
       case "completed":
-        return "Order completed. Thank you for choosing Nibbles Kitchen!";
+        return "Order completed. Thank you for choosing Nibbles!";
       default:
         return "Order status unknown.";
     }

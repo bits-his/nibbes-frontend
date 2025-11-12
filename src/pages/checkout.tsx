@@ -333,7 +333,7 @@ export default function Checkout() {
             className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
               ${
                 isActive
-                  ? "border-[#50BAAB] bg-[#50BAAB]/10 text-foreground shadow-md"
+                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
                   : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
               }`}
             onClick={() => {

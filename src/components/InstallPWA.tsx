@@ -102,12 +102,12 @@ export function InstallPWA() {
             <div className="w-12 h-12 bg-[#50BAA8] rounded-xl flex items-center justify-center">
               <img
                 src="/pwa-icons/icon-72x72.png"
-                alt="Nibbles Kitchen"
+                alt="Nibbles"
                 className="w-10 h-10 rounded-lg"
               />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-lg">Install Nibbles Kitchen</h3>
+              <h3 className="font-bold text-slate-900 text-lg">Install Nibbles</h3>
               <p className="text-sm text-slate-600">Add to your home screen</p>
             </div>
           </div>

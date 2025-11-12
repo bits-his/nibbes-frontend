@@ -257,7 +257,7 @@ export default function CustomerMenu() {
         <div className="absolute inset-0">
           <img
             src={heroImage}
-            alt="Nibbles Kitchen"
+            alt="Nibbles"
             className="w-full h-full object-cover object-center"
             loading="eager"
           />
@@ -265,7 +265,7 @@ export default function CustomerMenu() {
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto w-full">
           <h1 className="font-serif text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-2 sm:mb-3 leading-tight">
-            Order Fresh from Nibbles Kitchen
+            Order Fresh from Nibbles
           </h1>
           <p className="text-xs xs:text-sm sm:text-base md:text-lg text-white/90 mb-3 sm:mb-4">
             Authentic Nigerian cuisine delivered to your table

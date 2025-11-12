@@ -1,4 +1,4 @@
-# Nibbles Kitchen Order Management System - Complete Design System Audit Report
+# Nibbles Order Management System - Complete Design System Audit Report
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
@@ -16,7 +16,7 @@
 
 ## Executive Summary
 
-The Nibbles Kitchen Order Management System is a comprehensive food ordering platform built with React, TypeScript, and Tailwind CSS. The application serves three distinct user roles: customers, kitchen staff, and administrators, each with tailored interfaces and functionality. The system features real-time order tracking, payment integration, and role-based access control.
+The Nibbles Order Management System is a comprehensive food ordering platform built with React, TypeScript, and Tailwind CSS. The application serves three distinct user roles: customers, kitchen staff, and administrators, each with tailored interfaces and functionality. The system features real-time order tracking, payment integration, and role-based access control.
 
 **Key Features:**
 - Customer menu browsing and ordering

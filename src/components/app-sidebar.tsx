@@ -271,11 +271,11 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel className="flex justify-center py-6 px-4 border-b border-white/2 h-300">
               <div className="relative group">
-                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md group-hover:blur-lg transition-all duration-300"></div>
+                <div className="absolute inset-0 bg-white/10 rounded-full blur-md group-hover:blur-lg transition-all duration-300"></div>
                 <img
                   src="/nibbles.jpg"
-                  alt="Nibbles Kitchen Logo"
-                  className="relative h-30 w-40 rounded-2xl object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
+                  alt="Nibbles Logo"
+                  className="relative h-30 w-30 rounded-full object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
             </SidebarGroupLabel>
@@ -284,14 +284,14 @@ export function AppSidebar() {
             {user && (
               <div className="px-4 py-3 mb-2">
                 <div className="text-center">
-                  <p className="font-semibold text-[#50BAAB] text-sm truncate">
+                  <p className="font-semibold text-[#4EB5A4] text-sm truncate">
                     {user.username || user.email}
                   </p>
-                  <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">
+                  <p className="text-[#4EB5A4]/70 text-xs capitalize mt-1">
                     {user.role}
                   </p>
                   {userPermissions.length > 0 && (
-                    <p className="text-[#50BAA8]/50 text-xs mt-1">
+                    <p className="text-[#4EB5A4]/50 text-xs mt-1">
                       {userPermissions.length} permissions
                     </p>
                   )}

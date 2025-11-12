@@ -250,7 +250,7 @@ export function AppSidebar() {
                 <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md group-hover:blur-lg transition-all duration-300"></div>
                 <img
                   src="/nibbles.jpg"
-                  alt="Nibbles Kitchen Logo"
+                  alt="Nibbles Logo"
                   className="relative h-30 w-40 rounded-2xl object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
@@ -260,7 +260,7 @@ export function AppSidebar() {
             {user && (
               <div className="px-4 py-3 mb-2">
                 <div className="text-center">
-                  <p className="font-semibold text-[#50BAAB] text-sm truncate">
+                  <p className="font-semibold text-[#4EB5A4] text-sm truncate">
                     {user.username || user.email}
                   </p>
                   <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">

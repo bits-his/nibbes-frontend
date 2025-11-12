@@ -1,4 +1,4 @@
-# Nibbles Kitchen Order Management System - Design Guidelines
+# Nibbles Order Management System - Design Guidelines
 
 ## Design Approach
 
@@ -44,7 +44,7 @@
 ## Customer Ordering Interface
 
 **Homepage/Menu Browsing**:
-- Hero section (60vh-80vh): Full-width appetizing food image with blurred overlay, centered headline "Order Fresh from Nibbles Kitchen" (text-5xl), subheading about quick delivery/pickup, primary CTA button with backdrop-blur-md bg-white/20
+- Hero section (60vh-80vh): Full-width appetizing food image with blurred overlay, centered headline "Order Fresh from Nibbles" (text-5xl), subheading about quick delivery/pickup, primary CTA button with backdrop-blur-md bg-white/20
 - Category navigation: Horizontal scroll on mobile, fixed navigation bar on desktop (sticky top-0) with category pills
 - Menu grid: 3-column layout (desktop), image-first cards with rounded-2xl, each card showing food image (aspect-square), dish name (text-lg font-semibold), brief description (text-sm), price (text-xl font-bold)
 - Quick filters: Badge-style buttons for dietary preferences (Vegetarian, Spicy, Popular)
@@ -119,7 +119,7 @@
 
 ## Images
 
-**Hero Section**: Large, high-quality food photography showing Nibbles Kitchen's signature dishes, appetizing presentation with warm lighting. Image should convey freshness and quality (full-width, 60vh-80vh).
+**Hero Section**: Large, high-quality food photography showing Nibbles's signature dishes, appetizing presentation with warm lighting. Image should convey freshness and quality (full-width, 60vh-80vh).
 
 **Menu Items**: Square aspect ratio (aspect-square) food photography for each dish, consistent lighting and styling across all images, close-up shots highlighting texture and ingredients.
 

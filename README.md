@@ -1,6 +1,6 @@
-# Nibbles Kitchen Order Management System - Frontend
+# Nibbles Order Management System - Frontend
 
-A comprehensive frontend application for the Nibbles Kitchen Order Management System with analytics and inventory management capabilities.
+A comprehensive frontend application for the Nibbles Order Management System with analytics and inventory management capabilities.
 
 ## Features
 
@@ -72,7 +72,7 @@ The sidebar navigation dynamically shows different options based on user roles:
 
  Summary
 
-  I have successfully extended the Nibbles Kitchen Order Management System with a comprehensive analytics & reporting
+  I have successfully extended the Nibbles Order Management System with a comprehensive analytics & reporting
   module as requested. Here's what was implemented:
 
   Backend Features

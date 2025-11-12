@@ -77,13 +77,13 @@ export default function Signup() {
         <CardHeader className="text-center pb-8">
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-teal-600 rounded-lg blur opacity-20"></div>
-              <img src="/nibbles.jpg" alt="Nibbles Kitchen Logo" className="h-20 w-auto object-contain relative" />
+              <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full blur opacity-20"></div>
+              <img src="/nibbles.jpg" alt="Nibbles Logo" className="h-20 w-auto object-contain relative rounded-full" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold text-slate-900 sr-only">Nibbles Kitchen</CardTitle>
+          <CardTitle className="text-3xl font-bold text-slate-900 sr-only">Nibbles</CardTitle>
           <CardDescription className="text-base text-slate-600 mt-2">
-            Join Nibbles Kitchen and start managing your orders
+            Join Nibbles and start managing your orders
           </CardDescription>
         </CardHeader>
 

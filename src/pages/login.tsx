@@ -93,13 +93,13 @@ export default function Login() {
               <div className="absolute inset-0 bg-primary/5 rounded-full blur-xl"></div>
               <img
                 src="/nibbles.jpg"
-                alt="Nibbles Kitchen Logo"
-                className="h-20 w-auto object-contain relative z-10 transition-transform duration-300 hover:scale-105"
+                alt="Nibbles Logo"
+                className="h-20 w-auto object-contain relative z-10 rounded-full transition-transform duration-300 hover:scale-105"
               />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight sr-only">Nibbles Kitchen</CardTitle>
-          <CardDescription className="text-base text-foreground/70">Welcome back to Nibbles Kitchen</CardDescription>
+          <CardTitle className="text-3xl font-bold tracking-tight sr-only">Nibbles</CardTitle>
+          <CardDescription className="text-base text-foreground/70">Welcome back to Nibbles</CardDescription>
           <p className="text-sm text-muted-foreground mt-2">Sign in to manage your account</p>
         </CardHeader>
 

@@ -1,4 +1,4 @@
-// Nibbles Kitchen Service Worker
+// Nibbles Service Worker
 // Version 1.0.0
 
 const CACHE_NAME = 'nibbles-kitchen-v1';
@@ -118,7 +118,7 @@ self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push received:', event);
 
   const options = {
-    body: event.data ? event.data.text() : 'New notification from Nibbles Kitchen',
+    body: event.data ? event.data.text() : 'New notification from Nibbles',
     icon: '/pwa-icons/icon-192x192.png',
     badge: '/pwa-icons/icon-72x72.png',
     vibrate: [200, 100, 200],
@@ -131,7 +131,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('Nibbles Kitchen', options)
+    self.registration.showNotification('Nibbles', options)
   );
 });
 
