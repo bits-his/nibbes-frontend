@@ -346,9 +346,9 @@ function Router() {
       <Route
         path="/order-status"
         component={() => (
-          <ProtectedRoute requiredPermissions={["customer_menu", "docket_display"]}>
+          <PublicRoute>
             <OrderStatus />
-          </ProtectedRoute>
+          </PublicRoute>
         )}
       />
 
@@ -396,9 +396,9 @@ function Router() {
       <Route
         path="/docket"
         component={() => (
-          <ProtectedRoute requiredPermissions={["docket_display"]}>
+          <PublicRoute>
             <DucketDisplay />
-          </ProtectedRoute>
+          </PublicRoute>
         )}
       />
       <Route

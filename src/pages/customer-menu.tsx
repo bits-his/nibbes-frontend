@@ -85,18 +85,19 @@ export default function CustomerMenu() {
   }, []);
   const [showQRCode, setShowQRCode] = useState(false);
 
-  const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
+  const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
   });
 
-  const categories = [
-    "All",
-    "Main Course",
-    "Appetizer",
-    "Dessert",
-    "Drinks",
-    "Snacks",
-  ];
+  // Extract unique categories from menu items
+  const categories = menuItems
+    ? ["All", ...Array.from(new Set(menuItems.map(item => item.category)))]
+    : ["All"];
+
+  console.log("Available categories:", categories); // Debug log
+
+  // Use loading state from menu only
+  const isLoading = menuLoading;
 
   const filteredItems = menuItems?.filter(
     (item) =>
@@ -356,7 +357,7 @@ export default function CustomerMenu() {
 
             <div className="flex-1 overflow-x-auto min-w-0">
               <div className="flex gap-1 sm:gap-2">
-                {categories.map((category) => (
+                {(categories || ["All"]).map((category: string) => (
                   <Badge
                     key={category}
                     variant={
@@ -411,7 +412,7 @@ export default function CustomerMenu() {
               {/* Scrollable Category Buttons */}
               <div className="flex-1 overflow-x-auto -mx-3 px-3 mr-[1px]">
                 <div className="flex gap-1.5 sm:gap-2 w-max">
-                  {categories.map((category) => (
+                  {(categories || ["All"]).map((category: string) => (
                     <Badge
                       key={category}
                       variant={
