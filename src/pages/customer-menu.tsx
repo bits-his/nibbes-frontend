@@ -44,6 +44,12 @@ export default function CustomerMenu() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Initialize and refresh menu data on component mount
+  useEffect(() => {
+    // Force refresh the menu data when component mounts to ensure fresh data
+    queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+  }, []);
+
   // WebSocket connection for real-time menu updates
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
