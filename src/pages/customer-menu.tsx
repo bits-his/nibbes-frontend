@@ -21,6 +21,7 @@ import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem, CartItem } from "@shared/schema";
 import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
 import { queryClient } from "@/lib/queryClient";
+import { SEO } from "@/components/SEO";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -258,8 +259,16 @@ export default function CustomerMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
+    <>
+      <SEO
+        title="Home - Order Authentic Nigerian Cuisine Online"
+        description="Browse our menu of delicious Nigerian dishes. Order jollof rice, suya, pounded yam, egusi soup, pepper soup, fried rice and more. Fast online ordering with pickup service. Fresh meals prepared daily."
+        keywords="Nigerian food menu, order jollof rice online, suya delivery, Nigerian restaurant menu, African food online, pounded yam, egusi soup, order Nigerian food, online food ordering"
+        ogUrl="https://nibbleskitchen.netlify.app/"
+        canonicalUrl="https://nibbleskitchen.netlify.app/"
+      />
+      <div className="min-h-screen bg-background">
+        {/* Hero Section */}
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
           <img
@@ -737,6 +746,7 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
-    </div>
+      </div>
+    </>
   );
 }

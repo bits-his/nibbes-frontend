@@ -36,6 +36,8 @@ import DocketPage from "@/pages/docket";
 import InventoryPage from "@/pages/inventory";
 import CustomerAnalyticsDashboard from "@/pages/customer-analytics-enhanced";
 import StoreManagement from "@/pages/store-management";
+import AboutPage from "@/pages/about";
+import ContactPage from "@/pages/contact";
 
 // Define user type
 interface User {
@@ -342,6 +344,8 @@ function Router() {
 
       {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
+      <Route path="/about" component={AboutPage} />
+      <Route path="/contact" component={ContactPage} />
       <Route path="/checkout" component={Checkout} />
       <Route
         path="/order-status"

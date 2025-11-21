@@ -1,14 +1,16 @@
 {
-  "name": "Nibbles - Food Order Management",
+  "name": "Nibbles Kitchen - Authentic Nigerian Cuisine",
   "short_name": "Nibbles",
-  "description": "Order delicious meals from Nibbles. Manage your orders, browse menu, and enjoy seamless food ordering experience.",
+  "description": "Order authentic Nigerian cuisine online from Nibbles Kitchen. Browse our menu of jollof rice, suya, pounded yam, egusi soup and more. Fast pickup service with fresh meals prepared daily.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#50BAA8",
   "orientation": "portrait-primary",
   "scope": "/",
-  "categories": ["food", "shopping", "business"],
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["food", "shopping", "business", "lifestyle"],
   "icons": [
     {
       "src": "/pwa-icons/icon-72x72.png",
