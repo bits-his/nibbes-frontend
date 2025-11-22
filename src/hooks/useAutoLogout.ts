@@ -23,6 +23,9 @@ export const useAutoLogout = (isLoggedIn: boolean) => {
     };
 
     const handleLogout = () => {
+      // Show notification first
+      alert('Your session has expired. Please log in again.');
+
       // Clear stored user data
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -31,11 +34,8 @@ export const useAutoLogout = (isLoggedIn: boolean) => {
       localStorage.removeItem('pendingCheckoutCart');
       localStorage.removeItem('location');
 
-      // Navigate to login page
-      setLocation('/login');
-
-      // Show a notification about auto logout
-      alert('Your session has expired. Please log in again.');
+      // Force page reload to login after clearing data
+      window.location.href = '/login';
     };
 
     const scheduleMidnightLogout = () => {
