@@ -255,7 +255,7 @@ export default function CustomerMenu() {
       localStorage.setItem("location", JSON.stringify(locationData));
     }
 
-    setLocation("/guest-checkout");
+    setLocation("/checkout");
   };
 
   return (
