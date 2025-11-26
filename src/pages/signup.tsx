@@ -17,6 +17,7 @@ export default function Signup() {
   const { login } = useAuth()
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -45,6 +46,7 @@ export default function Signup() {
       const response = await apiRequest("POST", "/api/auth/register", {
         username,
         email,
+        phoneNumber,
         password,
       })
       const data = await response.json()
@@ -121,6 +123,21 @@ export default function Signup() {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber" className="text-sm font-semibold text-slate-700">
+                Phone Number
+              </Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                placeholder="Enter your phone number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 required
                 className="h-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
               />

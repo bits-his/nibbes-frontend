@@ -128,7 +128,7 @@ export default function GuestCheckout() {
               </p>
             </div>
 
-            <div className="space-y-2.5">
+            {/* <div className="space-y-2.5">
               <Label htmlFor="guestEmail" className="text-sm font-semibold text-foreground">
                 Email Address <span className="text-muted-foreground text-xs">(Optional)</span>
               </Label>
@@ -143,7 +143,7 @@ export default function GuestCheckout() {
               <p className="text-xs text-muted-foreground">
                 For order confirmation and updates
               </p>
-            </div>
+            </div> */}
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4 pt-2 pb-8">

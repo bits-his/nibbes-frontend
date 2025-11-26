@@ -287,9 +287,9 @@ export function AppSidebar() {
                   <p className="font-semibold text-[#4EB5A4] text-sm truncate">
                     {user.username || user.email}
                   </p>
-                  <p className="text-[#4EB5A4]/70 text-xs capitalize mt-1">
+                  {/* <p className="text-[#4EB5A4]/70 text-xs capitalize mt-1">
                     {user.role}
-                  </p>
+                  </p> */}
                   {/* {userPermissions.length > 0 && (
                     <p className="text-[#4EB5A4]/50 text-xs mt-1">
                       {userPermissions.length} permissions

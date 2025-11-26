@@ -139,7 +139,7 @@ export default function Checkout() {
         localStorage.setItem("pendingCheckoutCart", savedCart)
       }
 
-      setLocation("/login?redirect=/checkout")
+      setLocation("/guest-checkout")
       return
     }
 
@@ -205,7 +205,7 @@ export default function Checkout() {
       return
     }
 
-    const guestSession = getGuestSession()
+    const guestSession = getGuestSession();
 
     const orderData = {
       customerName: values.customerName,
@@ -285,7 +285,7 @@ export default function Checkout() {
                             <Input
                               placeholder="John Doe"
                               {...field}
-                              readOnly={!!user}
+                              readOnly={!!user && !!user.username} // Only read-only for authenticated users with username
                               className="h-11 text-base rounded-lg border-border/50"
                               data-testid="input-name"
                             />
@@ -425,17 +425,32 @@ export default function Checkout() {
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>Delivery</span>
-                        <span className={form.watch("orderType") === "pickup" ? " font-semibold" : ""}>
+                        <span className={form.watch("orderType") === "pickup" ? "font-semibold" : ""}>
                           {form.watch("orderType") === "pickup" ? "Free" : "₦500"}
                         </span>
                       </div>
+                      {form.watch("orderType") === "delivery" && (
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT (7.5%)</span>
+                          <span>₦{(() => {
+                            const baseAmount = subtotal + (form.watch("orderType") === "pickup" ? 0 : 500);
+                            return (baseAmount * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                          })()}</span>
+                        </div>
+                      )}
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
                         <span className="font-semibold text-foreground">Total</span>
                         <span className="text-2xl font-bold " data-testid="text-total">
                           ₦
-                          {(subtotal + (form.watch("orderType") === "pickup" ? 0 : 500)).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                          })}
+                          {(() => {
+                            const baseAmount = subtotal + (form.watch("orderType") === "pickup" ? 0 : 500);
+                            const totalWithVat = form.watch("orderType") === "delivery"
+                              ? baseAmount * 1.075 // Add 7.5% VAT for delivery
+                              : baseAmount;
+                            return totalWithVat.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            });
+                          })()}
                         </span>
                       </div>
                     </div>
