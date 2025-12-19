@@ -475,7 +475,7 @@ export default function UserManagement() {
             </div>
             <h1 className="text-4xl font-bold text-slate-900">User Management</h1>
           
-          <Button
+          {/* <Button
             onClick={() => {
               fetchRoles()
               setShowRolesDialog(true)
@@ -484,8 +484,8 @@ export default function UserManagement() {
             className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
           >
             <Shield className="w-5 h-5" />
-            Roles
-          </Button>
+            Roles 
+          </Button> */}
           </div>
           <p className="text-slate-600 ml-11">Manage users, roles, and permissions across your system</p>
         </div>

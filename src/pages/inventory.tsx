@@ -1,5 +1,3 @@
-"use client"
-
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,10 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Edit, Trash2, Package, AlertTriangle, CheckCircle, MinusCircle, PlusCircle, Loader } from "lucide-react"
+import { Plus, Edit, Trash2, Package, AlertTriangle, CheckCircle, MinusCircle, PlusCircle, Loader, Eye } from "lucide-react"
 
 interface InventoryItem {
   id: string
+  itemCode?: string
   name: string
   description: string
   quantity: number
@@ -51,6 +50,9 @@ export default function InventoryManagement() {
   const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [showTransactionsDialog, setShowTransactionsDialog] = useState<boolean>(false)
+  const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
+  const [transactionsLoading, setTransactionsLoading] = useState<boolean>(false)
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -109,16 +111,16 @@ export default function InventoryManagement() {
     const connectWebSocket = () => {
       try {
         const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
-        
+
         wsRef.current = new WebSocket(wsUrl);
-        
+
         wsRef.current.onopen = () => {
           console.log('Inventory WebSocket connected');
         };
-        
+
         wsRef.current.onmessage = (event) => {
           const message: WebSocketMessage = JSON.parse(event.data);
-          
+
           switch(message.event) {
             case 'inventory-update':
               // Reload inventory data when items are updated
@@ -141,13 +143,13 @@ export default function InventoryManagement() {
               console.log('Received unknown event:', message.event);
           }
         };
-        
+
         wsRef.current.onclose = () => {
           console.log('Inventory WebSocket disconnected');
           // Attempt to reconnect after 5 seconds
           setTimeout(connectWebSocket, 5000);
         };
-        
+
         wsRef.current.onerror = (error) => {
           console.error('Inventory WebSocket error:', error);
         };
@@ -172,7 +174,7 @@ export default function InventoryManagement() {
 
     if (selectedCategory !== "all") {
       result = result.filter((item) => item.category === selectedCategory)
-    }
+    } 
 
     if (showLowStockOnly) {
       result = result.filter((item) => item.quantity <= item.minThreshold)
@@ -246,10 +248,10 @@ export default function InventoryManagement() {
       const result = await response.json();
       const updatedItem = result.data; // Assuming backend returns the updated item
 
-      const updatedItems = inventoryItems.map(item => 
+      const updatedItems = inventoryItems.map(item =>
         item.id === itemData.id ? updatedItem : item
       );
-      
+
       setInventoryItems(updatedItems);
       setFilteredItems(updatedItems.filter(item => {
         let match = true;
@@ -265,10 +267,10 @@ export default function InventoryManagement() {
     } catch (error) {
       console.error('Error updating inventory item:', error);
       // Still update UI for immediate feedback, but show error
-      const updatedItems = inventoryItems.map(item => 
+      const updatedItems = inventoryItems.map(item =>
         item.id === itemData.id ? itemData : item
       );
-      
+
       setInventoryItems(updatedItems);
       setFilteredItems(updatedItems.filter(item => {
         let match = true;
@@ -326,6 +328,42 @@ export default function InventoryManagement() {
     )
   }
 
+  // Function to handle viewing item transactions
+  const handleViewItemTransactions = async (item: InventoryItem) => {
+    try {
+      setTransactionsLoading(true);
+
+      // Fetch transaction data for the specific item
+      // Use the store_entries endpoint to get all entries for this item
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/store-entries/item-code/${item.itemCode}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch transactions: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Assuming the API returns entries in the format we need
+      // If not, we might need to adjust the response structure
+      setSelectedItemTransactions(data.entries || []);
+      setShowTransactionsDialog(true);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      // Show error in console instead of toast
+      alert("Failed to load item transactions");
+      // Even if there's an error, still open the dialog but with an error message
+      setSelectedItemTransactions([]);
+      setShowTransactionsDialog(true);
+    } finally {
+      setTransactionsLoading(false);
+    }
+  }
+
   const getStatusColor = (quantity: number, minThreshold: number) => {
     if (quantity === 0) return "bg-red-100 text-red-800"
     if (quantity <= minThreshold) return "bg-yellow-100 text-yellow-800"
@@ -364,7 +402,7 @@ export default function InventoryManagement() {
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900">Inventory Management</h1>
+              <h1 className="text-4xl font-bold text-slate-900">Store Inventory</h1>
               <p className="text-slate-600 mt-2">Track and manage your ingredients and supplies</p>
             </div>
             <Button
@@ -471,6 +509,7 @@ export default function InventoryManagement() {
                       <TableHead className="text-slate-700 font-semibold">Unit</TableHead>
                       <TableHead className="text-slate-700 font-semibold">Min Threshold</TableHead>
                       <TableHead className="text-slate-700 font-semibold">Price/Unit</TableHead>
+                      <TableHead className="text-slate-700 font-semibold">Expiry Date</TableHead>
                       <TableHead className="text-slate-700 font-semibold">Status</TableHead>
                       <TableHead className="text-slate-700 font-semibold">Supplier</TableHead>
                       <TableHead className="text-right text-slate-700 font-semibold">Actions</TableHead>
@@ -490,6 +529,12 @@ export default function InventoryManagement() {
                           <TableCell className="text-slate-700">{item.unit}</TableCell>
                           <TableCell className="text-slate-700">{item.minThreshold}</TableCell>
                           <TableCell className="text-slate-700">₦{Number(item.pricePerUnit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-slate-700">
+                            {item.expiryDate ? 
+                              new Date(item.expiryDate).toLocaleDateString() : 
+                              "No expiry date"
+                            }
+                          </TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(item.quantity, item.minThreshold)}>
                               {getStatusText(item.quantity, item.minThreshold)}
@@ -498,6 +543,7 @@ export default function InventoryManagement() {
                           <TableCell className="text-slate-700">{item.supplier}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-1">
+                              {/* Commenting out all action buttons except View
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -537,13 +583,23 @@ export default function InventoryManagement() {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+                              */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewItemTransactions(item)}
+                                className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                                title="View Transactions"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">
+                        <TableCell colSpan={10} className="text-center py-8">
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-slate-300" />
                             <p className="text-slate-500">No inventory items found</p>
@@ -609,7 +665,7 @@ const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, o
   const [unit, setUnit] = useState(initialData?.unit || "kg")
   const [minThreshold, setMinThreshold] = useState(initialData?.minThreshold?.toString() || "5")
   const [pricePerUnit, setPricePerUnit] = useState(initialData?.pricePerUnit || "0.00")
-  const [category, setCategory] = useState(initialData?.category || "")
+  const [category, setCategory] = useState(initialData?.category || "Meat")
   const [supplier, setSupplier] = useState(initialData?.supplier || "")
   const [expiryDate, setExpiryDate] = useState(initialData?.expiryDate || "")
 
@@ -636,7 +692,7 @@ const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, o
     setUnit("kg")
     setMinThreshold("5")
     setPricePerUnit("0.00")
-    setCategory("")
+    setCategory("Meat")
     setSupplier("")
     setExpiryDate("")
   }
@@ -723,13 +779,25 @@ const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, o
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="category">Category</Label>
-          <Input
-            id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            required
-            className="border-slate-200"
-          />
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="border-slate-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Meat">Meat</SelectItem>
+              <SelectItem value="Vegetables">Vegetables</SelectItem>
+              <SelectItem value="Grains">Grains</SelectItem>
+              <SelectItem value="Oil">Oil</SelectItem>
+              <SelectItem value="Perishable">Perishable</SelectItem>
+              <SelectItem value="Daily Fresh">Daily Fresh</SelectItem>
+              <SelectItem value="Dairy">Dairy</SelectItem>
+              <SelectItem value="Bakery">Bakery</SelectItem>
+              <SelectItem value="Frozen">Frozen</SelectItem>
+              <SelectItem value="Beverages">Beverages</SelectItem>
+              <SelectItem value="Spices">Spices</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">

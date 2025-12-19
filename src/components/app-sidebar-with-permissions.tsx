@@ -12,6 +12,7 @@ import {
   BarChart3,
   Package,
   Store,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -109,6 +110,13 @@ const menuItems: MenuItem[] = [
     permissions: ["manage_store"],
   },
   { 
+    title: "Transactions", 
+    url: "/transactions", 
+    icon: CreditCard, 
+    roles: ["admin"],
+    permissions: ["manage_store", "manage_inventory"],
+  },
+  { 
     title: "Analytics & Reports", 
     url: "/dashboard/analytics", 
     icon: BarChart3, 
@@ -135,6 +143,13 @@ const menuItems: MenuItem[] = [
     icon: ClipboardList, 
     roles: ["admin"],
     permissions: ["create_orders"],
+  },
+  { 
+    title: "EM Card", 
+    url: "/emcard", 
+    icon: CreditCard, 
+    roles: ["admin"],
+    permissions: ["manage_menu"],
   },
   { 
     title: "Profile", 

@@ -110,6 +110,18 @@ const getStatusBadge = (status: string) => {
     </Badge>
   );
 };
+
+const getStatusCardColor = (status: string) => {
+  const cardColors: Record<string, string> = {
+    pending: "bg-yellow-200 border-yellow-400",
+    preparing: "bg-orange-200 border-orange-400",
+    ready: "bg-green-200 border-green-400",
+    completed: "bg-red-200 border-red-400",
+    cancelled: "bg-gray-300 border-gray-500",
+  };
+
+  return cardColors[status] || "bg-gray-200 border-gray-400";
+};
   
   return (
     <div className="min-h-screen bg-background p-6">
@@ -150,9 +162,9 @@ const getStatusBadge = (status: string) => {
             {activeOrders.map((order) => (
               <Card 
                 key={order.id} 
-                className="overflow-hidden border-2 hover:shadow-lg transition-shadow"
+                className={`overflow-hidden border-2 hover:shadow-lg transition-shadow ${getStatusCardColor(order.status)}`}
               >
-                <CardHeader className="p-6 bg-card space-y-3">
+                <CardHeader className="p-6 space-y-3">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-4xl font-bold mb-1">

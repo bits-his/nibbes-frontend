@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Plus, Minus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,13 +24,14 @@ type OrderFormValues = z.infer<typeof orderFormSchema>;
 
 export default function StaffOrders() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cart, setCart] = useState<CartItem[]>([]);
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
-      customerName: "",
+      customerName: "Nibbles Kitchen",
       customerPhone: "",
     },
   });
@@ -91,28 +93,33 @@ export default function StaffOrders() {
     0
   );
 
-  const createOrderMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/orders", data);
-      return await response.json();
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Order Created!",
-        description: `Walk-in order #${data.orderNumber} submitted to kitchen.`,
-      });
-      setCart([]);
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create order. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  // No longer creating order here - just preparing data for checkout
+  const handleProceedToCheckout = () => {
+    toast({
+      title: "Proceeding to Payment",
+      description: "Please confirm payment method...",
+    });
+    
+    // Store cart and customer data for checkout (NO order created yet)
+    localStorage.setItem('pendingWalkInOrder', JSON.stringify({
+      customerName: form.getValues('customerName'),
+      customerPhone: form.getValues('customerPhone'),
+      total: subtotal,
+      items: cart.map((item) => ({
+        menuItemId: item.menuItem.id,
+        quantity: item.quantity,
+        price: item.menuItem.price,
+        specialInstructions: item.specialInstructions,
+        name: item.menuItem.name,
+      })),
+    }));
+    
+    setCart([]);
+    form.reset({ customerName: "Nibbles Kitchen", customerPhone: "" });
+    
+    // Redirect to checkout page
+    setLocation('/checkout');
+  };
 
   const onSubmit = (values: OrderFormValues) => {
     if (cart.length === 0) {
@@ -124,20 +131,8 @@ export default function StaffOrders() {
       return;
     }
 
-    const orderData = {
-      customerName: values.customerName,
-      customerPhone: values.customerPhone || "N/A",
-      orderType: "walk-in",
-      paymentMethod: "cash",
-      items: cart.map((item) => ({
-        menuItemId: item.menuItem.id,
-        quantity: item.quantity,
-        price: item.menuItem.price,
-        specialInstructions: item.specialInstructions,
-      })),
-    };
-
-    createOrderMutation.mutate(orderData);
+    // Proceed to checkout instead of creating order
+    handleProceedToCheckout();
   };
 
   const handleClearOrder = () => {
@@ -275,6 +270,7 @@ export default function StaffOrders() {
                         <Input
                           placeholder="Enter customer name"
                           {...field}
+                          className="font-bold"
                           data-testid="input-customer-name"
                         />
                       </FormControl>
@@ -391,10 +387,10 @@ export default function StaffOrders() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createOrderMutation.isPending || cart.length === 0}
+                    disabled={cart.length === 0}
                     data-testid="button-submit"
                   >
-                    {createOrderMutation.isPending ? "Submitting..." : "Submit to Kitchen"}
+                    Proceed to Payment
                   </Button>
                 </div>
               </div>
@@ -413,14 +409,13 @@ export default function StaffOrders() {
             </div>
             <Button
               type="submit"
-              disabled={createOrderMutation.isPending}
               data-testid="mobile-submit-button"
               onClick={(e) => {
                 e.preventDefault();
                 form.handleSubmit(onSubmit)();
               }}
             >
-              {createOrderMutation.isPending ? "Submitting..." : "Submit to Kitchen"}
+              Proceed to Payment
             </Button>
           </div>
         </div>

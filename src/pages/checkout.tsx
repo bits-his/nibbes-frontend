@@ -2,11 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { useLocation } from "wouter"
-import { ArrowLeft, MapPin, Check, ChefHat } from "lucide-react"
+import { ArrowLeft, MapPin, Check, ChefHat, CreditCard, Banknote, Smartphone, Lock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
@@ -27,34 +30,13 @@ const checkoutFormSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>
 
-// function StepIndicator({ currentStep }: { currentStep: number }) {
-//   const steps = ["Contact", "Delivery", "Payment"]
-//   return (
-//     <div className="flex items-center justify-between mb-8">
-//       {steps.map((step, index) => (
-//         <div key={index} className="flex items-center">
-//           <div
-//             className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-//               index < currentStep
-//                 ? "bg-accent -foreground"
-//                 : index === currentStep
-//                   ? "bg-primary text-primary-foreground"
-//                   : "bg-muted text-muted-foreground"
-//             }`}
-//           >
-//             {index < currentStep ? <Check className="w-5 h-5" /> : index + 1}
-//           </div>
-//           <span className={`ml-2 font-medium ${index <= currentStep ? "text-foreground" : "text-muted-foreground"}`}>
-//             {step}
-//           </span>
-//           {index < steps.length - 1 && (
-//             <div className={`w-12 h-0.5 mx-2 ${index < currentStep ? "bg-accent" : "bg-muted"}`} />
-//           )}
-//         </div>
-//       ))}
-//     </div>
-//   )
-// }
+interface PaymentMethod {
+  id: string
+  name: string
+  description: string
+  icon: any
+  type: 'card' | 'cash' | 'pos' | 'transfer'
+}
 
 function CartSummaryHeader({ itemCount, subtotal }: { itemCount: number; subtotal: number }) {
   return (
@@ -82,13 +64,55 @@ function CartSummaryHeader({ itemCount, subtotal }: { itemCount: number; subtota
 
 export default function Checkout() {
   const [, setLocation] = useLocation()
-  const { toast } = useToast()
+  const { toast} = useToast()
   const { user, loading } = useAuth()
   const [cart, setCart] = useState<CartItem[]>([])
+  const [walkInOrder, setWalkInOrder] = useState<any>(null)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("cash")
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [transactionRef, setTransactionRef] = useState("")
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(
     null,
   )
-  const [currentStep, setCurrentStep] = useState(0)
+
+  // Payment methods available
+  const paymentMethods: PaymentMethod[] = [
+    {
+      id: 'cash',
+      name: 'Cash Payment',
+      description: 'Pay with cash on delivery/pickup',
+      icon: Banknote,
+      type: 'cash',
+    },
+    {
+      id: 'card',
+      name: 'Credit/Debit Card',
+      description: 'Pay securely with Interswitch',
+      icon: CreditCard,
+      type: 'card',
+    },
+    {
+      id: 'pos',
+      name: 'POS Terminal',
+      description: 'Pay with POS (Walk-in only)',
+      icon: CreditCard,
+      type: 'pos',
+    },
+    {
+      id: 'transfer',
+      name: 'Bank Transfer',
+      description: 'Direct bank transfer',
+      icon: Smartphone,
+      type: 'transfer',
+    },
+  ]
+
+  // Generate transaction reference
+  useEffect(() => {
+    const txnRef = `NIB-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    setTransactionRef(txnRef)
+  }, [])
 
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || "wss://server.brainstorm.ng/nibbleskitchen/ws"
@@ -132,6 +156,19 @@ export default function Checkout() {
   useEffect(() => {
     if (loading) return
 
+    // Check for walk-in order first
+    const pendingWalkIn = localStorage.getItem("pendingWalkInOrder")
+    if (pendingWalkIn) {
+      try {
+        const orderData = JSON.parse(pendingWalkIn)
+        setWalkInOrder(orderData)
+        return
+      } catch (error) {
+        console.error("Error parsing walk-in order:", error)
+        localStorage.removeItem("pendingWalkInOrder")
+      }
+    }
+
     const guestSession = getGuestSession()
     if (!user && !guestSession) {
       const savedCart = localStorage.getItem("cart")
@@ -168,7 +205,60 @@ export default function Checkout() {
     }
   }, [user, loading, setLocation, form])
 
-  const subtotal = cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
+  const subtotal = walkInOrder 
+    ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
+    : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
+
+  const calculateTotal = () => {
+    const baseAmount = subtotal + (form.watch("orderType") === "pickup" ? 0 : 500)
+    const totalWithVat = form.watch("orderType") === "delivery"
+      ? baseAmount * 1.075 // Add 7.5% VAT for delivery
+      : baseAmount
+    return totalWithVat
+  }
+
+  // Handle card payment - Create order with pending payment status
+  const handleCardPayment = async (orderData: any) => {
+    setIsProcessingPayment(true)
+
+    try {
+      toast({
+        title: "Creating Order",
+        description: "Please wait...",
+      })
+
+      // Create order with pending payment status
+      const response = await apiRequest("POST", "/api/orders", {
+        ...orderData,
+        paymentStatus: "pending",
+      })
+      const createdOrder = await response.json()
+
+      // Clear cart and close modal
+      localStorage.removeItem("cart")
+      setShowPaymentModal(false)
+      setIsProcessingPayment(false)
+
+      // Show success message with payment instructions
+      toast({
+        title: "Order Created!",
+        description: `Order #${createdOrder.orderNumber} created. Payment pending.`,
+      })
+
+      // Redirect to order tracking
+      setTimeout(() => {
+        setLocation("/docket")
+      }, 1500)
+    } catch (error) {
+      console.error('Order creation error:', error)
+      toast({
+        title: "Order Failed",
+        description: "Unable to create order. Please try again.",
+        variant: "destructive",
+      })
+      setIsProcessingPayment(false)
+    }
+  }
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -182,9 +272,15 @@ export default function Checkout() {
       })
       localStorage.removeItem("cart")
       form.reset()
-      setTimeout(() => {
-        setLocation("/docket")
-      }, 1500)
+      
+      // If payment method is card, redirect to payment
+      if (selectedPaymentMethod === 'card' && data.paymentUrl) {
+        window.location.href = data.paymentUrl
+      } else {
+        setTimeout(() => {
+          setLocation("/docket")
+        }, 1500)
+      }
     },
     onError: () => {
       toast({
@@ -205,12 +301,19 @@ export default function Checkout() {
       return
     }
 
-    const guestSession = getGuestSession();
+    // Show payment modal for confirmation
+    setShowPaymentModal(true)
+  }
+
+  const handlePaymentConfirmation = () => {
+    const values = form.getValues()
+    const guestSession = getGuestSession()
 
     const orderData = {
       customerName: values.customerName,
       customerPhone: values.customerPhone,
       orderType: values.orderType,
+      paymentMethod: selectedPaymentMethod,
       ...(guestSession && {
         guestId: guestSession.guestId,
         guestName: guestSession.guestName,
@@ -233,7 +336,132 @@ export default function Checkout() {
       })),
     }
 
-    createOrderMutation.mutate(orderData)
+    // If card payment, create order with pending status
+    if (selectedPaymentMethod === 'card') {
+      handleCardPayment(orderData)
+    } else {
+      // For cash/transfer, create order directly
+      createOrderMutation.mutate(orderData)
+      setShowPaymentModal(false)
+    }
+  }
+
+  const createWalkInOrderMutation = useMutation({
+    mutationFn: async (orderData: any) => {
+      const response = await apiRequest("POST", "/api/orders", orderData)
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Order Created & Payment Recorded!",
+        description: `Order #${data.orderNumber} has been created and sent to kitchen.`,
+      })
+      localStorage.removeItem("pendingWalkInOrder")
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
+      setTimeout(() => {
+        setLocation("/docket")
+      }, 1000)
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create order. Please try again.",
+        variant: "destructive",
+      })
+    },
+  })
+
+  const handleWalkInPayment = () => {
+    // Create order with payment info
+    const orderData = {
+      customerName: walkInOrder.customerName,
+      customerPhone: walkInOrder.customerPhone || "N/A",
+      orderType: "walk-in",
+      paymentMethod: selectedPaymentMethod,
+      paymentStatus: selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'pos' ? "paid" : "pending",
+      items: walkInOrder.items,
+    }
+    
+    createWalkInOrderMutation.mutate(orderData)
+  }
+
+  // Handle walk-in order payment
+  if (walkInOrder) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <Button
+            variant="ghost"
+            className="mb-8 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              localStorage.removeItem("pendingWalkInOrder")
+              setLocation("/staff")
+            }}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Walk-in Orders
+          </Button>
+
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-foreground mb-2">Confirm Payment</h1>
+            <p className="text-muted-foreground">{walkInOrder.customerName} - {cart.length || walkInOrder.items?.length || 0} items</p>
+          </div>
+
+          <Card className="border-border/50 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-accent/10 to-primary/5 border-b border-accent/20">
+              <CardTitle>Payment Method</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="space-y-3">
+                {paymentMethods.map((method) => {
+                  const IconComponent = method.icon
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                        selectedPaymentMethod === method.id
+                          ? "border-[#4EB5A4] bg-[#4EB5A4]/10"
+                          : "border-border/50 hover:border-accent/50"
+                      }`}
+                      onClick={() => setSelectedPaymentMethod(method.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <IconComponent className="w-5 h-5 text-[#4EB5A4]" />
+                          <div>
+                            <p className="font-semibold">{method.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {method.description}
+                            </p>
+                          </div>
+                        </div>
+                        {selectedPaymentMethod === method.id && <Check className="w-5 h-5 text-[#4EB5A4]" />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="border-t pt-6">
+                <div className="flex justify-between text-2xl font-bold mb-6">
+                  <span>Total Amount</span>
+                  <span className="text-[#4EB5A4]">₦{(walkInOrder.total || subtotal || 0).toLocaleString()}</span>
+                </div>
+
+                <Button
+                  onClick={handleWalkInPayment}
+                  disabled={createWalkInOrderMutation.isPending}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary"
+                >
+                  {createWalkInOrderMutation.isPending ? "Creating Order..." : "Confirm Payment"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   if (cart.length === 0) {
@@ -260,8 +488,6 @@ export default function Checkout() {
           <p className="text-muted-foreground">Secure checkout • Fast delivery • Real-time tracking</p>
         </div>
 
-        {/* <StepIndicator currentStep={currentStep} /> */}
-
         <CartSummaryHeader itemCount={cart.length} subtotal={subtotal} />
 
         <Form {...form}>
@@ -285,7 +511,7 @@ export default function Checkout() {
                             <Input
                               placeholder="John Doe"
                               {...field}
-                              readOnly={!!user && !!user.username} // Only read-only for authenticated users with username
+                              readOnly={!!user && !!user.username}
                               className="h-11 text-base rounded-lg border-border/50"
                               data-testid="input-name"
                             />
@@ -317,42 +543,41 @@ export default function Checkout() {
                 </Card>
 
                 {/* Order Type Selection Card */}
-{/* Order Type Selection Card */}
-<Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-  <CardHeader className="bg-muted/30 border-b border-border/30">
-    <CardTitle className="text-lg">2. Delivery Method</CardTitle>
-  </CardHeader>
-  <CardContent className="pt-6">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {["pickup", "delivery"].map((type) => {
-        const isActive = form.watch("orderType") === type;
-        return (
-          <button
-            key={type}
-            type="button"
-            className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
-              ${
-                isActive
-                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
-                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
-              }`}
-            onClick={() => {
-              form.setValue("orderType", type as "delivery" | "pickup");
-              setCurrentStep(1);
-            }}
-          >
-            <div className="font-semibold text-base capitalize">{type}</div>
-            <div className="text-sm text-muted-foreground mt-1">
-              {type === "pickup" ? "At our location" : "To your location"}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-    <FormMessage />
-  </CardContent>
-</Card>
-                {/* Location Information Cards Part */}
+                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                  <CardHeader className="bg-muted/30 border-b border-border/30">
+                    <CardTitle className="text-lg">2. Delivery Method</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {["pickup", "delivery"].map((type) => {
+                        const isActive = form.watch("orderType") === type
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+                              ${
+                                isActive
+                                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
+                                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
+                              }`}
+                            onClick={() => {
+                              form.setValue("orderType", type as "delivery" | "pickup")
+                            }}
+                          >
+                            <div className="font-semibold text-base capitalize">{type}</div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {type === "pickup" ? "At our location" : "To your location"}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <FormMessage />
+                  </CardContent>
+                </Card>
+
+                {/* Location Information */}
                 {locationData && form.watch("orderType") === "delivery" && (
                   <Card className="border-accent/30 bg-accent/5 shadow-sm">
                     <CardHeader className="bg-accent/10 border-b border-accent/20">
@@ -380,17 +605,68 @@ export default function Checkout() {
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <CardTitle className="text-lg">3. Payment Method</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4 p-4 border border-border/50 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
-                      <div className="w-12 h-8 bg-gradient-to-r from-primary to-accent rounded flex items-center justify-center text-white text-xs font-bold">
-                        💳
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">Secure Payment</p>
-                        <p className="text-sm text-muted-foreground">Interswitch WebPAY • Debit/Credit Card</p>
-                      </div>
-                      <Check className="w-5 h-5 " />
-                    </div>
+                  <CardContent className="pt-6 space-y-3">
+                    <RadioGroup value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                      {paymentMethods.filter(m => m.id !== 'pos').map((method) => {
+                        const IconComponent = method.icon
+                        return (
+                          <div
+                            key={method.id}
+                            className="flex cursor-pointer items-start space-x-3 rounded-lg border p-4 transition-all hover:bg-gray-50"
+                          >
+                            <RadioGroupItem
+                              value={method.id}
+                              id={method.id}
+                              className="mt-1"
+                            />
+                            <div className="flex-1">
+                              <label htmlFor={method.id} className="cursor-pointer">
+                                <div className="mb-2 flex items-center space-x-2">
+                                  <IconComponent className="h-5 w-5 text-[#4EB5A4]" />
+                                  <span className="font-medium">{method.name}</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {method.description}
+                                </p>
+                              </label>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </RadioGroup>
+
+                    {/* Payment method specific information */}
+                    {selectedPaymentMethod === 'card' && (
+                      <Alert className="border-purple-200 bg-purple-50">
+                        <Lock className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="mt-2 space-y-2">
+                            <div className="font-semibold">Secure Card Payment:</div>
+                            <div className="space-y-1 text-sm">
+                              <div>• Powered by Interswitch payment gateway</div>
+                              <div>• Supports Visa, Mastercard, and Verve</div>
+                              <div>• No card information stored on our servers</div>
+                            </div>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {selectedPaymentMethod === 'transfer' && (
+                      <Alert className="border-blue-200 bg-blue-50">
+                        <Banknote className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="mt-2 space-y-2">
+                            <div className="font-semibold">Bank Transfer Details:</div>
+                            <div className="space-y-1 text-sm">
+                              <div><strong>Bank:</strong> Sadiq Bank</div>
+                              <div><strong>Account Number:</strong> 1234567890</div>
+                              <div><strong>Account Name:</strong> Nibbles Kitchen</div>
+                            </div>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -433,24 +709,15 @@ export default function Checkout() {
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>VAT (7.5%)</span>
                           <span>₦{(() => {
-                            const baseAmount = subtotal + (form.watch("orderType") === "pickup" ? 0 : 500);
-                            return (baseAmount * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                            const baseAmount = subtotal + 500
+                            return (baseAmount * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })
                           })()}</span>
                         </div>
                       )}
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
                         <span className="font-semibold text-foreground">Total</span>
                         <span className="text-2xl font-bold " data-testid="text-total">
-                          ₦
-                          {(() => {
-                            const baseAmount = subtotal + (form.watch("orderType") === "pickup" ? 0 : 500);
-                            const totalWithVat = form.watch("orderType") === "delivery"
-                              ? baseAmount * 1.075 // Add 7.5% VAT for delivery
-                              : baseAmount;
-                            return totalWithVat.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                            });
-                          })()}
+                          ₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
@@ -460,10 +727,10 @@ export default function Checkout() {
                       type="submit"
                       size="lg"
                       className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
-                      disabled={createOrderMutation.isPending}
+                      disabled={createOrderMutation.isPending || isProcessingPayment}
                       data-testid="button-place-order"
                     >
-                      {createOrderMutation.isPending ? (
+                      {createOrderMutation.isPending || isProcessingPayment ? (
                         <span className="flex items-center gap-2">
                           <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
                           Processing
@@ -483,6 +750,108 @@ export default function Checkout() {
             </div>
           </form>
         </Form>
+
+        {/* Payment Confirmation Modal */}
+        <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                {selectedPaymentMethod === 'card' && (
+                  <CreditCard className="mr-2 h-5 w-5 text-blue-600" />
+                )}
+                {selectedPaymentMethod === 'cash' && (
+                  <Banknote className="mr-2 h-5 w-5 text-green-600" />
+                )}
+                {selectedPaymentMethod === 'transfer' && (
+                  <Smartphone className="mr-2 h-5 w-5 text-purple-600" />
+                )}
+                Confirm Your Order
+              </DialogTitle>
+              <DialogDescription>
+                Please review your order details before proceeding.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Order Summary */}
+              <div className="rounded-lg bg-gray-50 p-4">
+                <h4 className="mb-2 font-medium">Order Summary</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Items ({cart.length})</span>
+                    <span>₦{subtotal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Delivery</span>
+                    <span>{form.watch("orderType") === "pickup" ? "Free" : "₦500"}</span>
+                  </div>
+                  {form.watch("orderType") === "delivery" && (
+                    <div className="flex justify-between">
+                      <span>VAT (7.5%)</span>
+                      <span>₦{((subtotal + 500) * 0.075).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t pt-2 font-semibold">
+                    <span>Total</span>
+                    <span>₦{calculateTotal().toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Method Info */}
+              <div className="rounded-lg bg-blue-50 p-4">
+                <h4 className="mb-2 font-medium">Payment Method</h4>
+                <div className="flex items-center space-x-2">
+                  {selectedPaymentMethod === 'card' && (
+                    <CreditCard className="h-4 w-4 text-blue-600" />
+                  )}
+                  {selectedPaymentMethod === 'cash' && (
+                    <Banknote className="h-4 w-4 text-green-600" />
+                  )}
+                  {selectedPaymentMethod === 'transfer' && (
+                    <Smartphone className="h-4 w-4 text-purple-600" />
+                  )}
+                  <span className="text-sm">
+                    {paymentMethods.find(m => m.id === selectedPaymentMethod)?.name}
+                  </span>
+                </div>
+                {selectedPaymentMethod === 'card' && (
+                  <p className="text-xs text-gray-600 mt-2">
+                    Your order will be created and you can complete payment at the counter or via bank transfer.
+                  </p>
+                )}
+                {selectedPaymentMethod === 'transfer' && (
+                  <div className="mt-3 text-xs space-y-1">
+                    <p className="font-semibold">Bank Details:</p>
+                    <p>Bank: Sadiq Bank</p>
+                    <p>Account: 1234567890</p>
+                    <p>Name: Nibbles Kitchen</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="flex-col space-y-2">
+              <Button
+                onClick={handlePaymentConfirmation}
+                className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
+                disabled={isProcessingPayment || createOrderMutation.isPending}
+              >
+                {isProcessingPayment || createOrderMutation.isPending ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Confirm Order
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

@@ -179,7 +179,8 @@ const ProfilePage: React.FC = () => {
     try {
       const response = await apiRequest('POST', '/api/auth/change-password', {
         currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword
       });
 
       if (response.ok) {

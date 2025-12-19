@@ -12,6 +12,8 @@ import {
   BarChart3,
   Package,
   Store,
+  CreditCard,
+  ShoppingCart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -80,6 +82,13 @@ const menuItems: MenuItem[] = [
     permissions: ["order_management"],
   },
   {
+    title: "Archived Orders",
+    url: "/completed-orders",
+    icon: ClipboardList,
+    roles: ["admin"],
+    permissions: ["order_management"],
+  },
+  {
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
@@ -87,26 +96,33 @@ const menuItems: MenuItem[] = [
     permissions: ["menu_management"],
   },
   {
-    title: "User Management",
-    url: "/users",
-    icon: Users,
-    roles: ["admin"],
-    permissions: ["user_management"],
-  },
-  {
-    title: "Sales Inventory",
+    title: "Store Inventory",
     url: "/inventory",
     icon: Package,
     roles: ["admin", "kitchen"],
     permissions: ["sales_inventory"],
   },
-  // {
-  //   title: "Store Management",
-  //   url: "/store-management",
-  //   icon: Store,
-  //   roles: ["admin", "kitchen"],
-  //   permissions: ["store_management"],
-  // },
+  {
+    title: "Main Kitchen",
+    url: "/store-management",
+    icon: Store,
+    roles: ["admin", "kitchen"],
+    permissions: ["store_management"],
+  },
+  {
+    title: "Transactions",
+    url: "/transactions",
+    icon: CreditCard,
+    roles: ["admin"],
+    permissions: ["manage_store", "sales_inventory"],
+  },
+  {
+    title: "Kitchen Requests",
+    url: "/kitchen-requests",
+    icon: ShoppingCart,
+    roles: ["admin", "kitchen"],
+    permissions: ["kitchen_display", "sales_inventory"],
+  },
   {
     title: "Analytics & Reports",
     url: "/dashboard/analytics",
@@ -134,6 +150,20 @@ const menuItems: MenuItem[] = [
     icon: ClipboardList,
     roles: ["admin"],
     permissions: ["qr_code"],
+  },
+  {
+    title: "EM Card",
+    url: "/emcard",
+    icon: CreditCard,
+    roles: ["admin"], 
+    permissions: ["menu_management"],
+  },
+  {
+    title: "User Management",
+    url: "/users",
+    icon: Users,
+    roles: ["admin"],
+    permissions: ["user_management"],
   },
   {
     title: "Profile",

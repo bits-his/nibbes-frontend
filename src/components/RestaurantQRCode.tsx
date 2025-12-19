@@ -16,7 +16,7 @@ export function RestaurantQRCode({
   const [copied, setCopied] = useState(false);
 
   // QR Code URL with UTM parameters for tracking
-  const qrCodeUrl = `${baseUrl}/?utm_source=restaurant_qr&utm_medium=scan&utm_campaign=offline_marketing`;
+  const qrCodeUrl = `${baseUrl}`;
 
   const handleDownloadPNG = () => {
     const canvas = document.createElement('canvas');
@@ -101,7 +101,7 @@ export function RestaurantQRCode({
         </div>
 
         {/* URL Display */}
-        <div className="space-y-2">
+        {/* <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">QR Code URL:</label>
           <div className="flex gap-2">
             <input
@@ -123,10 +123,10 @@ export function RestaurantQRCode({
               )}
             </Button>
           </div>
-        </div>
+        </div> */}
 
         {/* UTM Parameters Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+        {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
           <h3 className="font-semibold text-blue-900">Tracking Parameters:</h3>
           <ul className="text-sm text-blue-800 space-y-1">
             <li><strong>Source:</strong> restaurant_qr</li>
@@ -136,7 +136,7 @@ export function RestaurantQRCode({
           <p className="text-xs text-blue-700 mt-2">
             These parameters will help track how many customers visit from scanning the QR code
           </p>
-        </div>
+        </div> */}
 
         {/* Download Buttons */}
         <div className="flex flex-col sm:flex-row gap-3">
@@ -164,7 +164,7 @@ export function RestaurantQRCode({
             <li>Download the QR code in your preferred format (PNG for printing, SVG for editing)</li>
             <li>Print the QR code on table tents, menus, or posters in your restaurant</li>
             <li>Customers can scan it with their phone camera to visit your menu</li>
-            <li>Track scans through your analytics dashboard using the UTM parameters</li>
+            {/* <li>Track scans through your analytics dashboard using the UTM parameters</li> */}
           </ol>
         </div>
       </CardContent>

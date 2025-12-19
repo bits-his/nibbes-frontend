@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import React, { useEffect, useState, useRef, createElement } from "react";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,8 +36,17 @@ import DocketPage from "@/pages/docket";
 import InventoryPage from "@/pages/inventory";
 import CustomerAnalyticsDashboard from "@/pages/customer-analytics-enhanced";
 import StoreManagement from "@/pages/store-management";
+import EMcard from "@/pages/EMcard";
+import ManagerReportsList from "@/pages/ManagerReportsList";
+import ManagerReportDetail from "@/pages/ManagerReportDetail";
+import ManagerReportsDashboard from "@/pages/ManagerReportsDashboard";
+import ManagerReportsByStaff from "@/pages/ManagerReportsByStaff";
+import KitchenRequests from "@/pages/KitchenRequests";
 import AboutPage from "@/pages/about";
 import ContactPage from "@/pages/contact";
+import TVDisplay from "@/pages/tv-display";
+import CompletedOrders from "@/pages/completed-orders";
+import Transactions from "@/pages/transactions";
 
 // Define user type
 interface User {
@@ -78,8 +87,31 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Check if user is already logged in (from localStorage)
     const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
+    const sessionStartTime = localStorage.getItem("sessionStartTime");
 
     const initializeUser = async () => {
+      // Check if session has expired (past midnight)
+      if (sessionStartTime) {
+        const sessionStart = new Date(parseInt(sessionStartTime));
+        const now = new Date();
+        const sessionStartDay = sessionStart.getDate();
+        const currentDay = now.getDate();
+
+        // If the day has changed, session expired
+        if (currentDay !== sessionStartDay) {
+          console.log('Session expired - clearing data and redirecting to login');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('sessionStartTime');
+          localStorage.removeItem('cart');
+          localStorage.removeItem('pendingCheckoutCart');
+          setUser(null);
+          setLoading(false);
+          window.location.href = '/login';
+          return;
+        }
+      }
+
       if (token && userData) {
         try {
           let parsedUser = JSON.parse(userData);
@@ -88,13 +120,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           if (!parsedUser.permissions || parsedUser.permissions.length === 0) {
             // Fetch user permissions and update the user object
             try {
-              const response = await fetch('/api/permissions/me', {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                }
-              });
-              if (response.ok) {
-                const data = await response.json();
+              const response = await apiRequest('GET', '/api/permissions/me');
+              const data = await response.json();
+              if (data) {
                 const permissionNames = data.permissions?.map((p: any) => p.name) || [];
                 
                 // Update user with permissions
@@ -128,15 +156,10 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("token", token);
       
       // Fetch user permissions and update the user data before storing
-      const response = await fetch('/api/permissions/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await apiRequest('GET', '/api/permissions/me');
+      const data = await response.json();
       
-      if (response.ok) {
-        const data = await response.json();
+      if (data) {
         const permissionNames = data.permissions?.map((p: any) => p.name) || [];
         
         // Update user with permissions
@@ -347,6 +370,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/tv-display" component={TVDisplay} />
       <Route
         path="/order-status"
         component={() => (
@@ -378,6 +402,14 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["order_management"]}>
             <OrderManagement />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/completed-orders"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["order_management"]}>
+            <CompletedOrders />
           </ProtectedRoute>
         )}
       />
@@ -422,7 +454,52 @@ function Router() {
           </ProtectedRoute>
         )}
       />
-      
+
+      <Route
+        path="/emcard"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <EMcard />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-list"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportsList />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-list/:reportId"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportDetail />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-dashboard"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportsDashboard />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-by-staff/:staffName"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportsByStaff />
+          </ProtectedRoute>
+        )}
+      />
+
       <Route
         path="/customer-analytics"
         component={() => (
@@ -461,6 +538,24 @@ function Router() {
       />
       
       <Route
+        path="/kitchen-requests"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["kitchen_display", "sales_inventory"]}>
+            <KitchenRequests />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/transactions"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["manage_store", "sales_inventory"]}>
+            <Transactions />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
         path="/dashboard/customers"
         component={() => (
           <ProtectedRoute requiredPermissions={["customer_insights"]}>
@@ -491,14 +586,15 @@ function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [location]);
 
-  // Don't show sidebar on login, signup, forgot password, reset password, and guest checkout pages
+  // Don't show sidebar on login, signup, forgot password, reset password, guest checkout, and tv-display pages
   const showSidebar =
     location !== "/login" &&
     location !== "/signup" &&
     location !== "/forgot-password" &&
     location !== "/reset-password" &&
     location !== "/guest-checkout" &&
-    location !== "/unauthorized";
+    location !== "/unauthorized" &&
+    location !== "/tv-display";
 
   return (
     <div className="flex h-screen w-full">
