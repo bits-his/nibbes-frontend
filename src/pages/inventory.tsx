@@ -286,21 +286,43 @@ export default function InventoryManagement() {
     }
   }
 
-  const handleDeleteItem = (id: string) => {
-    const updatedItems = inventoryItems.filter((item) => item.id !== id)
-    setInventoryItems(updatedItems)
-    setFilteredItems(
-      updatedItems.filter((item) => {
-        let match = true
-        if (selectedCategory !== "all") {
-          match = match && item.category === selectedCategory
-        }
-        if (showLowStockOnly) {
-          match = match && item.quantity <= item.minThreshold
-        }
-        return match
-      }),
-    )
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete item: ${response.status}`)
+      }
+
+      // Update UI after successful deletion
+      const updatedItems = inventoryItems.filter((item) => item.id !== id)
+      setInventoryItems(updatedItems)
+      setFilteredItems(
+        updatedItems.filter((item) => {
+          let match = true
+          if (selectedCategory !== "all") {
+            match = match && item.category === selectedCategory
+          }
+          if (showLowStockOnly) {
+            match = match && item.quantity <= item.minThreshold
+          }
+          return match
+        }),
+      )
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      alert('Failed to delete item. Please try again.')
+    }
   }
 
   const handleQuantityUpdate = (id: string, quantity: number, operation: "add" | "remove") => {
@@ -543,25 +565,6 @@ export default function InventoryManagement() {
                           <TableCell className="text-slate-700">{item.supplier}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-1">
-                              {/* Commenting out all action buttons except View
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleQuantityUpdate(item.id, 1, "add")}
-                                className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
-                                title="Add 1 unit"
-                              >
-                                <PlusCircle className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleQuantityUpdate(item.id, 1, "remove")}
-                                className="h-8 w-8 p-0 hover:bg-amber-50 hover:text-amber-600"
-                                title="Remove 1 unit"
-                              >
-                                <MinusCircle className="h-4 w-4" />
-                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -583,7 +586,6 @@ export default function InventoryManagement() {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                              */}
                               <Button
                                 variant="ghost"
                                 size="sm"

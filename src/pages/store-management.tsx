@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Plus, Package, AlertTriangle, Warehouse, Boxes, DollarSign, Loader } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface StoreItem {
   id: string
@@ -54,9 +55,14 @@ export default function StoreManagement() {
   const [loading, setLoading] = useState(true)
   const [loadingCategories, setLoadingCategories] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [selectedItemForEdit, setSelectedItemForEdit] = useState<StoreItem | null>(null)
+  const [selectedItemForDelete, setSelectedItemForDelete] = useState<StoreItem | null>(null)
   const [showRestockDialog, setShowRestockDialog] = useState(false)
   const [selectedItemForRestock, setSelectedItemForRestock] = useState<StoreItem | null>(null)
   const [restockQuantity, setRestockQuantity] = useState(0)
+  const [stockOperationType, setStockOperationType] = useState<'add' | 'remove'>('add')
   const [formData, setFormData] = useState<FormState>(initialFormState)
   const [nextItemCode, setNextItemCode] = useState("")
   const [generatingCode, setGeneratingCode] = useState(false)
@@ -245,6 +251,7 @@ export default function StoreManagement() {
   const handleRestockClick = (item: StoreItem) => {
     setSelectedItemForRestock(item)
     setRestockQuantity(0)
+    setStockOperationType('add')
     setShowRestockDialog(true)
   }
 
@@ -253,35 +260,110 @@ export default function StoreManagement() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter a valid quantity to add",
+        description: `Please enter a valid quantity to ${stockOperationType === 'add' ? 'add' : 'remove'}`,
+      })
+      return
+    }
+
+    // Check if removing more than available
+    if (stockOperationType === 'remove' && restockQuantity > selectedItemForRestock.currentBalance) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Cannot remove ${restockQuantity} ${selectedItemForRestock.unit}. Only ${selectedItemForRestock.currentBalance} ${selectedItemForRestock.unit} available.`,
       })
       return
     }
 
     try {
-      // Use the stock movement endpoint to properly log the restock
+      // Use the stock movement endpoint to properly log the stock change
       await apiRequest("POST", `/api/store/movements`, {
         storeItemId: selectedItemForRestock.id,
-        type: "IN",
+        type: stockOperationType === 'add' ? "IN" : "OUT",
         quantity: restockQuantity,
-        reference: "restock",
-        notes: `Restocked ${restockQuantity} ${selectedItemForRestock.unit} of ${selectedItemForRestock.name}`,
+        reference: stockOperationType === 'add' ? "restock" : "stock removal",
+        notes: `${stockOperationType === 'add' ? 'Restocked' : 'Removed'} ${restockQuantity} ${selectedItemForRestock.unit} of ${selectedItemForRestock.name}`,
       })
       
       toast({
         title: "Success",
-        description: `Added ${restockQuantity} ${selectedItemForRestock.unit} to ${selectedItemForRestock.name}`,
+        description: `${stockOperationType === 'add' ? 'Added' : 'Removed'} ${restockQuantity} ${selectedItemForRestock.unit} ${stockOperationType === 'add' ? 'to' : 'from'} ${selectedItemForRestock.name}`,
       })
       setShowRestockDialog(false)
       setSelectedItemForRestock(null)
       setRestockQuantity(0)
+      setStockOperationType('add')
       fetchItems()
     } catch (error) {
-      console.error("Error restocking item:", error)
+      console.error("Error updating stock:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to restock item",
+        description: `Failed to ${stockOperationType === 'add' ? 'add' : 'remove'} stock`,
+      })
+    }
+  }
+
+  const handleEditClick = (item: StoreItem) => {
+    setSelectedItemForEdit(item)
+    setFormData({
+      itemCode: item.itemCode,
+      name: item.name,
+      description: item.description,
+      currentBalance: item.currentBalance,
+      unit: item.unit,
+      costPrice: item.costPrice,
+      category: item.category,
+    })
+    setShowEditDialog(true)
+  }
+
+  const handleEditSubmit = async () => {
+    if (!selectedItemForEdit) return
+
+    try {
+      await apiRequest("PUT", `/api/store/items/${selectedItemForEdit.id}`, formData)
+      toast({
+        title: "Success",
+        description: "Item updated successfully",
+      })
+      setShowEditDialog(false)
+      setSelectedItemForEdit(null)
+      setFormData(initialFormState)
+      fetchItems()
+    } catch (error) {
+      console.error("Error updating item:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update item",
+      })
+    }
+  }
+
+  const handleDeleteClick = (item: StoreItem) => {
+    setSelectedItemForDelete(item)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedItemForDelete) return
+
+    try {
+      await apiRequest("DELETE", `/api/store/items/${selectedItemForDelete.id}`)
+      toast({
+        title: "Success",
+        description: "Item deleted successfully",
+      })
+      setShowDeleteDialog(false)
+      setSelectedItemForDelete(null)
+      fetchItems()
+    } catch (error) {
+      console.error("Error deleting item:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete item",
       })
     }
   }
@@ -291,7 +373,9 @@ export default function StoreManagement() {
       setTransactionsLoading(true);
       const response = await apiRequest("GET", `/api/store-entries/item-code/${item.itemCode}`);
       const data = await response.json();
-      setSelectedItemTransactions(data.entries || []);
+      // Extract entries from the data object
+      const entries = data.data?.entries || data.entries || [];
+      setSelectedItemTransactions(entries);
       setShowTransactionsDialog(true);
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -583,15 +667,39 @@ export default function StoreManagement() {
                           </TableCell>
                         )}
                         <TableCell className="text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewItemTransactions(item);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            View
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            {!isKitchenStaff && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditClick(item);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteClick(item);
+                                  }}
+                                  className="text-red-600 hover:text-red-800 hover:underline"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewItemTransactions(item);
+                              }}
+                              className="text-green-600 hover:text-green-800 hover:underline"
+                            >
+                              View
+                            </button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -607,10 +715,36 @@ export default function StoreManagement() {
       <Dialog open={showRestockDialog} onOpenChange={setShowRestockDialog}>
         <DialogContent className="max-w-md bg-white border-slate-200">
           <DialogHeader>
-            <DialogTitle className="text-xl text-gray-900">Restock Item</DialogTitle>
+            <DialogTitle className="text-xl text-gray-900">
+              {stockOperationType === 'add' ? 'Add Stock' : 'Remove Stock'}
+            </DialogTitle>
           </DialogHeader>
           {selectedItemForRestock && (
             <div className="space-y-4">
+              {/* Operation Type Tabs */}
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                <button
+                  onClick={() => setStockOperationType('add')}
+                  className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                    stockOperationType === 'add'
+                      ? 'bg-white text-green-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Add Stock
+                </button>
+                <button
+                  onClick={() => setStockOperationType('remove')}
+                  className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                    stockOperationType === 'remove'
+                      ? 'bg-white text-red-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Remove Stock
+                </button>
+              </div>
+
               <div className="bg-slate-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-gray-900 text-lg">{selectedItemForRestock.name}</h3>
                 {selectedItemForRestock.description && (
@@ -624,24 +758,35 @@ export default function StoreManagement() {
                 </div>
               </div>
               <div>
-                <Label className="text-gray-700 font-semibold">Quantity to Add *</Label>
+                <Label className="text-gray-700 font-semibold">
+                  Quantity to {stockOperationType === 'add' ? 'Add' : 'Remove'} *
+                </Label>
                 <Input
                   type="number"
                   min="0"
                   step="1"
                   value={restockQuantity}
                   onChange={(e) => setRestockQuantity(Number.parseFloat(e.target.value) || 0)}
-                  placeholder="Enter quantity to add"
+                  placeholder={`Enter quantity to ${stockOperationType === 'add' ? 'add' : 'remove'}`}
                   className="bg-white border-slate-300 text-gray-900 mt-1"
                   autoFocus
                 />
               </div>
               {restockQuantity > 0 && (
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className={`p-4 rounded-lg border ${
+                  stockOperationType === 'add'
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
+                }`}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">New Stock Level:</span>
-                    <span className="font-bold text-green-700">
-                      {selectedItemForRestock.currentBalance + restockQuantity} {selectedItemForRestock.unit}
+                    <span className={`font-bold ${
+                      stockOperationType === 'add' ? 'text-green-700' : 'text-red-700'
+                    }`}>
+                      {stockOperationType === 'add'
+                        ? selectedItemForRestock.currentBalance + restockQuantity
+                        : selectedItemForRestock.currentBalance - restockQuantity
+                      } {selectedItemForRestock.unit}
                     </span>
                   </div>
                 </div>
@@ -658,10 +803,157 @@ export default function StoreManagement() {
                 <Button
                   type="button"
                   onClick={handleRestockSubmit}
-                  className="flex-1 bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold"
+                  className={`flex-1 font-semibold text-white ${
+                    stockOperationType === 'add'
+                      ? 'bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700'
+                      : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                  }`}
                   disabled={restockQuantity <= 0}
                 >
-                  Add Stock
+                  {stockOperationType === 'add' ? 'Add Stock' : 'Remove Stock'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-gray-900">Edit Item</DialogTitle>
+            <DialogDescription>
+              Update the details of this store item
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-700 font-semibold">Item Code</Label>
+                <Input
+                  value={formData.itemCode}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-700 font-semibold">Name *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Item name"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-gray-700 font-semibold">Description</Label>
+              <Input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Item description"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label className="text-gray-700 font-semibold">Current Balance *</Label>
+                <Input
+                  type="number"
+                  value={formData.currentBalance}
+                  onChange={(e) => setFormData({ ...formData, currentBalance: Number.parseFloat(e.target.value) })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-700 font-semibold">Unit *</Label>
+                <Input
+                  value={formData.unit}
+                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  placeholder="pcs, kg, liters"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-700 font-semibold">Cost Price *</Label>
+                <Input
+                  type="number"
+                  value={formData.costPrice}
+                  onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) })}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-gray-700 font-semibold">Category *</Label>
+              <Input
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="Category"
+              />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowEditDialog(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleEditSubmit}
+                className="flex-1 bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold"
+              >
+                Update Item
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-gray-900">Delete Item</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this item? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedItemForDelete && (
+            <div className="space-y-4">
+              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                <p className="font-semibold text-gray-900 text-lg">{selectedItemForDelete.name}</p>
+                {selectedItemForDelete.description && (
+                  <p className="text-sm text-gray-600 mt-1">{selectedItemForDelete.description}</p>
+                )}
+                <div className="mt-3 flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Current Stock:</span>
+                  <span className="font-semibold text-gray-900">
+                    {selectedItemForDelete.currentBalance} {selectedItemForDelete.unit}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ Warning: All transaction history for this item will be preserved, but the item will no longer be available for new transactions.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowDeleteDialog(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold"
+                >
+                  Delete Item
                 </Button>
               </div>
             </div>

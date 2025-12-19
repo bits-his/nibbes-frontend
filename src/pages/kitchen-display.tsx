@@ -243,7 +243,7 @@ const getStatusBadge = (status: string) => {
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-complete-${order.id}`}
                       >
-                        Complete Order
+                        Collected ✅
                       </Button>
                     )}
                   </div>
