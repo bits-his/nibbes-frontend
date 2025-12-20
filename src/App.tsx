@@ -370,6 +370,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/staff/checkout" component={Checkout} />
       <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
       <Route path="/tv-display" component={TVDisplay} />
       <Route

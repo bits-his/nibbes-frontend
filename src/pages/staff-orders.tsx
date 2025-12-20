@@ -117,8 +117,8 @@ export default function StaffOrders() {
     setCart([]);
     form.reset({ customerName: "Nibbles Kitchen", customerPhone: "" });
     
-    // Redirect to checkout page
-    setLocation('/checkout');
+    // Redirect to staff checkout page
+    setLocation('/staff/checkout');
   };
 
   const onSubmit = (values: OrderFormValues) => {
