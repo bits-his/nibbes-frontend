@@ -69,6 +69,8 @@ export default function StoreManagement() {
   const [showTransactionsDialog, setShowTransactionsDialog] = useState(false)
   const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("")
   const { toast } = useToast()
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -159,22 +161,24 @@ export default function StoreManagement() {
 
   useEffect(() => {
     fetchItems()
-    fetchCategories()
+    fetchInventoryCategories()
     fetchNextItemCode()
   }, [fetchNextItemCode])
 
-  const fetchCategories = async () => {
+  const fetchInventoryCategories = async () => {
     try {
       setLoadingCategories(true)
-      const response = await apiRequest("GET", "/api/menu/categories")
+      const response = await apiRequest("GET", "/api/inventory-categories")
       const data = await response.json()
-      setCategories(data)
+      // Extract category names from the response data
+      const categoryNames = data.data?.map((cat: any) => cat.name) || data.map((cat: any) => cat.name) || []
+      setCategories(categoryNames)
     } catch (error) {
-      console.error("Error fetching categories:", error)
+      console.error("Error fetching inventory categories:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to fetch categories",
+        description: "Failed to fetch inventory categories",
       })
     } finally {
       setLoadingCategories(false)
@@ -389,6 +393,39 @@ export default function StoreManagement() {
       setTransactionsLoading(false);
     }
   }
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a category name",
+      });
+      return;
+    }
+
+    try {
+      await apiRequest("POST", "/api/inventory-categories", {
+        name: newCategoryName.trim(),
+      });
+
+      toast({
+        title: "Success",
+        description: "Category created successfully",
+      });
+
+      setShowAddCategoryDialog(false);
+      setNewCategoryName("");
+      fetchInventoryCategories(); // Refresh the categories list
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create category",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
@@ -884,11 +921,40 @@ export default function StoreManagement() {
             </div>
             <div>
               <Label className="text-gray-700 font-semibold">Category *</Label>
-              <Input
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="Category"
-              />
+              {loadingCategories ? (
+                <Input
+                  value="Loading categories..."
+                  disabled
+                  className="bg-gray-100"
+                />
+              ) : (
+                <div className="flex gap-2">
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">Select a category</option>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowAddCategoryDialog(true);
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 pt-4">
               <Button
@@ -1017,6 +1083,50 @@ export default function StoreManagement() {
               ))}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Category Dialog */}
+      <Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-gray-900">Add New Category</DialogTitle>
+            <DialogDescription>
+              Create a new category for store inventory items
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-gray-700 font-semibold">Category Name *</Label>
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter category name"
+                autoFocus
+                className="mt-1"
+              />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowAddCategoryDialog(false);
+                  setNewCategoryName("");
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleAddCategory}
+                className="flex-1 bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold"
+              >
+                Add Category
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

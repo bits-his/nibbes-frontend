@@ -35,8 +35,12 @@ export default function DocketPage() {
     // Remove all polling options since we're using WebSockets for real-time updates
   });
 
-  // Show all orders including completed ones
-  const activeOrders = orders;
+  // Show all orders including those awaiting payment
+  // Just display them with appropriate status indicators
+  const activeOrders = orders?.filter(order => {
+    // Show all orders - let the UI indicate payment status
+    return true;
+  });
 
   // WebSocket connection for real-time updates
   useEffect(() => {

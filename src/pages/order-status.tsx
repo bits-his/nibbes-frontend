@@ -13,7 +13,20 @@ export default function OrderStatus() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const orderId = new URLSearchParams(search).get("id");
+  const paymentStatus = new URLSearchParams(search).get("payment");
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [showPaymentMessage, setShowPaymentMessage] = useState(false);
+
+  // Show payment confirmation message if coming from payment gateway
+  useEffect(() => {
+    if (paymentStatus) {
+      setShowPaymentMessage(true);
+      // Remove payment parameter from URL after showing message
+      setTimeout(() => {
+        setShowPaymentMessage(false);
+      }, 5000);
+    }
+  }, [paymentStatus]);
 
   const { data: order, isLoading } = useQuery<OrderWithItems>({
     queryKey: ["/api/orders", orderId],
@@ -143,6 +156,23 @@ export default function OrderStatus() {
           </Card>
         ) : order ? (
           <div className="space-y-6">
+            {/* Payment Confirmation Message */}
+            {showPaymentMessage && (
+              <Card className="border-green-500 bg-green-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <div>
+                      <h3 className="font-semibold text-green-900">Payment Successful!</h3>
+                      <p className="text-sm text-green-700">
+                        Your payment has been confirmed. Your order is being prepared.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Order Status Card */}
             <Card>
               <CardHeader>

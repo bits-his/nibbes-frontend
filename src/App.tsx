@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import React, { useEffect, useState, useRef, createElement } from "react";
+import React, { useEffect, useState, useRef, createElement, lazy } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -370,6 +370,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
       <Route path="/tv-display" component={TVDisplay} />
       <Route
         path="/order-status"

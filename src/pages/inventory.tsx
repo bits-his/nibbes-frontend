@@ -47,6 +47,10 @@ export default function InventoryManagement() {
   const [showLowStockOnly, setShowLowStockOnly] = useState<boolean>(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState<boolean>(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false)
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState<boolean>(false)
+  const [inventoryCategories, setInventoryCategories] = useState<string[]>([])
+  const [newCategoryName, setNewCategoryName] = useState<string>("")
+  const [newCategoryDescription, setNewCategoryDescription] = useState<string>("")
   const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +111,25 @@ export default function InventoryManagement() {
       }
     }
 
+    const fetchInventoryCategories = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const categories = (data.data || []).map((cat: any) => cat.name)
+          setInventoryCategories(categories)
+        }
+      } catch (err) {
+        console.error("Error fetching inventory categories:", err)
+      }
+    }
+
     // Connect to WebSocket for real-time inventory updates
     const connectWebSocket = () => {
       try {
@@ -159,6 +182,7 @@ export default function InventoryManagement() {
     };
 
     fetchInventoryData();
+    fetchInventoryCategories();
     connectWebSocket();
 
     // Cleanup function
@@ -350,6 +374,54 @@ export default function InventoryManagement() {
     )
   }
 
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name')
+      return
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newCategoryName,
+          description: newCategoryDescription,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create category')
+      }
+
+      // Refresh categories
+      const categoriesResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (categoriesResponse.ok) {
+        const data = await categoriesResponse.json()
+        const categories = (data.data || []).map((cat: any) => cat.name)
+        setInventoryCategories(categories)
+      }
+
+      setIsAddCategoryDialogOpen(false)
+      setNewCategoryName('')
+      setNewCategoryDescription('')
+      alert('Category added successfully!')
+    } catch (error) {
+      console.error('Error adding category:', error)
+      alert(error instanceof Error ? error.message : 'Failed to add category')
+    }
+  }
+
   // Function to handle viewing item transactions
   const handleViewItemTransactions = async (item: InventoryItem) => {
     try {
@@ -427,13 +499,23 @@ export default function InventoryManagement() {
               <h1 className="text-4xl font-bold text-slate-900">Store Inventory</h1>
               <p className="text-slate-600 mt-2">Track and manage your ingredients and supplies</p>
             </div>
-            <Button
-              onClick={() => setIsAddDialogOpen(true)}
-              className="bg-[#50BAA8] hover:bg-[#3fa391] text-white gap-2 shadow-md"
-            >
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button
+                onClick={() => setIsAddCategoryDialogOpen(true)}
+                variant="outline"
+                className="border-[#50BAA8] text-[#50BAA8] hover:bg-[#50baa80d] gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Category
+              </Button>
+              <Button
+                onClick={() => setIsAddDialogOpen(true)}
+                className="bg-[#50BAA8] hover:bg-[#3fa391] text-white gap-2 shadow-md"
+              >
+                <Plus className="h-4 w-4" />
+                Add Item
+              </Button>
+            </div>
           </div>
 
           {/* Summary Cards */}
@@ -492,7 +574,7 @@ export default function InventoryManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {inventorySummary?.categories.map((category) => (
+                  {(inventoryCategories.length > 0 ? inventoryCategories : inventorySummary?.categories || []).map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}
                     </SelectItem>
@@ -615,6 +697,46 @@ export default function InventoryManagement() {
             </CardContent>
           </Card>
 
+          {/* Add Category Dialog */}
+          <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add Inventory Category</DialogTitle>
+                <DialogDescription>Create a category specifically for store inventory items</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="categoryName">Category Name</Label>
+                  <Input
+                    id="categoryName"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g. Daily Fresh"
+                    className="border-slate-200"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="categoryDescription">Description (optional)</Label>
+                  <Input
+                    id="categoryDescription"
+                    value={newCategoryDescription}
+                    onChange={(e) => setNewCategoryDescription(e.target.value)}
+                    placeholder="Describe what items go into this category"
+                    className="border-slate-200"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsAddCategoryDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button className="bg-[#50BAA8] text-white" onClick={handleAddCategory}>
+                    Save Category
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Add Item Dialog */}
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogContent className="sm:max-w-md">
@@ -626,6 +748,7 @@ export default function InventoryManagement() {
                 onSubmit={handleAddItem}
                 onCancel={() => setIsAddDialogOpen(false)}
                 isEdit={false}
+                inventoryCategories={inventoryCategories}
               />
             </DialogContent>
           </Dialog>
@@ -643,6 +766,7 @@ export default function InventoryManagement() {
                   onCancel={() => setIsEditDialogOpen(false)}
                   isEdit={true}
                   initialData={currentItem}
+                  inventoryCategories={inventoryCategories}
                 />
               </DialogContent>
             </Dialog>
@@ -658,9 +782,10 @@ interface AddEditInventoryFormProps {
   onCancel: () => void
   isEdit: boolean
   initialData?: InventoryItem
+  inventoryCategories?: string[]
 }
 
-const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, onCancel, isEdit, initialData }) => {
+const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, onCancel, isEdit, initialData, inventoryCategories = [] }) => {
   const [name, setName] = useState(initialData?.name || "")
   const [description, setDescription] = useState(initialData?.description || "")
   const [quantity, setQuantity] = useState(initialData?.quantity?.toString() || "0")
@@ -786,18 +911,28 @@ const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, o
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Meat">Meat</SelectItem>
-              <SelectItem value="Vegetables">Vegetables</SelectItem>
-              <SelectItem value="Grains">Grains</SelectItem>
-              <SelectItem value="Oil">Oil</SelectItem>
-              <SelectItem value="Perishable">Perishable</SelectItem>
-              <SelectItem value="Daily Fresh">Daily Fresh</SelectItem>
-              <SelectItem value="Dairy">Dairy</SelectItem>
-              <SelectItem value="Bakery">Bakery</SelectItem>
-              <SelectItem value="Frozen">Frozen</SelectItem>
-              <SelectItem value="Beverages">Beverages</SelectItem>
-              <SelectItem value="Spices">Spices</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
+              {inventoryCategories.length > 0 ? (
+                inventoryCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))
+              ) : (
+                <>
+                  <SelectItem value="Meat">Meat</SelectItem>
+                  <SelectItem value="Vegetables">Vegetables</SelectItem>
+                  <SelectItem value="Grains">Grains</SelectItem>
+                  <SelectItem value="Oil">Oil</SelectItem>
+                  <SelectItem value="Perishable">Perishable</SelectItem>
+                  <SelectItem value="Daily Fresh">Daily Fresh</SelectItem>
+                  <SelectItem value="Dairy">Dairy</SelectItem>
+                  <SelectItem value="Bakery">Bakery</SelectItem>
+                  <SelectItem value="Frozen">Frozen</SelectItem>
+                  <SelectItem value="Beverages">Beverages</SelectItem>
+                  <SelectItem value="Spices">Spices</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>

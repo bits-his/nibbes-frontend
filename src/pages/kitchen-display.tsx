@@ -110,9 +110,17 @@ const getStatusBadge = (status: string) => {
     return order.orderNumber.toString().toLowerCase().includes(searchTerm.toLowerCase());
   }) || [];
 
-  const activeOrders = filteredOrders?.filter((order) =>
-    order.status !== "completed" && order.status !== "cancelled"
-  );
+  const activeOrders = filteredOrders?.filter((order) => {
+    // Exclude completed and cancelled orders
+    if (order.status === "completed" || order.status === "cancelled") {
+      return false;
+    }
+    // Exclude orders with pending payment (waiting for Interswitch confirmation)
+    if (order.paymentStatus === 'pending' && order.status === 'pending') {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-background p-6">
