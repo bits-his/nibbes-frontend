@@ -86,7 +86,7 @@ export default function Checkout() {
     null,
   )
 
-  // Payment methods available
+  // Payment methods available for customer checkout (online orders)
   const paymentMethods: PaymentMethod[] = [
     // {
     //   id: 'cash',
@@ -116,6 +116,38 @@ export default function Checkout() {
     //   icon: Smartphone,
     //   type: 'transfer',
     // },
+  ]
+
+  // Payment methods available for walk-in orders (staff checkout)
+  const walkInPaymentMethods: PaymentMethod[] = [
+    {
+      id: 'cash',
+      name: 'Cash Payment',
+      description: 'Customer pays with cash',
+      icon: Banknote,
+      type: 'cash',
+    },
+    {
+      id: 'card',
+      name: 'Credit/Debit Card',
+      description: 'Pay securely with Interswitch',
+      icon: CreditCard,
+      type: 'card',
+    },
+    {
+      id: 'pos',
+      name: 'POS Terminal',
+      description: 'Pay with POS at counter',
+      icon: CreditCard,
+      type: 'pos',
+    },
+    {
+      id: 'transfer',
+      name: 'Bank Transfer',
+      description: 'Customer paid via bank transfer',
+      icon: Smartphone,
+      type: 'transfer',
+    },
   ]
 
   // Generate transaction reference
@@ -175,6 +207,7 @@ export default function Checkout() {
         try {
           const orderData = JSON.parse(pendingWalkIn)
           setWalkInOrder(orderData)
+          setSelectedPaymentMethod('cash') // Default to cash for walk-in orders
           return
         } catch (error) {
           console.error("Error parsing walk-in order:", error)
@@ -732,7 +765,7 @@ export default function Checkout() {
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
               <div className="space-y-3">
-                {paymentMethods.map((method) => {
+                {walkInPaymentMethods.map((method) => {
                   const IconComponent = method.icon
                   return (
                     <button
