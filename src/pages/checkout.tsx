@@ -21,6 +21,13 @@ import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
 
+// Extend Window interface for Interswitch
+declare global {
+  interface Window {
+    webpayCheckout: (config: any) => void;
+  }
+}
+
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
   customerPhone: z.string().optional(),
@@ -189,7 +196,7 @@ export default function Checkout() {
 
     // Use cart from context instead of localStorage
     if (cartFromContext.length > 0) {
-      setCart(cartFromContext)
+      setCart(cartFromContext as any)
     } else {
       // If cart is empty, redirect to home
       setLocation("/")
@@ -300,10 +307,16 @@ export default function Checkout() {
         return
       }
 
-      // Interswitch Inline Checkout Configuration - LIVE MODE
+      // Interswitch Inline Checkout Configuration - TEST MODE
       const paymentConfig = {
-        merchant_code: "MX162337",
-        pay_item_id: "MX162337_MERCHANT_APP",
+        // TEST MODE CREDENTIALS
+        merchant_code: "MX250773",
+        pay_item_id: "Default_Payable_MX250773",
+        
+        // LIVE MODE CREDENTIALS (commented out)
+        // merchant_code: "MX162337",
+        // pay_item_id: "MX162337_MERCHANT_APP",
+        
         txn_ref: txnRef,
         amount: amount,
         currency: 566, // NGN currency code
@@ -313,8 +326,11 @@ export default function Checkout() {
         cust_email: orderData.customerEmail || "customer@nibbleskitchen.com",
         cust_phone: orderData.customerPhone || "",
         
-        // LIVE MODE - Real payments will be processed
-        mode: "LIVE",
+        // TEST MODE - Test payments (no real money charged)
+        mode: "TEST",
+        
+        // LIVE MODE (commented out)
+        // mode: "LIVE",
         
         // Payment channels - Enable all payment options
         // Remove or comment out to show all available options
@@ -603,10 +619,16 @@ export default function Checkout() {
         console.log("Transaction Reference:", transactionRef)
         console.log("Amount (kobo):", amountInKobo)
 
-        // Interswitch Inline Checkout Configuration
+        // Interswitch Inline Checkout Configuration - TEST MODE
         const paymentConfig = {
-          merchant_code: "MX162337",
-          pay_item_id: "MX162337_MERCHANT_APP",
+          // TEST MODE CREDENTIALS
+          merchant_code: "MX250773",
+          pay_item_id: "Default_Payable_MX250773",
+          
+          // LIVE MODE CREDENTIALS (commented out)
+          // merchant_code: "MX162337",
+          // pay_item_id: "MX162337_MERCHANT_APP",
+          
           txn_ref: transactionRef,
           amount: amountInKobo,
           currency: 566, // NGN
@@ -648,7 +670,11 @@ export default function Checkout() {
             })
             setIsProcessingPayment(false)
           },
-          mode: "LIVE"
+          // TEST MODE - Test payments (no real money charged)
+          mode: "TEST"
+          
+          // LIVE MODE (commented out)
+          // mode: "LIVE"
         }
 
         console.log("Opening Interswitch payment modal with config:", paymentConfig)

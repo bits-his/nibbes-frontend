@@ -109,7 +109,7 @@ export default function CustomerMenu() {
   );
 
   const addToCart = (menuItem: MenuItem) => {
-    addToCartContext({ menuItem });
+    addToCartContext({ menuItem: menuItem as any });
     toast({
       title: "Added to Cart",
       description: `${menuItem.name} has been added to your cart.`,
@@ -451,9 +451,9 @@ export default function CustomerMenu() {
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             {filteredItems?.map((item) => {
               const isInCart = cart.some(
-                (cartItem) => cartItem.menuItem.id === item.id
+                (cartItem) => String(cartItem.menuItem.id) === String(item.id)
               );
-              const cartItem = cart.find((cartItem) => cartItem.menuItem.id === item.id);
+              const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
               return (
                 <Card
                   key={item.id}
@@ -492,7 +492,7 @@ export default function CustomerMenu() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => item.id && updateQuantity(item.id, -1)}
+                            onClick={() => item.id && updateQuantity(String(item.id), -1)}
                             data-testid={`button-minus-${item.id}`}
                             className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
                           >
@@ -504,7 +504,7 @@ export default function CustomerMenu() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => item.id && updateQuantity(item.id, 1)}
+                            onClick={() => item.id && updateQuantity(String(item.id), 1)}
                             data-testid={`button-plus-${item.id}`}
                             className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
                           >

@@ -10,7 +10,7 @@ interface RestaurantQRCodeProps {
 }
 
 export function RestaurantQRCode({
-  baseUrl = 'https://nibbleskitchen.netlify.app',
+  baseUrl = 'https://nibblesfastfood.com',
   size = 256
 }: RestaurantQRCodeProps) {
   const [copied, setCopied] = useState(false);

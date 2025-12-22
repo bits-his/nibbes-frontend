@@ -1,14 +1,12 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Local Development Backend (currently active)
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.1.136:5050';
+// Local Development Backend (for development - comment out for production)
+// export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.1.136:5050';
+// export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://192.168.1.136:5050/ws';
 
-// WebSocket URL for local development
-export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://192.168.1.136:5050/ws';
-
-// Online Production Backend (for switching - uncomment to use)
-// export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
-// export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+// Online Production Backend (currently active)
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

@@ -413,8 +413,8 @@ const getStatusBadge = (status: string) => {
                                   createdAt: order.createdAt,
                                   customerName: order.customerName,
                                   orderType: order.orderType,
-                                  items: order.items || [],
-                                  total: parseFloat(order.total),
+                                  items: (order as any).items || [],
+                                  total: parseFloat((order as any).total || '0'),
                                   paymentMethod: order.paymentMethod || 'N/A',
                                   paymentStatus: order.paymentStatus || 'N/A'
                                 }
@@ -531,7 +531,7 @@ const getStatusBadge = (status: string) => {
                       createdAt: selectedOrder.createdAt,
                       customerName: selectedOrder.customerName,
                       orderType: selectedOrder.orderType,
-                      items: selectedOrder.items || [],
+                      items: (selectedOrder as any).items || [],
                       total: parseFloat(selectedOrder.totalAmount),
                       paymentMethod: selectedOrder.paymentMethod || 'N/A',
                       paymentStatus: selectedOrder.paymentStatus || 'N/A'

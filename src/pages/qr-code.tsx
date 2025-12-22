@@ -2,8 +2,8 @@ import { RestaurantQRCode } from '@/components/RestaurantQRCode';
 import { SEO } from '@/components/SEO';
 
 export default function QRCodePage() {
-  // Get the production URL from environment variable or use Netlify URL as fallback
-  const baseUrl = import.meta.env.VITE_PRODUCTION_URL || 'https://192.168.1.136:5173';
+  // Production URL
+  const baseUrl = import.meta.env.VITE_PRODUCTION_URL || 'https://nibblesfastfood.com';
 
   return (
     <>

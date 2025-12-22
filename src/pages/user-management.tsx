@@ -1244,7 +1244,7 @@ export default function UserManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Role</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete role "{roleToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete role "{(roleToDelete as any)?.name}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
