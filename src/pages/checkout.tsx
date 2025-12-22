@@ -71,7 +71,7 @@ export default function Checkout() {
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
   const [cart, setCart] = useState<CartItem[]>([])
   const [walkInOrder, setWalkInOrder] = useState<any>(null)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("cash")
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("card")
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [transactionRef, setTransactionRef] = useState("")
@@ -81,13 +81,13 @@ export default function Checkout() {
 
   // Payment methods available
   const paymentMethods: PaymentMethod[] = [
-    {
-      id: 'cash',
-      name: 'Cash Payment',
-      description: 'Pay with cash on delivery/pickup',
-      icon: Banknote,
-      type: 'cash',
-    },
+    // {
+    //   id: 'cash',
+    //   name: 'Cash Payment',
+    //   description: 'Pay with cash on delivery/pickup',
+    //   icon: Banknote,
+    //   type: 'cash',
+    // },
     {
       id: 'card',
       name: 'Credit/Debit Card',
@@ -102,13 +102,13 @@ export default function Checkout() {
       icon: CreditCard,
       type: 'pos',
     },
-    {
-      id: 'transfer',
-      name: 'Bank Transfer',
-      description: 'Direct bank transfer',
-      icon: Smartphone,
-      type: 'transfer',
-    },
+    // {
+    //   id: 'transfer',
+    //   name: 'Bank Transfer',
+    //   description: 'Direct bank transfer',
+    //   icon: Smartphone,
+    //   type: 'transfer',
+    // },
   ]
 
   // Generate transaction reference
@@ -218,7 +218,7 @@ export default function Checkout() {
     : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
 
   const calculateTotal = () => {
-    const baseAmount = subtotal + (form.watch("orderType") === "pickup" ? 0 : 500)
+    const baseAmount = subtotal // Removed delivery charge
     const totalWithVat = form.watch("orderType") === "delivery"
       ? baseAmount * 1.075 // Add 7.5% VAT for delivery
       : baseAmount
@@ -992,19 +992,10 @@ export default function Checkout() {
                         <span>Subtotal</span>
                         <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Delivery</span>
-                        <span className={form.watch("orderType") === "pickup" ? "font-semibold" : ""}>
-                          {form.watch("orderType") === "pickup" ? "Free" : "₦500"}
-                        </span>
-                      </div>
                       {form.watch("orderType") === "delivery" && (
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>VAT (7.5%)</span>
-                          <span>₦{(() => {
-                            const baseAmount = subtotal + 500
-                            return (baseAmount * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })
-                          })()}</span>
+                          <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                       )}
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
@@ -1074,14 +1065,10 @@ export default function Checkout() {
                     <span>Items ({cart.length})</span>
                     <span>₦{subtotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Delivery</span>
-                    <span>{form.watch("orderType") === "pickup" ? "Free" : "₦500"}</span>
-                  </div>
                   {form.watch("orderType") === "delivery" && (
                     <div className="flex justify-between">
                       <span>VAT (7.5%)</span>
-                      <span>₦{((subtotal + 500) * 0.075).toLocaleString()}</span>
+                      <span>₦{(subtotal * 0.075).toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between border-t pt-2 font-semibold">
