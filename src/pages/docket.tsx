@@ -35,12 +35,23 @@ export default function DocketPage() {
     // Remove all polling options since we're using WebSockets for real-time updates
   });
 
-  // Show all orders including those awaiting payment
-  // Just display them with appropriate status indicators
+  // Filter orders to only show paid orders
   const activeOrders = orders?.filter(order => {
-    // Show all orders - let the UI indicate payment status
+    // Exclude orders with pending payment (waiting for payment confirmation)
+    if (order.paymentStatus === 'pending') {
+      return false;
+    }
     return true;
   });
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(permission => {
+        console.log("Notification permission:", permission);
+      });
+    }
+  }, []);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -62,6 +73,30 @@ export default function DocketPage() {
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      } else if (data.type === "order_ready_notification") {
+        // Check if this notification is for the current user/guest
+        const isForCurrentUser = 
+          (user && data.customerEmail === user.email) ||
+          (guestSession && data.guestId === guestSession.guestId);
+        
+        if (isForCurrentUser) {
+          // Show browser notification
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("Order Ready! 🎉", {
+              body: data.message,
+              icon: "/logo.png",
+              badge: "/logo.png",
+              tag: `order-${data.orderNumber}`,
+              requireInteraction: true
+            });
+          }
+          
+          // Also show toast notification
+          console.log("🎉 Your order is ready!", data.message);
+          
+          // Refresh orders to show updated status
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+        }
       }
     };
 

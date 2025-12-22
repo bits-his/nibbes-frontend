@@ -281,17 +281,17 @@ export default function TVDisplay() {
             <p className="text-2xl md:text-3xl text-gray-500 mt-3">Orders will appear here when ready</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 md:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {readyOrders.map((order) => (
               <div
                 key={order.id}
-                className="bg-white border-2 border-[#50BAA8] rounded-xl p-3 md:p-4 shadow-xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center"
+                className="bg-white border-4 border-[#50BAA8] rounded-2xl p-6 md:p-8 shadow-2xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center min-h-[180px] md:min-h-[220px]"
               >
                 <div className="text-center">
-                  <div className="text-xl md:text-2xl lg:text-3xl font-bold text-[#50BAA8] mb-1">
+                  <div className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-[#50BAA8] mb-3">
                     #{order.orderNumber}
                   </div>
-                  <div className="inline-block bg-[#50BAA8] text-white px-3 py-1.5 rounded-lg text-sm md:text-lg font-bold">
+                  <div className="inline-block bg-[#50BAA8] text-white px-4 py-2 md:px-6 md:py-3 rounded-xl text-lg md:text-2xl lg:text-3xl font-bold">
                     ✓ READY
                   </div>
                 </div>

@@ -549,7 +549,7 @@ export default function Checkout() {
     // For card payments, use Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
       try {
-        setIsProcessing(true)
+        setIsProcessingPayment(true)
         
         // Create order with pending payment status
         const orderData = {
@@ -585,7 +585,7 @@ export default function Checkout() {
             description: "Payment system not available. Please try another payment method.",
             variant: "destructive",
           })
-          setIsProcessing(false)
+          setIsProcessingPayment(false)
           return
         }
 
@@ -627,11 +627,11 @@ export default function Checkout() {
                 variant: "destructive",
               })
             }
-            setIsProcessing(false)
+            setIsProcessingPayment(false)
           },
           onClose: function () {
             console.log("Walk-in payment modal closed")
-            setIsProcessing(false)
+            setIsProcessingPayment(false)
           },
           onError: function (error: any) {
             console.error("Walk-in payment error:", error)
@@ -640,7 +640,7 @@ export default function Checkout() {
               description: "An error occurred during payment. Please try again.",
               variant: "destructive",
             })
-            setIsProcessing(false)
+            setIsProcessingPayment(false)
           },
           mode: "LIVE"
         }
@@ -655,7 +655,7 @@ export default function Checkout() {
           description: "Unable to process card payment. Please try again.",
           variant: "destructive",
         })
-        setIsProcessing(false)
+        setIsProcessingPayment(false)
       }
     } else {
       // For cash/POS/transfer payments, create order directly with paid status
