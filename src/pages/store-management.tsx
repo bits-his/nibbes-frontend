@@ -168,18 +168,33 @@ export default function StoreManagement() {
   const fetchInventoryCategories = async () => {
     try {
       setLoadingCategories(true)
-      const response = await apiRequest("GET", "/api/inventory-categories")
+      // Fetch menu categories for Main Kitchen (store items)
+      const response = await apiRequest("GET", "/api/menu/categories")
       const data = await response.json()
+      console.log('Main Kitchen - Fetched menu categories:', data)
+      
       // Extract category names from the response data
-      const categoryNames = data.data?.map((cat: any) => cat.name) || data.map((cat: any) => cat.name) || []
-      setCategories(categoryNames)
+      if (Array.isArray(data)) {
+        setCategories(data)
+        console.log('Main Kitchen - Categories set:', data)
+      } else if (data.data && Array.isArray(data.data)) {
+        const categoryNames = data.data.map((cat: any) => cat.name || cat)
+        setCategories(categoryNames)
+        console.log('Main Kitchen - Categories set:', categoryNames)
+      } else {
+        console.error('Main Kitchen - Unexpected categories format:', data)
+        // Fallback to defaults
+        setCategories(["Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"])
+      }
     } catch (error) {
-      console.error("Error fetching inventory categories:", error)
+      console.error("Error fetching menu categories:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to fetch inventory categories",
+        description: "Failed to fetch menu categories",
       })
+      // Fallback to defaults
+      setCategories(["Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"])
     } finally {
       setLoadingCategories(false)
     }
@@ -405,7 +420,8 @@ export default function StoreManagement() {
     }
 
     try {
-      await apiRequest("POST", "/api/inventory-categories", {
+      // Post to menu categories endpoint for Main Kitchen
+      await apiRequest("POST", "/api/menu/categories", {
         name: newCategoryName.trim(),
       });
 
@@ -661,7 +677,7 @@ export default function StoreManagement() {
                 <TableHeader className="font-semibold">
                   <TableRow className="border-slate-200 hover:bg-transparent">
                     <TableHead className="text-gray-700">Name</TableHead>
-                    {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Initial Quantity</TableHead>}
+                    {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Quantity</TableHead>}
                     <TableHead className="text-gray-700 text-right">Remaining</TableHead>
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Used/Sold</TableHead>}
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Total Value</TableHead>}
@@ -705,7 +721,7 @@ export default function StoreManagement() {
                         )}
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            {!isKitchenStaff && (
+                            {/* {!isKitchenStaff && (
                               <>
                                 <button
                                   onClick={(e) => {
@@ -726,7 +742,7 @@ export default function StoreManagement() {
                                   Delete
                                 </button>
                               </>
-                            )}
+                            )} */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
@@ -77,6 +78,12 @@ export default function UserManagement() {
   const [roleName, setRoleName] = useState("")
   const [roleDescription, setRoleDescription] = useState("")
   const [selectedRolePermissions, setSelectedRolePermissions] = useState<string[]>([])
+  
+  // Delete confirmation dialogs
+  const [showDeleteUserDialog, setShowDeleteUserDialog] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -200,19 +207,24 @@ export default function UserManagement() {
     }
   }
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) {
-      return
-    }
+  const handleDeleteUserClick = (user: User) => {
+    setUserToDelete(user)
+    setShowDeleteUserDialog(true)
+  }
+
+  const handleDeleteUserConfirm = async () => {
+    if (!userToDelete) return
 
     try {
-      await apiRequest("DELETE", `/api/users/${userId}`)
+      await apiRequest("DELETE", `/api/users/${userToDelete.id}`)
 
       toast({
         title: "Success",
         description: "User deleted successfully",
       })
 
+      setShowDeleteUserDialog(false)
+      setUserToDelete(null)
       fetchUsers()
     } catch (error: any) {
       toast({
@@ -427,19 +439,24 @@ export default function UserManagement() {
     }
   }
 
-  const handleDeleteRole = async (roleId: string) => {
-    if (!window.confirm("Are you sure you want to delete this role?")) {
-      return
-    }
+  const handleDeleteRoleClick = (role: Role) => {
+    setRoleToDelete(role)
+    setShowDeleteRoleDialog(true)
+  }
+
+  const handleDeleteRoleConfirm = async () => {
+    if (!roleToDelete) return
 
     try {
-      await apiRequest("DELETE", `/api/roles/${roleId}`)
+      await apiRequest("DELETE", `/api/roles/${roleToDelete.id}`)
 
       toast({
         title: "Success",
         description: "Role deleted successfully",
       })
 
+      setShowDeleteRoleDialog(false)
+      setRoleToDelete(null)
       fetchRoles()
     } catch (error: any) {
       toast({
@@ -780,7 +797,7 @@ export default function UserManagement() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUserClick(user)}
                               className="border-red-200 text-red-600 hover:bg-red-50 gap-2"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -992,7 +1009,7 @@ export default function UserManagement() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleDeleteRole(role.id)}
+                                  onClick={() => handleDeleteRoleClick(role)}
                                   className="border-red-200 text-red-600 hover:bg-red-50"
                                 >
                                   <Trash2 className="w-3 h-3 mr-1" />
@@ -1199,6 +1216,48 @@ export default function UserManagement() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={showDeleteUserDialog} onOpenChange={setShowDeleteUserDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete user "{userToDelete?.username}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUserConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Role Confirmation Dialog */}
+      <AlertDialog open={showDeleteRoleDialog} onOpenChange={setShowDeleteRoleDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete role "{roleToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRoleConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

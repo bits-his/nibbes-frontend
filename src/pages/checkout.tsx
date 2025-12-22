@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient"
 import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
+import { useCart } from "@/context/CartContext"
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
@@ -67,6 +68,7 @@ export default function Checkout() {
   const [, setLocation] = useLocation()
   const { toast} = useToast()
   const { user, loading } = useAuth()
+  const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
   const [cart, setCart] = useState<CartItem[]>([])
   const [walkInOrder, setWalkInOrder] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("cash")
@@ -176,19 +178,20 @@ export default function Checkout() {
 
     const guestSession = getGuestSession()
     if (!user && !guestSession) {
-      const savedCart = localStorage.getItem("cart")
-      if (savedCart) {
-        localStorage.setItem("pendingCheckoutCart", savedCart)
+      // Save current cart to pending checkout before redirecting
+      if (cartFromContext.length > 0) {
+        localStorage.setItem("pendingCheckoutCart", JSON.stringify(cartFromContext))
       }
 
       setLocation("/guest-checkout")
       return
     }
 
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      setCart(JSON.parse(savedCart))
+    // Use cart from context instead of localStorage
+    if (cartFromContext.length > 0) {
+      setCart(cartFromContext)
     } else {
+      // If cart is empty, redirect to home
       setLocation("/")
     }
 
@@ -208,7 +211,7 @@ export default function Checkout() {
       form.setValue("customerName", guestSession.guestName)
       form.setValue("customerPhone", guestSession.guestPhone)
     }
-  }, [user, loading, setLocation, form])
+  }, [user, loading, setLocation, form, cartFromContext])
 
   const subtotal = walkInOrder 
     ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
@@ -322,8 +325,8 @@ export default function Checkout() {
           console.log('Payment completed:', response)
           console.log('Response code:', response.resp || response.responseCode)
           
-          // Clear cart on any response
-          localStorage.removeItem("cart")
+          // Clear cart on any response using context method
+          clearCart()
           
           // Check payment response
           // Interswitch success codes: "00" or "10" (pending)
@@ -333,6 +336,9 @@ export default function Checkout() {
               title: "Payment Successful! 🎉",
               description: `Order #${createdOrder.orderNumber} has been paid and sent to kitchen.`,
             })
+            
+            // Clear cart using context method
+            clearCart()
             
             // Redirect to order status with success flag
             setTimeout(() => {
@@ -444,7 +450,7 @@ export default function Checkout() {
         title: "Order Placed!",
         description: `Your order #${data.orderNumber} has been received and placed.`,
       })
-      localStorage.removeItem("cart")
+      clearCart() // Use clearCart from context
       form.reset()
       
       // If payment method is card, redirect to payment

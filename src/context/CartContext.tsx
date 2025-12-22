@@ -29,30 +29,53 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = 'cart';
 
+// Get user-specific cart key
+const getUserCartKey = (userId?: string) => {
+  return userId ? `cart_user_${userId}` : 'cart_guest';
+};
+
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(user?.id);
 
-  // Load cart from localStorage on initial render
+  // Load cart from localStorage when user changes
   useEffect(() => {
-    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        if (Array.isArray(parsedCart)) {
-          setCart(parsedCart);
+    const userId = user?.id;
+    const cartKey = getUserCartKey(userId);
+    
+    // If user changed, clear current cart and load new user's cart
+    if (currentUserId !== userId) {
+      console.log('User changed, loading cart for:', userId || 'guest');
+      setCurrentUserId(userId);
+      
+      const savedCart = localStorage.getItem(cartKey);
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          if (Array.isArray(parsedCart)) {
+            setCart(parsedCart);
+          } else {
+            setCart([]);
+          }
+        } catch (error) {
+          console.error('Failed to parse cart from localStorage', error);
+          setCart([]);
         }
-      } catch (error) {
-        console.error('Failed to parse cart from localStorage', error);
+      } else {
+        // No saved cart for this user
+        setCart([]);
       }
     }
-  }, []);
+  }, [user, currentUserId]);
 
-  // Save cart to localStorage whenever it changes
+  // Save cart to localStorage whenever it changes (user-specific)
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
+    const userId = user?.id;
+    const cartKey = getUserCartKey(userId);
+    localStorage.setItem(cartKey, JSON.stringify(cart));
+  }, [cart, user]);
 
   // Sync cart with server when user logs in
   const syncCartWithServer = useCallback(async (cartItems: CartItem[]) => {

@@ -100,7 +100,25 @@ export default function MenuManagement() {
     try {
       const response = await apiRequest("GET", "/api/menu/categories");
       const data = await response.json();
-      setCategories(data);
+      console.log('Fetched categories:', data);
+      
+      // API returns array of strings directly
+      if (Array.isArray(data)) {
+        setCategories(data);
+      } else if (data.data && Array.isArray(data.data)) {
+        // Handle if wrapped in data property
+        setCategories(data.data);
+      } else {
+        console.error('Unexpected categories format:', data);
+        // Fallback to defaults
+        setCategories([
+          "Main Course",
+          "Appetizer",
+          "Dessert",
+          "Drinks",
+          "Snacks",
+        ]);
+      }
     } catch (error) {
       console.error("Failed to fetch categories:", error);
       // Default to existing categories if API fails

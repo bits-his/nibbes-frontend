@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { ShoppingCart, Plus, CheckCircle, XCircle, Clock, Package, Trash2, ThumbsUp } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -67,6 +68,8 @@ const KitchenRequests: React.FC = () => {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<KitchenRequest | null>(null);
   const [givenQuantities, setGivenQuantities] = useState<number[]>([]);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [requestToCancel, setRequestToCancel] = useState<KitchenRequest | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -283,17 +286,24 @@ const KitchenRequests: React.FC = () => {
     }
   };
 
-  const handleCancelRequest = async (id: number) => {
-    if (!confirm("Cancel this request? If approved, materials will be returned to inventory.")) return;
+  const handleCancelRequestClick = (request: KitchenRequest) => {
+    setRequestToCancel(request);
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelRequestConfirm = async () => {
+    if (!requestToCancel) return;
 
     try {
-      const response = await apiRequest("PATCH", `/api/kitchen-requests/${id}/cancel`);
+      const response = await apiRequest("PATCH", `/api/kitchen-requests/${requestToCancel.id}/cancel`);
 
       if (response.ok) {
         toast({
           title: "Success",
           description: "Request cancelled successfully",
         });
+        setShowCancelDialog(false);
+        setRequestToCancel(null);
         fetchData();
       } else {
         const error = await response.json();
@@ -594,7 +604,7 @@ const KitchenRequests: React.FC = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleCancelRequest(request.id)}
+                              onClick={() => handleCancelRequestClick(request)}
                               className="text-red-600 hover:bg-red-50"
                             >
                               <XCircle className="w-4 h-4 mr-1" />
@@ -750,6 +760,27 @@ const KitchenRequests: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Request Confirmation Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Request</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cancel this request? If approved, materials will be returned to inventory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, Keep Request</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelRequestConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Yes, Cancel Request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

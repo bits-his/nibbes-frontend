@@ -23,7 +23,10 @@ export const usePrint = () => {
     const printWindow = window.open('', '_blank', 'width=300,height=600')
     
     if (!printWindow) {
-      alert('Please allow popups for printing')
+      // TODO: Show toast notification instead of alert
+      // User will notice if print window doesn't open
+      // alert('Please allow popups for printing')
+      console.error('Print window blocked. Please allow popups for printing.')
       return
     }
     

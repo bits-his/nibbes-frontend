@@ -171,7 +171,10 @@ export default function CustomerMenu() {
           localStorage.setItem("location", JSON.stringify(locationInfo));
 
           // Show success message
-          alert(`Location detected: ${address}`);
+          toast({
+            title: "Location Detected",
+            description: address,
+          });
         } catch (error) {
           console.error("Error getting address:", error);
           // If reverse geocoding fails, still store coordinates
@@ -182,9 +185,10 @@ export default function CustomerMenu() {
           };
           setLocationData(locationInfo);
           localStorage.setItem("location", JSON.stringify(locationInfo));
-          alert(
-            `Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          );
+          toast({
+            title: "Location Detected",
+            description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          });
         } finally {
           setLocationLoading(false);
         }

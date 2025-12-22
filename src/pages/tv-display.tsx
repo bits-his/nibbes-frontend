@@ -281,7 +281,7 @@ export default function TVDisplay() {
             <p className="text-2xl md:text-3xl text-gray-500 mt-3">Orders will appear here when ready</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {readyOrders.map((order) => (
               <div
                 key={order.id}

@@ -5,10 +5,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Edit, Trash2, Package, AlertTriangle, CheckCircle, MinusCircle, PlusCircle, Loader, Eye } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface InventoryItem {
   id: string
@@ -40,6 +42,7 @@ interface InventorySummary {
 }
 
 export default function InventoryManagement() {
+  const { toast } = useToast()
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [inventorySummary, setInventorySummary] = useState<InventorySummary | null>(null)
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([])
@@ -53,10 +56,15 @@ export default function InventoryManagement() {
   const [newCategoryDescription, setNewCategoryDescription] = useState<string>("")
   const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [showTransactionsDialog, setShowTransactionsDialog] = useState<boolean>(false)
   const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState<boolean>(false)
+  const [showDeleteItemDialog, setShowDeleteItemDialog] = useState<boolean>(false)
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
+  const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState<boolean>(false)
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -108,25 +116,6 @@ export default function InventoryManagement() {
         setError(err instanceof Error ? err.message : "Failed to load inventory data")
       } finally {
         setLoading(false)
-      }
-    }
-
-    const fetchInventoryCategories = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const categories = (data.data || []).map((cat: any) => cat.name)
-          setInventoryCategories(categories)
-        }
-      } catch (err) {
-        console.error("Error fetching inventory categories:", err)
       }
     }
 
@@ -311,10 +300,6 @@ export default function InventoryManagement() {
   }
 
   const handleDeleteItem = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-      return
-    }
-
     try {
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory/${id}`, {
         method: 'DELETE',
@@ -343,9 +328,21 @@ export default function InventoryManagement() {
           return match
         }),
       )
+      
+      // Close dialog and show success toast
+      setShowDeleteItemDialog(false)
+      setItemToDelete(null)
+      toast({
+        title: "Success",
+        description: "Item deleted successfully.",
+      })
     } catch (error) {
       console.error('Error deleting item:', error)
-      alert('Failed to delete item. Please try again.')
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete item. Please try again.",
+      })
     }
   }
 
@@ -376,7 +373,11 @@ export default function InventoryManagement() {
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert('Please enter a category name')
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a category name",
+      })
       return
     }
 
@@ -399,6 +400,27 @@ export default function InventoryManagement() {
       }
 
       // Refresh categories
+      await fetchInventoryCategories()
+
+      setNewCategoryName('')
+      setNewCategoryDescription('')
+      toast({
+        title: "Success",
+        description: "Category added successfully!",
+      })
+    } catch (error) {
+      console.error('Error adding category:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to add category',
+      })
+    }
+  }
+
+  const handleDeleteCategory = async (categoryName: string) => {
+    try {
+      // First, get the category ID by name
       const categoriesResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -406,19 +428,71 @@ export default function InventoryManagement() {
         },
       })
 
-      if (categoriesResponse.ok) {
-        const data = await categoriesResponse.json()
+      if (!categoriesResponse.ok) {
+        throw new Error('Failed to fetch categories')
+      }
+
+      const data = await categoriesResponse.json()
+      const categories = data.data || []
+      const category = categories.find((cat: any) => cat.name === categoryName)
+
+      if (!category) {
+        throw new Error('Category not found')
+      }
+
+      // Delete the category
+      const deleteResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories/${category.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!deleteResponse.ok) {
+        const error = await deleteResponse.json()
+        throw new Error(error.error || 'Failed to delete category')
+      }
+
+      // Refresh categories
+      await fetchInventoryCategories()
+
+      // Close dialog and show success toast
+      setShowDeleteCategoryDialog(false)
+      setCategoryToDelete(null)
+      toast({
+        title: "Success",
+        description: "Category deleted successfully!",
+      })
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to delete category',
+      })
+    }
+  }
+
+  const fetchInventoryCategories = async () => {
+    try {
+      setLoadingCategories(true)
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/inventory-categories`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
         const categories = (data.data || []).map((cat: any) => cat.name)
         setInventoryCategories(categories)
       }
-
-      setIsAddCategoryDialogOpen(false)
-      setNewCategoryName('')
-      setNewCategoryDescription('')
-      alert('Category added successfully!')
     } catch (error) {
-      console.error('Error adding category:', error)
-      alert(error instanceof Error ? error.message : 'Failed to add category')
+      console.error("Error fetching inventory categories:", error)
+    } finally {
+      setLoadingCategories(false)
     }
   }
 
@@ -426,10 +500,16 @@ export default function InventoryManagement() {
   const handleViewItemTransactions = async (item: InventoryItem) => {
     try {
       setTransactionsLoading(true);
+      setShowTransactionsDialog(true);
 
       // Fetch transaction data for the specific item
-      // Use the store_entries endpoint to get all entries for this item
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/store-entries/item-code/${item.itemCode}`, {
+      // Try using itemCode first, fall back to item ID
+      const identifier = item.itemCode || item.id;
+      const endpoint = item.itemCode 
+        ? `/api/store-entries/item-code/${item.itemCode}`
+        : `/api/store-entries/inventory/${item.id}`;
+
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}${endpoint}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
@@ -442,17 +522,26 @@ export default function InventoryManagement() {
 
       const data = await response.json();
 
-      // Assuming the API returns entries in the format we need
-      // If not, we might need to adjust the response structure
-      setSelectedItemTransactions(data.entries || []);
-      setShowTransactionsDialog(true);
+      // Handle different response formats and transform to expected format
+      let rawEntries = data.entries || data.data?.entries || data.data || data || [];
+      
+      // Transform entries to match expected format
+      const transactions = rawEntries.map((entry: any) => ({
+        transactionType: entry.qtyIn > 0 ? 'IN' : 'OUT',
+        quantity: entry.qtyIn > 0 ? entry.qtyIn : entry.qtyOut,
+        unit: item.unit || '',
+        transactionDate: entry.date || entry.createdAt,
+        location: entry.qtyIn > 0 ? entry.source : entry.destination,
+        remarks: entry.description || entry.notes || '',
+        costPrice: entry.costPrice || 0,
+        balanceAfter: entry.balanceAfter || 'N/A',
+      }));
+      
+      setSelectedItemTransactions(transactions);
     } catch (error) {
       console.error("Error fetching transactions:", error);
-      // Show error in console instead of toast
-      alert("Failed to load item transactions");
-      // Even if there's an error, still open the dialog but with an error message
+      // Show empty state instead of error
       setSelectedItemTransactions([]);
-      setShowTransactionsDialog(true);
     } finally {
       setTransactionsLoading(false);
     }
@@ -662,7 +751,10 @@ export default function InventoryManagement() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteItem(item.id)}
+                                onClick={() => {
+                                  setItemToDelete(item)
+                                  setShowDeleteItemDialog(true)
+                                }}
                                 className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
                                 title="Delete item"
                               >
@@ -699,38 +791,87 @@ export default function InventoryManagement() {
 
           {/* Add Category Dialog */}
           <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add Inventory Category</DialogTitle>
-                <DialogDescription>Create a category specifically for store inventory items</DialogDescription>
+                <DialogTitle>Manage Inventory Categories</DialogTitle>
+                <DialogDescription>Add new categories or delete existing ones</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="categoryName">Category Name</Label>
-                  <Input
-                    id="categoryName"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="e.g. Daily Fresh"
-                    className="border-slate-200"
-                  />
+              <div className="space-y-6">
+                {/* Add New Category Section */}
+                <div className="space-y-4 pb-4 border-b border-slate-200">
+                  <h3 className="font-semibold text-slate-900">Add New Category</h3>
+                  <div className="flex gap-2">
+                    <Input
+                      id="categoryName"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="e.g. Daily Fresh"
+                      className="border-slate-200 flex-1"
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                    />
+                    <Button 
+                      className="bg-[#50BAA8] text-white" 
+                      onClick={handleAddCategory}
+                      disabled={!newCategoryName.trim()}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+                  {/* <div className="space-y-2">
+                    <Label htmlFor="categoryDescription">Description (optional)</Label>
+                    <Input
+                      id="categoryDescription"
+                      value={newCategoryDescription}
+                      onChange={(e) => setNewCategoryDescription(e.target.value)}
+                      placeholder="Describe what items go into this category"
+                      className="border-slate-200"
+                    />
+                  </div> */}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="categoryDescription">Description (optional)</Label>
-                  <Input
-                    id="categoryDescription"
-                    value={newCategoryDescription}
-                    onChange={(e) => setNewCategoryDescription(e.target.value)}
-                    placeholder="Describe what items go into this category"
-                    className="border-slate-200"
-                  />
+
+                {/* Existing Categories Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-slate-900">Existing Categories</h3>
+                  {loadingCategories ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader className="h-6 w-6 animate-spin text-[#50BAA8]" />
+                      <span className="ml-2 text-slate-600">Loading categories...</span>
+                    </div>
+                  ) : inventoryCategories.length > 0 ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {inventoryCategories.map((category, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
+                        >
+                          <span className="font-medium text-slate-900">{category}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setCategoryToDelete(category)
+                              setShowDeleteCategoryDialog(true)
+                            }}
+                            className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                            title="Delete category"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-slate-500">
+                      <Package className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                      <p>No categories yet. Add one above!</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-end gap-2">
+
+                <div className="flex justify-end pt-4 border-t border-slate-200">
                   <Button variant="outline" onClick={() => setIsAddCategoryDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button className="bg-[#50BAA8] text-white" onClick={handleAddCategory}>
-                    Save Category
+                    Close
                   </Button>
                 </div>
               </div>
@@ -771,6 +912,121 @@ export default function InventoryManagement() {
               </DialogContent>
             </Dialog>
           )}
+
+          {/* Transactions Dialog */}
+          <Dialog open={showTransactionsDialog} onOpenChange={setShowTransactionsDialog}>
+            <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Item Transaction History</DialogTitle>
+                <DialogDescription>
+                  View all stock movements and transactions for this item
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {transactionsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader className="h-6 w-6 animate-spin text-[#50BAA8]" />
+                    <span className="ml-2 text-slate-600">Loading transactions...</span>
+                  </div>
+                ) : selectedItemTransactions.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedItemTransactions.map((transaction: any, index: number) => (
+                      <Card key={index} className="border-slate-200">
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  className={
+                                    transaction.transactionType === 'IN'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }
+                                >
+                                  {transaction.transactionType === 'IN' ? 'Stock In' : 'Stock Out'}
+                                </Badge>
+                                <span className="text-sm text-slate-600">
+                                  {new Date(transaction.transactionDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-sm font-medium text-slate-900">
+                                Quantity: {transaction.quantity} {transaction.unit || ''}
+                              </p>
+                              {transaction.location && (
+                                <p className="text-sm text-slate-600">
+                                  Location: {transaction.location}
+                                </p>
+                              )}
+                              {transaction.remarks && (
+                                <p className="text-sm text-slate-600">
+                                  Remarks: {transaction.remarks}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">
+                                ₦{Number(transaction.costPrice || 0).toLocaleString()}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Balance: {transaction.balanceAfter || 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-500">No transactions found for this item</p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Item Confirmation Dialog */}
+          <AlertDialog open={showDeleteItemDialog} onOpenChange={setShowDeleteItemDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Inventory Item</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete <strong>{itemToDelete?.name}</strong>? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => itemToDelete && handleDeleteItem(itemToDelete.id)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Delete Category Confirmation Dialog */}
+          <AlertDialog open={showDeleteCategoryDialog} onOpenChange={setShowDeleteCategoryDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete the category <strong>"{categoryToDelete}"</strong>? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => categoryToDelete && handleDeleteCategory(categoryToDelete)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>

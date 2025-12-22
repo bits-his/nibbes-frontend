@@ -23,8 +23,9 @@ export const useAutoLogout = (isLoggedIn: boolean) => {
     };
 
     const handleLogout = () => {
-      // Show notification first
-      alert('Your session has expired. Please log in again.');
+      // TODO: Show toast notification instead of alert
+      // For now, commenting out alert as user will see login page anyway
+      // alert('Your session has expired. Please log in again.');
 
       // Clear stored user data
       localStorage.removeItem('token');

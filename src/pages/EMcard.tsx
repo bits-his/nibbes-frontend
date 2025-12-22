@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { CreditCard, ArrowLeft, Printer, Settings, Plus, Trash2, Eye, EyeOff, TrendingUp } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
@@ -48,6 +49,8 @@ const EMcard: React.FC = () => {
   const [loadingChecklist, setLoadingChecklist] = useState(true);
   const [showChecklistManager, setShowChecklistManager] = useState(false);
   const [newItemName, setNewItemName] = useState('');
+  const [showDeleteChecklistDialog, setShowDeleteChecklistDialog] = useState(false);
+  const [checklistItemToDelete, setChecklistItemToDelete] = useState<number | null>(null);
   const { toast } = useToast();
   
   const [formData, setFormData] = useState<FormData>({
@@ -259,19 +262,24 @@ const EMcard: React.FC = () => {
     }
   };
 
-  const handleDeleteChecklistItem = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this checklist item?")) {
-      return;
-    }
+  const handleDeleteChecklistItemClick = (id: number) => {
+    setChecklistItemToDelete(id);
+    setShowDeleteChecklistDialog(true);
+  };
+
+  const handleDeleteChecklistItemConfirm = async () => {
+    if (checklistItemToDelete === null) return;
 
     try {
-      const response = await apiRequest("DELETE", `/api/checklist-items/${id}`);
+      const response = await apiRequest("DELETE", `/api/checklist-items/${checklistItemToDelete}`);
 
       if (response.ok) {
         toast({
           title: "Success",
           description: "Checklist item deleted successfully",
         });
+        setShowDeleteChecklistDialog(false);
+        setChecklistItemToDelete(null);
         fetchChecklistItems();
       } else {
         const error = await response.json();
@@ -373,7 +381,7 @@ const EMcard: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteChecklistItem(item.id)}
+                              onClick={() => handleDeleteChecklistItemClick(item.id)}
                               title="Delete"
                             >
                               <Trash2 className="w-4 h-4 text-red-600" />
@@ -714,6 +722,27 @@ const EMcard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Checklist Item Confirmation Dialog */}
+      <AlertDialog open={showDeleteChecklistDialog} onOpenChange={setShowDeleteChecklistDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Checklist Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this checklist item? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteChecklistItemConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
