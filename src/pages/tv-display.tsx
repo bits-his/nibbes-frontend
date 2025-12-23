@@ -28,6 +28,7 @@ interface Order {
 interface WebSocketMessage {
   type: string
   data: any
+  order?: any  // Some messages have order property instead of data
 }
 
 // Time Display Component
@@ -140,21 +141,24 @@ export default function TVDisplay() {
           
           // Handle different WebSocket events
           switch(message.type) {
+            case 'order_status_change':  // Backend sends this event
             case 'order_status_updated':
             case 'order_ready':
             case 'order_update':
             case 'new_order':
-              handleOrderUpdate(message.data)
+              // Use message.order if available, otherwise message.data
+              handleOrderUpdate(message.order || message.data)
               break
             
             case 'order_completed':
-              handleOrderCompleted(message.data)
+              handleOrderCompleted(message.order || message.data)
               break
             
             default:
               // For any order-related event, check the status
-              if (message.data && message.data.status) {
-                handleOrderUpdate(message.data)
+              const orderData = message.order || message.data
+              if (orderData && orderData.status) {
+                handleOrderUpdate(orderData)
               }
           }
         }
@@ -197,21 +201,33 @@ export default function TVDisplay() {
 
   // Handle order updates from WebSocket
   const handleOrderUpdate = (orderData: any) => {
-    if (!orderData) return
+    if (!orderData) {
+      console.log('⚠️ TV Display: Received empty order data')
+      return
+    }
+
+    console.log('📦 TV Display: Processing order update:', {
+      id: orderData.id,
+      orderNumber: orderData.orderNumber,
+      status: orderData.status
+    })
 
     // If order status is "ready", add or update it
     if (orderData.status === "ready") {
+      console.log('✅ TV Display: Adding/updating READY order #' + orderData.orderNumber)
       setReadyOrders(prev => {
         // Check if order already exists
         const existingIndex = prev.findIndex(o => o.id === orderData.id)
         
         if (existingIndex >= 0) {
           // Update existing order
+          console.log('🔄 TV Display: Updating existing order')
           const updated = [...prev]
           updated[existingIndex] = orderData
           return updated
         } else {
           // Add new order and sort
+          console.log('➕ TV Display: Adding new order')
           const newOrders = [...prev, orderData]
           newOrders.sort((a, b) => 
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -222,20 +238,34 @@ export default function TVDisplay() {
     } 
     // If order status is "completed", remove it
     else if (orderData.status === "completed") {
+      console.log('🗑️ TV Display: Removing COMPLETED order #' + orderData.orderNumber)
       setReadyOrders(prev => prev.filter(o => o.id !== orderData.id))
     }
     // If order status is "pending" or "preparing", remove it if it exists
     else if (orderData.status === "pending" || orderData.status === "preparing") {
+      console.log('🔙 TV Display: Removing order #' + orderData.orderNumber + ' (status: ' + orderData.status + ')')
       setReadyOrders(prev => prev.filter(o => o.id !== orderData.id))
+    }
+    else {
+      console.log('ℹ️ TV Display: Ignoring order with status:', orderData.status)
     }
   }
 
   // Handle order completed event
   const handleOrderCompleted = (orderData: any) => {
-    if (!orderData) return
+    if (!orderData) {
+      console.log('⚠️ TV Display: Received empty order data for completion')
+      return
+    }
+    
+    console.log('🎉 TV Display: Order COMPLETED event received for #' + orderData.orderNumber)
     
     // Remove completed order from display
-    setReadyOrders(prev => prev.filter(o => o.id !== orderData.id))
+    setReadyOrders(prev => {
+      const filtered = prev.filter(o => o.id !== orderData.id)
+      console.log('📊 TV Display: Orders after removal:', filtered.length)
+      return filtered
+    })
   }
 
   return (
