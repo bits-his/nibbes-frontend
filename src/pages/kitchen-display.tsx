@@ -123,40 +123,42 @@ const getStatusBadge = (status: string) => {
   });
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6">
       <div className="max-w-screen-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <ChefHat className="w-8 h-8 text-primary" />
-            <h1 className="font-serif text-4xl font-bold">Kitchen Display</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ChefHat className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Kitchen Display</h1>
           </div>
-          <div className="flex items-center gap-4">
-            {/* Search Input - Added between "Kitchen Display" and "Active Orders" */}
-            <div className="relative w-64">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            {/* Search Input - Made responsive */}
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search by order number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2"
+                className="pl-10 pr-4 py-2 w-full"
               />
             </div>
-            <Badge variant="outline" className="px-4 py-2 text-base">
-              Active Orders: {activeOrders?.length || 0}
-            </Badge>
-            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Badge variant="outline" className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base whitespace-nowrap">
+                Active: {activeOrders?.length || 0}
+              </Badge>
+              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+            </div>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
               <Card key={i} className="overflow-hidden">
-                <CardHeader className="p-6">
-                  <div className="h-12 bg-muted rounded animate-pulse mb-2" />
-                  <div className="h-6 bg-muted rounded animate-pulse" />
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="h-10 sm:h-12 bg-muted rounded animate-pulse mb-2" />
+                  <div className="h-5 sm:h-6 bg-muted rounded animate-pulse" />
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="space-y-2">
                     <div className="h-4 bg-muted rounded animate-pulse" />
                     <div className="h-4 bg-muted rounded animate-pulse" />
@@ -166,43 +168,43 @@ const getStatusBadge = (status: string) => {
             ))}
           </div>
         ) : activeOrders && activeOrders.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {activeOrders.map((order) => (
               <Card
                 key={order.id}
                 className="overflow-hidden border-2"
                 data-testid={`card-order-${order.id}`}
               >
-                <CardHeader className="p-6 bg-card space-y-3">
-                  <div className="flex items-start justify-between gap-4">
+                <CardHeader className="p-4 sm:p-6 bg-card space-y-2 sm:space-y-3">
+                  <div className="flex items-start justify-between gap-3 sm:gap-4">
                     <div>
-                      <div className="text-4xl font-bold mb-1" data-testid={`text-order-number-${order.id}`}>
+                      <div className="text-3xl sm:text-4xl font-bold mb-1" data-testid={`text-order-number-${order.id}`}>
                         #{order.orderNumber}
                       </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
+                      <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 sm:gap-2">
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                         {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
                       </div>
                     </div>
                     {getStatusBadge(order.status)}
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">{order.orderType}</Badge>
-                    <span className="font-medium">{order.customerName}</span>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <Badge variant="outline" className="text-xs sm:text-sm">{order.orderType}</Badge>
+                    <span className="font-medium text-sm sm:text-base">{order.customerName}</span>
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     {order.orderItems.map((item) => (
-                      <div key={item.id} className="flex justify-between gap-3" data-testid={`order-item-${item.id}`}>
+                      <div key={item.id} className="flex justify-between gap-2 sm:gap-3" data-testid={`order-item-${item.id}`}>
                         <div className="flex-1">
-                          <div className="font-semibold text-lg">
+                          <div className="font-semibold text-base sm:text-lg">
                             {item.quantity}x {item.menuItem.name}
                           </div>
                           {item.specialInstructions && (
-                            <div className="text-sm text-muted-foreground italic mt-1">
+                            <div className="text-xs sm:text-sm text-muted-foreground italic mt-1">
                               Note: {item.specialInstructions}
                             </div>
                           )}
@@ -212,17 +214,17 @@ const getStatusBadge = (status: string) => {
                   </div>
 
                   {order.notes && (
-                    <div className="pt-3 border-t">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="pt-2 sm:pt-3 border-t">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         <span className="font-semibold">Notes:</span> {order.notes}
                       </p>
                     </div>
                   )}
 
-                  <div className="pt-3 border-t space-y-2">
+                  <div className="pt-2 sm:pt-3 border-t space-y-2">
                     {order.status === "pending" && (
                       <Button
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                         size="lg"
                         onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "preparing" })}
                         disabled={updateStatusMutation.isPending}
@@ -233,7 +235,7 @@ const getStatusBadge = (status: string) => {
                     )}
                     {order.status === "preparing" && (
                       <Button
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                         size="lg"
                         onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
                         disabled={updateStatusMutation.isPending}
@@ -244,7 +246,7 @@ const getStatusBadge = (status: string) => {
                     )}
                     {order.status === "ready" && (
                       <Button
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                         size="lg"
                         variant="secondary"
                         onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "completed" })}
@@ -260,10 +262,10 @@ const getStatusBadge = (status: string) => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-24">
-            <ChefHat className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
-            <h2 className="text-2xl font-semibold mb-2">No Active Orders</h2>
-            <p className="text-muted-foreground">
+          <div className="text-center py-16 sm:py-20 md:py-24">
+            <ChefHat className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 mx-auto text-muted-foreground mb-4 sm:mb-6" />
+            <h2 className="text-xl sm:text-2xl font-semibold mb-2">No Active Orders</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
               New orders will appear here automatically
             </p>
           </div>
