@@ -152,10 +152,10 @@ const getStatusBadge = (status: string) => {
 
 const getStatusCardColor = (status: string) => {
   const cardColors: Record<string, string> = {
-    pending: "bg-yellow-200 border-yellow-400",
-    preparing: "bg-orange-200 border-orange-400",
+    pending: "bg-red-100 border-red-400",
+    preparing: "bg-yellow-100 border-yellow-400",
     ready: "bg-green-200 border-green-400",
-    completed: "bg-red-200 border-red-400",
+    completed: "bg-gray-200 border-gray-400",
     cancelled: "bg-gray-300 border-gray-500",
   };
 

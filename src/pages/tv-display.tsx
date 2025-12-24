@@ -341,7 +341,7 @@ export default function TVDisplay() {
                 className="bg-white border-4 border-[#50BAA8] rounded-2xl p-8 md:p-10 shadow-2xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center min-h-[280px] md:min-h-[320px]"
               >
                 <div className="text-center">
-                  <div className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-[#50BAA8] mb-4">
+                  <div className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-gray-900 mb-4">
                     #{order.orderNumber}
                   </div>
                   <div className="inline-block bg-[#50BAA8] text-white px-6 py-3 md:px-8 md:py-4 rounded-xl text-2xl md:text-3xl lg:text-4xl font-bold">
