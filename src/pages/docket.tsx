@@ -134,11 +134,11 @@ const getStatusIcon = (status: string) => {
 
 const getStatusBadge = (status: string) => {
   const statusColors: Record<string, string> = {
-    pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
-    preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
-    ready: "px-6 py-3 capitalize ",
-    completed: "bg-red-200 px-6 py-3 capitalize text-red-800",
-    cancelled: "bg-black-200 px-6 py-3 capitalize text-black-800",
+    pending: "bg-red-200 px-6 py-3 capitalize text-red-800",
+    preparing: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+    ready: "bg-green-200 px-6 py-3 capitalize text-green-800",
+    completed: "bg-gray-300 px-6 py-3 capitalize text-gray-800",
+    cancelled: "bg-gray-400 px-6 py-3 capitalize text-gray-900",
   };
 
   const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3 ";
