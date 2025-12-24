@@ -247,13 +247,9 @@ const KitchenRequests: React.FC = () => {
   };
 
   const handleCompleteRequest = async (id: number) => {
-    const notes = prompt("Add completion notes (optional):");
-    
-    if (notes === null) return; // User cancelled
-
     try {
       const response = await apiRequest("PATCH", `/api/kitchen-requests/${id}/complete`, {
-        notes: notes || null
+        notes: null
       });
 
       if (response.ok) {
@@ -400,7 +396,7 @@ const KitchenRequests: React.FC = () => {
                             <option value="">Select material...</option>
                             {inventoryItems.map(item => (
                               <option key={item.id} value={item.id}>
-                                {item.name} ({item.quantity} {item.unit} available)
+                                {item.name}
                               </option>
                             ))}
                           </select>
