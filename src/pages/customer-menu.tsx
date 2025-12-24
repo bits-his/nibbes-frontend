@@ -9,7 +9,6 @@ import {
   QrCode,
   Search,
   ChevronDown,
-  Menu,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -413,7 +412,7 @@ export default function CustomerMenu() {
                 </div>
               </div>
 
-              {/* Cart Button - Hamburger Menu */}
+              {/* Cart Button */}
               <Button
                 size="icon"
                 variant="default"
@@ -421,7 +420,7 @@ export default function CustomerMenu() {
                 onClick={() => setCartOpen(true)}
                 aria-label="Open cart"
               >
-                <Menu className="w-5 h-5" />
+                <ShoppingCart className="w-5 h-5" />
                 {cart.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center font-bold">
                     {cart.length}
