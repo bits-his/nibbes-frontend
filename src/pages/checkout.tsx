@@ -128,13 +128,6 @@ export default function Checkout() {
       type: 'cash',
     },
     {
-      id: 'card',
-      name: 'Credit/Debit Card',
-      description: 'Pay securely with Interswitch',
-      icon: CreditCard,
-      type: 'card',
-    },
-    {
       id: 'pos',
       name: 'POS Terminal',
       description: 'Pay with POS at counter',
@@ -1050,7 +1043,7 @@ export default function Checkout() {
                         <span>Subtotal</span>
                         <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
-                      {form.watch("orderType") === "delivery" && (
+                      {(form.watch("orderType") === "delivery" || form.watch("orderType") === "pickup") && (
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>VAT (7.5%)</span>
                           <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
