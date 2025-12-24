@@ -61,7 +61,30 @@ export default function TVDisplay() {
   const [readyOrders, setReadyOrders] = useState<Order[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
+  
+  // Pagination: 8 orders per page (4 columns x 2 rows)
+  const ordersPerPage = 8
+  const totalPages = Math.ceil(readyOrders.length / ordersPerPage)
+  const displayedOrders = readyOrders.slice(
+    currentPage * ordersPerPage,
+    (currentPage + 1) * ordersPerPage
+  )
+  
+  // Auto-scroll every 5 seconds if there are more than 8 orders
+  useEffect(() => {
+    if (readyOrders.length <= ordersPerPage) {
+      setCurrentPage(0)
+      return
+    }
+    
+    const interval = setInterval(() => {
+      setCurrentPage((prev) => (prev + 1) % totalPages)
+    }, 5000) // 5 seconds
+    
+    return () => clearInterval(interval)
+  }, [readyOrders.length, totalPages, ordersPerPage])
 
   // Fetch initial ready orders
   const fetchReadyOrders = async () => {
@@ -287,12 +310,12 @@ export default function TVDisplay() {
         )}
       </div>
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[#50BAA8] to-teal-600 py-4 px-4 md:py-6 md:px-8 border-b-4 border-[#50BAA8]">
-        <h1 className="text-3xl md:text-5xl lg:text-7xl font-bold text-center text-white tracking-wide">
+      {/* Header - Reduced size */}
+      <div className="bg-gradient-to-r from-[#50BAA8] to-teal-600 py-2 px-4 md:py-3 md:px-6 border-b-4 border-[#50BAA8]">
+        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center text-white tracking-wide">
           🍽️ READY ORDERS
         </h1>
-        <p className="text-center text-lg md:text-xl lg:text-2xl text-white/90 mt-1 md:mt-2">
+        <p className="text-center text-sm md:text-base lg:text-lg text-white/90 mt-0.5 md:mt-1">
           Orders ready for pickup
         </p>
       </div>
@@ -311,21 +334,35 @@ export default function TVDisplay() {
             <p className="text-2xl md:text-3xl text-gray-500 mt-3">Orders will appear here when ready</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {readyOrders.map((order) => (
+          <div className="grid grid-cols-4 gap-6 md:gap-8">
+            {displayedOrders.map((order) => (
               <div
                 key={order.id}
-                className="bg-white border-4 border-[#50BAA8] rounded-2xl p-6 md:p-8 shadow-2xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center min-h-[180px] md:min-h-[220px]"
+                className="bg-white border-4 border-[#50BAA8] rounded-2xl p-8 md:p-10 shadow-2xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center min-h-[280px] md:min-h-[320px]"
               >
                 <div className="text-center">
-                  <div className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-[#50BAA8] mb-3">
+                  <div className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-[#50BAA8] mb-4">
                     #{order.orderNumber}
                   </div>
-                  <div className="inline-block bg-[#50BAA8] text-white px-4 py-2 md:px-6 md:py-3 rounded-xl text-lg md:text-2xl lg:text-3xl font-bold">
-                    ✓ READY
+                  <div className="inline-block bg-[#50BAA8] text-white px-6 py-3 md:px-8 md:py-4 rounded-xl text-2xl md:text-3xl lg:text-4xl font-bold">
+                    READY ✓
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Pagination Indicator */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            {Array.from({ length: totalPages }).map((_, index) => (
+              <div
+                key={index}
+                className={`h-3 w-3 rounded-full transition-all ${
+                  index === currentPage ? 'bg-[#50BAA8] w-8' : 'bg-gray-300'
+                }`}
+              />
             ))}
           </div>
         )}

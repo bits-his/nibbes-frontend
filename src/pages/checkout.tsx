@@ -259,9 +259,8 @@ export default function Checkout() {
 
   const calculateTotal = () => {
     const baseAmount = subtotal // Removed delivery charge
-    const totalWithVat = form.watch("orderType") === "delivery"
-      ? baseAmount * 1.075 // Add 7.5% VAT for delivery
-      : baseAmount
+    // Add 7.5% VAT for both pickup and delivery
+    const totalWithVat = baseAmount * 1.075
     return totalWithVat
   }
 
