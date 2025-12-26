@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, startTransition } from "react"
 import { useLocation } from "wouter"
 import { ArrowLeft, MapPin, Check, ChefHat, CreditCard, Banknote, Smartphone, Lock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -85,6 +85,10 @@ export default function Checkout() {
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number; address: string } | null>(
     null,
   )
+  const [deliveryFee, setDeliveryFee] = useState<number>(0)
+  const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false)
+  const [geoPricingId, setGeoPricingId] = useState<string | null>(null)
+  const [deliveryRoute, setDeliveryRoute] = useState<{ from: string; to: string } | null>(null)
 
   // Payment methods available for customer checkout (online orders)
   const paymentMethods: PaymentMethod[] = [
@@ -246,12 +250,66 @@ export default function Checkout() {
     }
   }, [user, loading, setLocation, form, cartFromContext])
 
+  // Calculate delivery fee when order type is delivery and location is available
+  useEffect(() => {
+    const calculateDeliveryFee = async () => {
+      const orderType = form.watch("orderType")
+      
+      // Only calculate for delivery orders with location
+      if (orderType !== "delivery" || !locationData?.address) {
+        setDeliveryFee(0)
+        setGeoPricingId(null)
+        setDeliveryRoute(null)
+        return
+      }
+
+      setIsCalculatingDelivery(true)
+      try {
+        const response = await apiRequest("POST", "/api/delivery/calculate-fee", {
+          deliveryLocation: locationData.address
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success && result.data) {
+            setDeliveryFee(result.data.price)
+            setGeoPricingId(result.data.geoPricingId)
+            setDeliveryRoute({
+              from: result.data.fromLocation || 'Nibbles Kitchen',
+              to: result.data.toLocation || 'Your Location'
+            })
+            console.log('✅ Delivery fee calculated:', result.data)
+          } else {
+            console.warn('⚠️ No delivery pricing found for this location')
+            setDeliveryFee(0)
+            setGeoPricingId(null)
+            setDeliveryRoute(null)
+          }
+        } else {
+          console.error('❌ Failed to calculate delivery fee')
+          setDeliveryFee(0)
+          setGeoPricingId(null)
+          setDeliveryRoute(null)
+        }
+      } catch (error) {
+        console.error('❌ Error calculating delivery fee:', error)
+        setDeliveryFee(0)
+        setGeoPricingId(null)
+        setDeliveryRoute(null)
+      } finally {
+        setIsCalculatingDelivery(false)
+      }
+    }
+
+    calculateDeliveryFee()
+  }, [form.watch("orderType"), locationData])
+
   const subtotal = walkInOrder 
     ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
     : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
 
   const calculateTotal = () => {
-    const baseAmount = subtotal // Removed delivery charge
+    const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
     // Add 7.5% VAT for both pickup and delivery
     const totalWithVat = baseAmount * 1.075
     return totalWithVat
@@ -320,27 +378,30 @@ export default function Checkout() {
       
       // Check if Interswitch script is loaded
       if (typeof (window as any).webpayCheckout === 'undefined') {
-        console.error('Interswitch script not loaded - redirecting to payment instructions')
+        console.error('Interswitch script not loaded - redirecting to home')
         toast({
-          title: "Order Created!",
-          description: "Redirecting to payment instructions...",
+          title: "Payment System Unavailable",
+          description: "Redirecting to home page...",
+          variant: "destructive",
         })
-        // Fallback to payment instructions
-        setTimeout(() => {
-          setLocation("/payment-instructions?id=" + createdOrder.id + "&orderNumber=" + createdOrder.orderNumber + "&amount=" + (createdOrder.totalAmount || calculateTotal()))
-        }, 1500)
+        // Fallback to home
+        startTransition(() => {
+          setTimeout(() => {
+            setLocation("/")
+          }, 1500)
+        })
         return
       }
 
-      // Interswitch Inline Checkout Configuration - TEST MODE
+      // Interswitch Inline Checkout Configuration - LIVE MODE
       const paymentConfig = {
-        // TEST MODE CREDENTIALS
-        merchant_code: "MX250773",
-        pay_item_id: "Default_Payable_MX250773",
+        // TEST MODE CREDENTIALS (COMMENTED OUT)
+        // merchant_code: "MX250773",
+        // pay_item_id: "Default_Payable_MX250773",
         
-        // LIVE MODE CREDENTIALS (commented out)
-        // merchant_code: "MX162337",
-        // pay_item_id: "MX162337_MERCHANT_APP",
+        // LIVE MODE CREDENTIALS (ACTIVE)
+        merchant_code: "MX162337",
+        pay_item_id: "MX162337_MERCHANT_APP",
         
         txn_ref: txnRef,
         amount: amount,
@@ -351,11 +412,15 @@ export default function Checkout() {
         cust_email: orderData.customerEmail || "customer@nibbleskitchen.com",
         cust_phone: orderData.customerPhone || "",
         
-        // TEST MODE - Test payments (no real money charged)
-        mode: "TEST",
+        // Merchant information
+        merchant_name: "Nibbles Kitchen",
+        logo_url: window.location.origin + "/nibbles.jpg",
         
-        // LIVE MODE (commented out)
-        // mode: "LIVE",
+        // TEST MODE - Test payments (COMMENTED OUT)
+        // mode: "TEST",
+        
+        // LIVE MODE (ACTIVE)
+        mode: "LIVE",
         
         // Payment channels - Enable all payment options
         // Remove or comment out to show all available options
@@ -382,9 +447,11 @@ export default function Checkout() {
             clearCart()
             
             // Redirect to order status with success flag
-            setTimeout(() => {
-              setLocation("/order-status?id=" + createdOrder.id + "&payment=success")
-            }, 1500)
+            startTransition(() => {
+              setTimeout(() => {
+                setLocation("/order-status?id=" + createdOrder.id + "&payment=success")
+              }, 1500)
+            })
           } else if (response.resp === "10" || response.responseCode === "10") {
             // Payment pending (e.g., bank transfer initiated)
             toast({
@@ -392,22 +459,26 @@ export default function Checkout() {
               description: "Your payment is being processed. You'll be notified when confirmed.",
             })
             
-            setTimeout(() => {
-              setLocation("/order-status?id=" + createdOrder.id + "&payment=pending")
-            }, 1500)
+            startTransition(() => {
+              setTimeout(() => {
+                setLocation("/order-status?id=" + createdOrder.id + "&payment=pending")
+              }, 1500)
+            })
           } else {
             // Payment failed or other status
             console.error('Payment failed with response:', response)
             toast({
-              title: "Payment Issue",
-              description: "Payment could not be completed. Please try again or use bank transfer.",
+              title: "Payment Failed",
+              description: "Payment could not be completed. Redirecting to home page...",
               variant: "destructive",
             })
             
-            // Redirect to payment instructions as fallback
-            setTimeout(() => {
-              setLocation("/payment-instructions?id=" + createdOrder.id + "&orderNumber=" + createdOrder.orderNumber + "&amount=" + (createdOrder.totalAmount || calculateTotal()))
-            }, 2000)
+            // Redirect to home
+            startTransition(() => {
+              setTimeout(() => {
+                setLocation("/")
+              }, 2000)
+            })
           }
         },
         
@@ -416,13 +487,15 @@ export default function Checkout() {
           console.log('Payment modal closed by user')
           toast({
             title: "Payment Cancelled",
-            description: "You can complete payment later from order status page.",
+            description: "Redirecting to home page...",
           })
           
-          // Redirect to order status
-          setTimeout(() => {
-            setLocation("/order-status?id=" + createdOrder.id)
-          }, 1000)
+          // Use startTransition to avoid Suspense error
+          startTransition(() => {
+            setTimeout(() => {
+              setLocation("/")
+            }, 1000)
+          })
         },
         
         // Error callback
@@ -430,14 +503,16 @@ export default function Checkout() {
           console.error('Payment error:', error)
           toast({
             title: "Payment Error",
-            description: "An error occurred. Please try again or use bank transfer.",
+            description: "An error occurred. Redirecting to home page...",
             variant: "destructive",
           })
           
-          // Redirect to payment instructions as fallback
-          setTimeout(() => {
-            setLocation("/payment-instructions?id=" + createdOrder.id + "&orderNumber=" + createdOrder.orderNumber + "&amount=" + (createdOrder.totalAmount || calculateTotal()))
-          }, 2000)
+          // Use startTransition to avoid Suspense error
+          startTransition(() => {
+            setTimeout(() => {
+              setLocation("/")
+            }, 2000)
+          })
         }
       }
 
@@ -455,14 +530,16 @@ export default function Checkout() {
         console.error('Error opening Interswitch modal:', error)
         toast({
           title: "Payment System Error",
-          description: "Could not open payment modal. Redirecting to alternative payment method...",
+          description: "Could not open payment modal. Redirecting to home page...",
           variant: "destructive",
         })
         
-        // Fallback to payment instructions
-        setTimeout(() => {
-          setLocation("/payment-instructions?id=" + createdOrder.id + "&orderNumber=" + createdOrder.orderNumber + "&amount=" + (createdOrder.totalAmount || calculateTotal()))
-        }, 2000)
+        // Fallback to home
+        startTransition(() => {
+          setTimeout(() => {
+            setLocation("/")
+          }, 2000)
+        })
       }
       
     } catch (error: any) {
@@ -644,20 +721,25 @@ export default function Checkout() {
         console.log("Transaction Reference:", transactionRef)
         console.log("Amount (kobo):", amountInKobo)
 
-        // Interswitch Inline Checkout Configuration - TEST MODE
+        // Interswitch Inline Checkout Configuration - LIVE MODE
         const paymentConfig = {
-          // TEST MODE CREDENTIALS
-          merchant_code: "MX250773",
-          pay_item_id: "Default_Payable_MX250773",
+          // TEST MODE CREDENTIALS (COMMENTED OUT)
+          // merchant_code: "MX250773",
+          // pay_item_id: "Default_Payable_MX250773",
           
-          // LIVE MODE CREDENTIALS (commented out)
-          // merchant_code: "MX162337",
-          // pay_item_id: "MX162337_MERCHANT_APP",
+          // LIVE MODE CREDENTIALS (ACTIVE)
+          merchant_code: "MX162337",
+          pay_item_id: "MX162337_MERCHANT_APP",
           
           txn_ref: transactionRef,
           amount: amountInKobo,
           currency: 566, // NGN
           site_redirect_url: `${window.location.origin}/order-status?id=${createdOrder.id}`,
+          
+          // Merchant information
+          merchant_name: "Nibbles Kitchen",
+          logo_url: window.location.origin + "/nibbles.jpg",
+          
           onComplete: function (response: any) {
             console.log("Walk-in payment completed:", response)
             console.log("Response code:", response.responseCode)
@@ -671,7 +753,9 @@ export default function Checkout() {
               
               // Clear walk-in order and redirect
               localStorage.removeItem("pendingWalkInOrder")
-              setLocation(`/order-status?id=${createdOrder.id}`)
+              startTransition(() => {
+                setLocation(`/order-status?id=${createdOrder.id}`)
+              })
             } else {
               // Payment failed
               toast({
@@ -695,11 +779,11 @@ export default function Checkout() {
             })
             setIsProcessingPayment(false)
           },
-          // TEST MODE - Test payments (no real money charged)
-          mode: "TEST"
+          // TEST MODE - Test payments (COMMENTED OUT)
+          // mode: "TEST"
           
-          // LIVE MODE (commented out)
-          // mode: "LIVE"
+          // LIVE MODE (ACTIVE)
+          mode: "LIVE"
         }
 
         console.log("Opening Interswitch payment modal with config:", paymentConfig)
@@ -1043,10 +1127,27 @@ export default function Checkout() {
                         <span>Subtotal</span>
                         <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
+                      {form.watch("orderType") === "delivery" && deliveryFee > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Delivery Fee</span>
+                            {isCalculatingDelivery ? (
+                              <span className="text-xs">Calculating...</span>
+                            ) : (
+                              <span>₦{deliveryFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            )}
+                          </div>
+                          {deliveryRoute && (
+                            <div className="font-bold text-lg text-muted-foreground/70 pl-0">
+                              {deliveryRoute.from} → {deliveryRoute.to}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {(form.watch("orderType") === "delivery" || form.watch("orderType") === "pickup") && (
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>VAT (7.5%)</span>
-                          <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span>₦{((subtotal + deliveryFee) * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                       )}
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
@@ -1116,10 +1217,23 @@ export default function Checkout() {
                     <span>Items ({cart.length})</span>
                     <span>₦{subtotal.toLocaleString()}</span>
                   </div>
+                  {form.watch("orderType") === "delivery" && deliveryFee > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span>Delivery Fee</span>
+                        <span>₦{deliveryFee.toLocaleString()}</span>
+                      </div>
+                      {deliveryRoute && (
+                        <div className="text-xs text-muted-foreground pl-0">
+                          {deliveryRoute.from} → {deliveryRoute.to}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {form.watch("orderType") === "delivery" && (
                     <div className="flex justify-between">
                       <span>VAT (7.5%)</span>
-                      <span>₦{(subtotal * 0.075).toLocaleString()}</span>
+                      <span>₦{((subtotal + deliveryFee) * 0.075).toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between border-t pt-2 font-semibold">
@@ -1128,6 +1242,29 @@ export default function Checkout() {
                   </div>
                 </div>
               </div>
+
+              {/* Delivery Information */}
+              {form.watch("orderType") === "delivery" && locationData && (
+                <div className="rounded-lg bg-green-50 p-4">
+                  <h4 className="mb-2 font-medium flex items-center">
+                    <MapPin className="h-4 w-4 mr-2 text-green-600" />
+                    Delivery Location
+                  </h4>
+                  <p className="text-sm text-gray-700">{locationData.address}</p>
+                </div>
+              )}
+
+              {/* Pickup Information */}
+              {form.watch("orderType") === "pickup" && (
+                <div className="rounded-lg bg-orange-50 p-4">
+                  <h4 className="mb-2 font-medium flex items-center">
+                    <MapPin className="h-4 w-4 mr-2 text-orange-600" />
+                    Pickup Location
+                  </h4>
+                  <p className="text-sm text-gray-700">Lafiya Road Nasarawa GRA, Kano</p>
+                  <p className="text-xs text-gray-500 mt-1">Nibbles Kitchen</p>
+                </div>
+              )}
 
               {/* Payment Method Info */}
               <div className="rounded-lg bg-blue-50 p-4">
