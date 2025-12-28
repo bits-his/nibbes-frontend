@@ -2,7 +2,7 @@
 
 import { useState, useEffect, startTransition } from "react"
 import { useLocation } from "wouter"
-import { ArrowLeft, MapPin, Check, ChefHat, CreditCard, Banknote, Smartphone, Lock } from "lucide-react"
+import { ArrowLeft, MapPin, Check, ChefHat, CreditCard, Banknote, Smartphone, Lock, Plus, X } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -89,6 +89,11 @@ export default function Checkout() {
   const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false)
   const [geoPricingId, setGeoPricingId] = useState<string | null>(null)
   const [deliveryRoute, setDeliveryRoute] = useState<{ from: string; to: string } | null>(null)
+  const [tempAddress, setTempAddress] = useState<string>("")
+  
+  // Multi-payment state for walk-in orders
+  const [multiPaymentEnabled, setMultiPaymentEnabled] = useState(false)
+  const [paymentSplits, setPaymentSplits] = useState<Array<{ method: string; amount: number }>>([{ method: 'cash', amount: 0 }])
 
   // Payment methods available for customer checkout (online orders)
   const paymentMethods: PaymentMethod[] = [
@@ -669,6 +674,43 @@ export default function Checkout() {
     },
   })
 
+  // Multi-payment helper functions
+  const addPaymentSplit = () => {
+    setPaymentSplits([...paymentSplits, { method: 'cash', amount: 0 }])
+  }
+
+  const removePaymentSplit = (index: number) => {
+    if (paymentSplits.length > 1) {
+      setPaymentSplits(paymentSplits.filter((_, i) => i !== index))
+    }
+  }
+
+  const updatePaymentSplit = (index: number, field: 'method' | 'amount', value: string | number) => {
+    const updated = [...paymentSplits]
+    if (field === 'method') {
+      updated[index].method = value as string
+    } else {
+      updated[index].amount = Number(value)
+    }
+    setPaymentSplits(updated)
+  }
+
+  const getTotalPaid = () => {
+    return paymentSplits.reduce((sum, split) => sum + split.amount, 0)
+  }
+
+  const getRemainingAmount = () => {
+    const total = walkInOrder?.total || subtotal || 0
+    return total - getTotalPaid()
+  }
+
+  const isPaymentValid = () => {
+    if (!multiPaymentEnabled) return true
+    const total = walkInOrder?.total || subtotal || 0
+    const paid = getTotalPaid()
+    return Math.abs(total - paid) < 0.01 // Allow for floating point errors
+  }
+
   const handleWalkInPayment = async () => {
     // For card payments, use Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
@@ -799,14 +841,33 @@ export default function Checkout() {
         setIsProcessingPayment(false)
       }
     } else {
+      // Validate multi-payment if enabled
+      if (multiPaymentEnabled && !isPaymentValid()) {
+        toast({
+          title: "Invalid Payment Amount",
+          description: `Total payment (₦${getTotalPaid().toLocaleString()}) must equal order total (₦${(walkInOrder.total || subtotal || 0).toLocaleString()})`,
+          variant: "destructive",
+        })
+        return
+      }
+
       // For cash/POS/transfer payments, create order directly with paid status
       const orderData = {
         customerName: walkInOrder.customerName,
         customerPhone: walkInOrder.customerPhone || "N/A",
         orderType: "walk-in",
-        paymentMethod: selectedPaymentMethod,
-        paymentStatus: selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'pos' ? "paid" : "pending",
+        paymentMethod: multiPaymentEnabled 
+          ? paymentSplits.map(s => s.method).join(' + ') 
+          : selectedPaymentMethod,
+        paymentStatus: "paid",
         items: walkInOrder.items,
+        // Add payment splits info if multi-payment is enabled
+        ...(multiPaymentEnabled && {
+          paymentSplits: paymentSplits.map(split => ({
+            method: split.method,
+            amount: split.amount
+          }))
+        })
       }
       
       createWalkInOrderMutation.mutate(orderData)
@@ -840,42 +901,178 @@ export default function Checkout() {
               <CardTitle>Payment Method</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
-              <div className="space-y-3">
-                {walkInPaymentMethods.map((method) => {
-                  const IconComponent = method.icon
-                  return (
-                    <button
-                      key={method.id}
-                      type="button"
-                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                        selectedPaymentMethod === method.id
-                          ? "border-[#4EB5A4] bg-[#4EB5A4]/10"
-                          : "border-border/50 hover:border-accent/50"
-                      }`}
-                      onClick={() => setSelectedPaymentMethod(method.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <IconComponent className="w-5 h-5 text-[#4EB5A4]" />
-                          <div>
-                            <p className="font-semibold">{method.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {method.description}
-                            </p>
-                          </div>
-                        </div>
-                        {selectedPaymentMethod === method.id && <Check className="w-5 h-5 text-[#4EB5A4]" />}
-                      </div>
-                    </button>
-                  )
-                })}
+              {/* Multi-payment toggle */}
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="font-semibold">Split Payment</p>
+                  <p className="text-sm text-muted-foreground">Use multiple payment methods</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMultiPaymentEnabled(!multiPaymentEnabled)
+                    if (!multiPaymentEnabled) {
+                      // Initialize with first split
+                      setPaymentSplits([{ method: 'cash', amount: 0 }])
+                    } else {
+                      // Reset to single payment
+                      setPaymentSplits([{ method: 'cash', amount: 0 }])
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    multiPaymentEnabled ? 'bg-[#4EB5A4]' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      multiPaymentEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
 
-              <div className="border-t pt-6">
-                <div className="flex justify-between text-2xl font-bold mb-6">
-                  <span>Total Amount</span>
-                  <span className="text-[#4EB5A4]">₦{(walkInOrder.total || subtotal || 0).toLocaleString()}</span>
+              {/* Single payment method selection */}
+              {!multiPaymentEnabled && (
+                <div className="space-y-3">
+                  {walkInPaymentMethods.map((method) => {
+                    const IconComponent = method.icon
+                    return (
+                      <button
+                        key={method.id}
+                        type="button"
+                        className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                          selectedPaymentMethod === method.id
+                            ? "border-[#4EB5A4] bg-[#4EB5A4]/10"
+                            : "border-border/50 hover:border-accent/50"
+                        }`}
+                        onClick={() => setSelectedPaymentMethod(method.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <IconComponent className="w-5 h-5 text-[#4EB5A4]" />
+                            <div>
+                              <p className="font-semibold">{method.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {method.description}
+                              </p>
+                            </div>
+                          </div>
+                          {selectedPaymentMethod === method.id && <Check className="w-5 h-5 text-[#4EB5A4]" />}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
+              )}
+
+              {/* Multi-payment splits */}
+              {multiPaymentEnabled && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Payment Splits</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={addPaymentSplit}
+                      className="text-xs"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Payment
+                    </Button>
+                  </div>
+
+                  {paymentSplits.map((split, index) => {
+                    const selectedMethod = walkInPaymentMethods.find(m => m.method === split.method)
+                    const IconComponent = selectedMethod?.icon || Banknote
+                    
+                    return (
+                      <div key={index} className="p-4 border-2 border-border/50 rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">Payment {index + 1}</span>
+                          {paymentSplits.length > 1 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removePaymentSplit(index)}
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Method</label>
+                            <select
+                              value={split.method}
+                              onChange={(e) => updatePaymentSplit(index, 'method', e.target.value)}
+                              className="w-full p-2 border rounded-md bg-background"
+                            >
+                              {walkInPaymentMethods.map((method) => (
+                                <option key={method.id} value={method.id}>
+                                  {method.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Amount</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
+                              <Input
+                                type="number"
+                                value={split.amount || ''}
+                                onChange={(e) => updatePaymentSplit(index, 'amount', e.target.value)}
+                                className="pl-8"
+                                placeholder="0"
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Payment summary */}
+                  <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Paid:</span>
+                      <span className="font-semibold">₦{getTotalPaid().toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Order Total:</span>
+                      <span className="font-semibold">₦{(walkInOrder.total || subtotal || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">Remaining:</span>
+                      <span className={`font-bold ${
+                        getRemainingAmount() > 0 ? 'text-orange-500' : 
+                        getRemainingAmount() < 0 ? 'text-red-500' : 
+                        'text-green-500'
+                      }`}>
+                        ₦{Math.abs(getRemainingAmount()).toLocaleString()}
+                        {getRemainingAmount() > 0 && ' (underpaid)'}
+                        {getRemainingAmount() < 0 && ' (overpaid)'}
+                        {getRemainingAmount() === 0 && ' ✓'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t pt-6">
+                {!multiPaymentEnabled && (
+                  <div className="flex justify-between text-2xl font-bold mb-6">
+                    <span>Total Amount</span>
+                    <span className="text-[#4EB5A4]">₦{(walkInOrder.total || subtotal || 0).toLocaleString()}</span>
+                  </div>
+                )}
 
                 <Button
                   onClick={handleWalkInPayment}
@@ -1005,7 +1202,69 @@ export default function Checkout() {
                   </CardContent>
                 </Card>
 
-                {/* Location Information */}
+                {/* Delivery Location Input - Show when delivery is selected but no location set */}
+                {!locationData && form.watch("orderType") === "delivery" && (
+                  <Card className="border-orange-300 bg-orange-50/50 shadow-sm">
+                    <CardHeader className="bg-orange-100/50 border-b border-orange-200">
+                      <CardTitle className="flex items-center gap-2 text-lg text-orange-900">
+                        <MapPin className="w-5 h-5" />
+                        Enter Delivery Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                      <Alert className="border-orange-300 bg-orange-50">
+                        <MapPin className="h-4 w-4 text-orange-600" />
+                        <AlertDescription className="text-orange-900">
+                          Please enter your delivery address to calculate delivery fee
+                        </AlertDescription>
+                      </Alert>
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
+                            value={tempAddress}
+                            onChange={(e) => setTempAddress(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && tempAddress.trim()) {
+                                const newLocationData = {
+                                  address: tempAddress.trim(),
+                                  latitude: 0,
+                                  longitude: 0
+                                }
+                                setLocationData(newLocationData)
+                                localStorage.setItem("location", JSON.stringify(newLocationData))
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              if (tempAddress.trim()) {
+                                const newLocationData = {
+                                  address: tempAddress.trim(),
+                                  latitude: 0,
+                                  longitude: 0
+                                }
+                                setLocationData(newLocationData)
+                                localStorage.setItem("location", JSON.stringify(newLocationData))
+                              }
+                            }}
+                            disabled={!tempAddress.trim() || isCalculatingDelivery}
+                            className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90"
+                          >
+                            {isCalculatingDelivery ? "Calculating..." : "Set Location"}
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Delivery fee will be calculated automatically based on your location
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Location Information - Show when location is set */}
                 {locationData && form.watch("orderType") === "delivery" && (
                   <Card className="border-accent/30 bg-accent/5 shadow-sm">
                     <CardHeader className="bg-accent/10 border-b border-accent/20">
@@ -1014,7 +1273,7 @@ export default function Checkout() {
                         Delivery Location
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-6">
+                    <CardContent className="pt-6 space-y-4">
                       <div className="flex items-start gap-4 p-4 bg-background/50 rounded-lg border border-accent/20">
                         <MapPin className="w-5 h-5  mt-0.5 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -1023,7 +1282,27 @@ export default function Checkout() {
                             {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
                           </p>
                         </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setTempAddress(locationData.address)
+                            setLocationData(null)
+                            localStorage.removeItem("location")
+                          }}
+                          className="flex-shrink-0"
+                        >
+                          Edit
+                        </Button>
                       </div>
+                      {isCalculatingDelivery && (
+                        <Alert className="border-blue-300 bg-blue-50">
+                          <AlertDescription className="text-blue-900">
+                            Calculating delivery fee...
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     </CardContent>
                   </Card>
                 )}

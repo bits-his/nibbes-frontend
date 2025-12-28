@@ -38,9 +38,20 @@ export default function StaffOrders() {
 
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
-  const categories = ["All", "Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"];
+  // Fetch categories from API with refetch on mount and focus
+  const { data: categoriesData } = useQuery<string[]>({
+    queryKey: ["/api/menu/categories"],
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always consider data stale
+  });
+
+  // Add "All" to the beginning of categories
+  const categories = ["All", ...(categoriesData || [])];
 
   const filteredItems = menuItems?.filter(
     (item) =>
@@ -159,8 +170,9 @@ export default function StaffOrders() {
         // Refresh active orders when there are changes
         queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       } else if (data.type === "menu_item_update") {
-        // Refresh menu data when items are updated
+        // Refresh menu data and categories when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
       }
     };
 
