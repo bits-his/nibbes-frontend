@@ -413,10 +413,16 @@ const getStatusBadge = (status: string) => {
                                   createdAt: order.createdAt,
                                   customerName: order.customerName,
                                   orderType: order.orderType,
-                                  items: (order as any).items || [],
-                                  total: parseFloat((order as any).total || '0'),
+                                  items: order.orderItems.map((item: any) => ({
+                                    name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
+                                    quantity: item.quantity,
+                                    price: item.price,
+                                    specialInstructions: item.specialInstructions
+                                  })),
+                                  total: parseFloat(order.totalAmount || '0'),
                                   paymentMethod: order.paymentMethod || 'N/A',
-                                  paymentStatus: order.paymentStatus || 'N/A'
+                                  paymentStatus: order.paymentStatus || 'N/A',
+                                  tendered: parseFloat(order.totalAmount || '0')
                                 }
                                 printInvoice(orderData)
                               }}
@@ -531,10 +537,16 @@ const getStatusBadge = (status: string) => {
                       createdAt: selectedOrder.createdAt,
                       customerName: selectedOrder.customerName,
                       orderType: selectedOrder.orderType,
-                      items: (selectedOrder as any).items || [],
+                      items: selectedOrder.orderItems.map((item: any) => ({
+                        name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
+                        quantity: item.quantity,
+                        price: item.price,
+                        specialInstructions: item.specialInstructions
+                      })),
                       total: parseFloat(selectedOrder.totalAmount),
                       paymentMethod: selectedOrder.paymentMethod || 'N/A',
-                      paymentStatus: selectedOrder.paymentStatus || 'N/A'
+                      paymentStatus: selectedOrder.paymentStatus || 'N/A',
+                      tendered: parseFloat(selectedOrder.totalAmount)
                     }
                     printInvoice(orderData)
                   }}

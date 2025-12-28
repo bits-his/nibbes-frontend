@@ -20,6 +20,7 @@ import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
+import { usePrint } from "@/hooks/usePrint"
 
 // Extend Window interface for Interswitch
 declare global {
@@ -76,6 +77,7 @@ export default function Checkout() {
   const { toast} = useToast()
   const { user, loading } = useAuth()
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
+  const { printInvoice } = usePrint()
   const [cart, setCart] = useState<CartItem[]>([])
   const [walkInOrder, setWalkInOrder] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("card")
@@ -659,11 +661,30 @@ export default function Checkout() {
         title: "Order Created & Payment Recorded!",
         description: `Order #${data.orderNumber} has been created and sent to kitchen.`,
       })
+      
+      // Show invoice before redirecting to docket
+      const orderDataForPrint = {
+        orderNumber: data.orderNumber,
+        createdAt: data.createdAt || new Date().toISOString(),
+        customerName: walkInOrder?.customerName || data.customerName || 'N/A',
+        orderType: 'walk-in',
+        items: walkInOrder?.items || data.items || [],
+        total: parseFloat(data.totalAmount || walkInOrder?.total || 0),
+        paymentMethod: data.paymentMethod || 'N/A',
+        paymentStatus: data.paymentStatus || 'paid',
+        tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
+      }
+      
+      // Print invoice
+      printInvoice(orderDataForPrint)
+      
       localStorage.removeItem("pendingWalkInOrder")
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
+      
+      // Delay redirect slightly to allow invoice to print
       setTimeout(() => {
         setLocation("/docket")
-      }, 1000)
+      }, 1500)
     },
     onError: () => {
       toast({

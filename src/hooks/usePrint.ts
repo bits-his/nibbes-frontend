@@ -8,7 +8,8 @@ interface OrderData {
   items: Array<{
     name: string
     quantity: number
-    price: string
+    price: string | number
+    specialInstructions?: string | null
   }>
   subtotal?: number
   deliveryFee?: number
@@ -16,6 +17,7 @@ interface OrderData {
   total: number
   paymentMethod: string
   paymentStatus: string
+  tendered?: number
 }
 
 export const usePrint = () => {
@@ -29,6 +31,24 @@ export const usePrint = () => {
       console.error('Print window blocked. Please allow popups for printing.')
       return
     }
+
+    // Format date and time
+    const orderDate = new Date(orderData.createdAt)
+    const dateStr = orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const timeStr = orderDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+    // Calculate totals
+    const totalAmount = orderData.total || 0
+    const tendered = orderData.tendered || totalAmount
+    const balance = tendered - totalAmount
+
+    // Format currency
+    const formatCurrency = (amount: number) => {
+      return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+
+    // Prepare items with serial numbers
+    const items = orderData.items || []
     
     const invoiceHTML = `
       <!DOCTYPE html>
@@ -46,7 +66,7 @@ export const usePrint = () => {
               margin: 0; 
               padding: 5mm;
               font-family: 'Courier New', monospace;
-              font-size: 12px;
+              font-size: 11px;
             }
           }
           body {
@@ -54,84 +74,214 @@ export const usePrint = () => {
             margin: 0 auto;
             padding: 5mm;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 11px;
+            line-height: 1.4;
           }
-          .header {
-            text-align: center;
-            border-bottom: 2px dashed #000;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 18px;
-          }
-          .info {
-            margin-bottom: 10px;
-          }
-          .items {
-            border-top: 1px dashed #000;
-            border-bottom: 1px dashed #000;
-            padding: 10px 0;
-            margin: 10px 0;
-          }
-          .item {
+          .header-section {
             display: flex;
             justify-content: space-between;
-            margin: 5px 0;
+            align-items: flex-start;
+            margin-bottom: 8px;
           }
-          .total {
+          .order-number {
+            font-size: 20px;
             font-weight: bold;
-            font-size: 14px;
-            text-align: right;
-            margin-top: 10px;
+            margin: 0;
           }
-          .footer {
+          .customer-name {
+            font-size: 12px;
+            margin: 4px 0 0 0;
+          }
+          .time-date {
+            text-align: right;
+            font-size: 11px;
+          }
+          .time-date p {
+            margin: 2px 0;
+          }
+          .receipt-title {
             text-align: center;
-            margin-top: 20px;
-            border-top: 2px dashed #000;
-            padding-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 12px 0;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+          }
+          .items-table th {
+            text-align: left;
+            font-weight: bold;
+            padding: 4px 0;
+            border-bottom: 1px solid #000;
+          }
+          .items-table td {
+            padding: 4px 0;
+            vertical-align: top;
+          }
+          .item-sno {
+            width: 30px;
+            text-align: left;
+          }
+          .item-name {
+            padding-left: 8px;
+          }
+          .item-amount {
+            text-align: right;
+            width: 80px;
+          }
+          .summary-section {
+            margin: 12px 0;
+            padding-top: 8px;
+            border-top: 1px solid #000;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+          }
+          .summary-label {
+            font-weight: bold;
+          }
+          .summary-value {
+            text-align: right;
+          }
+          .payment-mode {
+            margin-top: 8px;
+          }
+          .notes-section {
+            margin-top: 16px;
+          }
+          .item-note-box {
+            border: 1px solid #000;
+            border-radius: 8px;
+            padding: 8px;
+            margin: 8px 0;
+            position: relative;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .item-note-header-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+          }
+          .item-note-header {
+            font-weight: bold;
+          }
+          .item-note-time {
+            font-size: 10px;
+            color: #666;
+          }
+          .item-note-content {
+            font-size: 10px;
+            color: #666;
+            margin-top: auto;
+            padding-bottom: 20px;
+          }
+          .item-note-order-number {
+            position: absolute;
+            bottom: 4px;
+            right: 8px;
+            font-size: 10px;
+            font-weight: bold;
+          }
+          .dashed-separator {
+            border-top: 1px dashed #000;
+            margin: 8px 0;
           }
         </style>
       </head>
       <body>
-        <div class=\"header\">
-          <h1>NIBBLES KITCHEN</h1>
-          <p>Thank you for your order!</p>
+        <!-- Header Section -->
+        <div class="header-section">
+          <div>
+            <p class="order-number">#${orderData.orderNumber}</p>
+            <p class="customer-name">${orderData.customerName}</p>
+          </div>
+          <div class="time-date">
+            <p>Time</p>
+            <p>${timeStr}</p>
+            <p>Date</p>
+            <p>${dateStr}</p>
+          </div>
         </div>
-        
-        <div class=\"info\">
-          <p><strong>Order #:</strong> ${orderData.orderNumber}</p>
-          <p><strong>Date:</strong> ${new Date(orderData.createdAt).toLocaleString()}</p>
-          <p><strong>Customer:</strong> ${orderData.customerName}</p>
-          <p><strong>Type:</strong> ${orderData.orderType}</p>
+
+        <!-- Receipt Title -->
+        <div class="receipt-title">RECEIPT</div>
+
+        <!-- Items Table -->
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="item-sno">SN</th>
+              <th class="item-name">Item / Description</th>
+              <th class="item-amount">Amt</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item: any, index: number) => {
+              const itemName = item.name || item.menuItemName || 'Unknown Item'
+              const quantity = item.quantity || 1
+              const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price || 0
+              const amount = price * quantity
+              const displayName = `${itemName} x ${quantity}`
+              
+              return `
+                <tr>
+                  <td class="item-sno">${index + 1}</td>
+                  <td class="item-name">${displayName}</td>
+                  <td class="item-amount">${formatCurrency(amount)}</td>
+                </tr>
+              `
+            }).join('')}
+          </tbody>
+        </table>
+
+        <!-- Summary Section -->
+        <div class="summary-section">
+          <div class="summary-row">
+            <span class="summary-label">Total Amount</span>
+            <span class="summary-value">${formatCurrency(totalAmount)}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Tendered</span>
+            <span class="summary-value">${formatCurrency(tendered)}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Balance</span>
+            <span class="summary-value">${formatCurrency(balance)}</span>
+          </div>
+          <div class="payment-mode">
+            <span class="summary-label">Payment mode:</span> ${orderData.paymentMethod || 'N/A'}
+          </div>
         </div>
-        
-        <div class=\"items\">
-          <h3>Items:</h3>
-          ${orderData.items.map((item: any) => `
-            <div class=\"item\">
-              <span>${item.quantity}x ${item.name}</span>
-              <span>₦${(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
-            </div>
-          `).join('')}
-        </div>
-        
-        <div class=\"total\">
-          <p>Subtotal: ₦${orderData.subtotal?.toFixed(2) || '0.00'}</p>
-          ${orderData.deliveryFee ? `<p>Delivery: ₦${orderData.deliveryFee.toFixed(2)}</p>` : ''}
-          ${orderData.vat ? `<p>VAT (7.5%): ₦${orderData.vat.toFixed(2)}</p>` : ''}
-          <p style=\"font-size: 16px; margin-top: 10px;\">TOTAL: ₦${orderData.total.toFixed(2)}</p>
-        </div>
-        
-        <div class=\"info\">
-          <p><strong>Payment:</strong> ${orderData.paymentMethod}</p>
-          <p><strong>Status:</strong> ${orderData.paymentStatus}</p>
-        </div>
-        
-        <div class=\"footer\">
-          <p>Powered by Nibbles Kitchen</p>
-          <p>www.nibbleskitchen.com</p>
+
+        <!-- Individual Item Notes Sections -->
+        <div class="notes-section">
+          ${items.map((item: any, index: number) => {
+            const itemName = item.name || item.menuItemName || 'Unknown Item'
+            const quantity = item.quantity || 1
+            const displayName = `${itemName} x ${quantity}`
+            const specialInstructions = item.specialInstructions || 'notes...'
+            const orderNumber = `#${orderData.orderNumber}`
+            
+            return `
+              <div class="item-note-box">
+                <div class="item-note-header-wrapper">
+                  <div class="item-note-header">${displayName}</div>
+                  <div class="item-note-time">${timeStr}</div>
+                </div>
+                <div class="item-note-content">${specialInstructions}</div>
+                <div class="item-note-order-number">${orderNumber}</div>
+              </div>
+              ${index < items.length - 1 ? '<div class="dashed-separator"></div>' : ''}
+            `
+          }).join('')}
         </div>
         
         <script>
