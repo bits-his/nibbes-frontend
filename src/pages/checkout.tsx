@@ -90,6 +90,8 @@ export default function Checkout() {
   const [geoPricingId, setGeoPricingId] = useState<string | null>(null)
   const [deliveryRoute, setDeliveryRoute] = useState<{ from: string; to: string } | null>(null)
   const [tempAddress, setTempAddress] = useState<string>("")
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
   
   // Multi-payment state for walk-in orders
   const [multiPaymentEnabled, setMultiPaymentEnabled] = useState(false)
@@ -312,6 +314,86 @@ export default function Checkout() {
   const subtotal = walkInOrder 
     ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
     : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
+
+  // Check location using browser geolocation
+  const checkLocation = () => {
+    setLocationLoading(true)
+    setLocationError(null)
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser")
+      setLocationLoading(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+
+        try {
+          // Reverse geocode to get address
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          )
+          const data = await response.json()
+
+          const address =
+            data.display_name ||
+            `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+
+          const locationInfo = { latitude, longitude, address }
+          setLocationData(locationInfo)
+          setTempAddress(address)
+
+          // Store location in localStorage
+          localStorage.setItem("location", JSON.stringify(locationInfo))
+
+          // Show success message
+          toast({
+            title: "Location Detected",
+            description: address,
+          })
+        } catch (error) {
+          console.error("Error getting address:", error)
+          // If reverse geocoding fails, still store coordinates
+          const locationInfo = {
+            latitude,
+            longitude,
+            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          }
+          setLocationData(locationInfo)
+          setTempAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+          localStorage.setItem("location", JSON.stringify(locationInfo))
+          toast({
+            title: "Location Detected",
+            description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          })
+        } finally {
+          setLocationLoading(false)
+        }
+      },
+      (error) => {
+        let errorMessage = ""
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage =
+              "Location access denied. Please allow location access in your browser settings."
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable."
+            break
+          case error.TIMEOUT:
+            errorMessage = "The request to get location timed out."
+            break
+          default:
+            errorMessage = "An unknown error occurred."
+            break
+        }
+        setLocationError(errorMessage)
+        setLocationLoading(false)
+      }
+    )
+  }
 
   const calculateTotal = () => {
     const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
@@ -615,7 +697,7 @@ export default function Checkout() {
     const orderData = {
       customerName: values.customerName,
       customerPhone: values.customerPhone,
-      orderType: values.orderType,
+      orderType: "online", // Customer checkout is always "online" order type
       paymentMethod: selectedPaymentMethod,
       ...(guestSession && {
         guestId: guestSession.guestId,
@@ -983,7 +1065,7 @@ export default function Checkout() {
                   </div>
 
                   {paymentSplits.map((split, index) => {
-                    const selectedMethod = walkInPaymentMethods.find(m => m.method === split.method)
+                    const selectedMethod = walkInPaymentMethods.find(m => m.id === split.method)
                     const IconComponent = selectedMethod?.icon || Banknote
                     
                     return (
@@ -1219,6 +1301,49 @@ export default function Checkout() {
                         </AlertDescription>
                       </Alert>
                       <div className="space-y-3">
+                        {/* Auto-detect location button */}
+                        <div className="flex justify-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={checkLocation}
+                            disabled={locationLoading}
+                            className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                          >
+                            {locationLoading ? (
+                              <>
+                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                                Detecting Location...
+                              </>
+                            ) : (
+                              <>
+                                <MapPin className="w-4 h-4 mr-2" />
+                                Use My Current Location
+                              </>
+                            )}
+                          </Button>
+                        </div>
+
+                        {/* Error message */}
+                        {locationError && (
+                          <Alert variant="destructive" className="border-red-300 bg-red-50">
+                            <AlertDescription className="text-red-900">
+                              {locationError}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {/* Divider */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-orange-200" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-orange-50 px-2 text-orange-600">Or enter manually</span>
+                          </div>
+                        </div>
+
+                        {/* Manual address input */}
                         <div className="flex gap-2">
                           <Input
                             placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"

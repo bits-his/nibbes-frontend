@@ -247,73 +247,23 @@ export default function CustomerMenu() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto w-full">
-          <h1 className="font-serif text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-2 sm:mb-3 leading-tight">
-            Order Fresh from Nibbles
-          </h1>
-          <p className="text-xs xs:text-sm sm:text-base md:text-lg text-white/90 mb-3 sm:mb-4">
-            Authentic Nigerian cuisine delivered to your table
-          </p>
-
-          {/* Location Section */}
-          <div className="mb-3 sm:mb-4 p-2 sm:p-3 rounded-lg bg-white/10 backdrop-blur-sm max-w-xs xs:max-w-sm mx-auto w-full">
-            <div className="flex flex-col items-center gap-1 sm:gap-2">
-              {locationData ? (
-                <div className="text-center w-full">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <MapPin className="w-3 h-3 xs:w-4 xs:h-4 text-green-400" />
-                    <span className="text-white font-medium text-xs xs:text-sm">Location Set</span>
-                  </div>
-                  <p className="text-white/80 text-xs xs:text-sm line-clamp-2">
-                    {locationData.address}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-white/80 text-xs xs:text-sm w-full text-center">
-                  Help us locate you for delivery
-                </p>
-              )}
-
-              <Button
-                size="sm"
-                variant="secondary"
-                className="w-full text-xs py-1 sm:py-1.5"
-                onClick={checkLocation}
-                disabled={locationLoading}
-                data-testid="button-check-location"
-              >
-                {locationLoading ? (
-                  <>
-                    <div className="mr-1 h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                    Detecting...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-3 h-3 mr-1" />
-                    {locationData ? "Update Location" : "Check My Location"}
-                  </>
-                )}
-              </Button>
-
-              {locationError && (
-                <p className="text-red-300 text-xs text-center mt-1">
-                  {locationError}
-                </p>
-              )}
-            </div>
+          {/* Brand Taglines */}
+          <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
+            {/* Main Tagline */}
+            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
+              <span className="block mb-2">Fast. Premium. Affordable.</span>
+            </h1>
+            
+            {/* Secondary Tagline */}
+            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl text-white/95 font-semibold drop-shadow-lg">
+              Quality food that moves fast.
+            </p>
+            
+            {/* Call to Action Tagline */}
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 font-medium drop-shadow-md">
+              Eat more. Pay less. Move on.
+            </p>
           </div>
-          <Button
-            size="sm"
-            variant="default"
-            className="text-xs sm:text-sm px-3 py-2 sm:px-4 sm:py-3 backdrop-blur-md bg-white/20 border-2 border-white/30 hover:bg-white/30 w-full max-w-[160px] xs:max-w-[180px] sm:max-w-[200px]"
-            onClick={() =>
-              document
-                .getElementById("menu")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-            data-testid="button-browse-menu"
-          >
-            Browse Menu
-          </Button>
         </div>
       </section>
 
