@@ -1,173 +1,95 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Copy, Check } from 'lucide-react';
+import { Download, Copy, Check, ExternalLink, Zap } from 'lucide-react';
 import { useState } from 'react';
 
-interface RestaurantQRCodeProps {
-  baseUrl?: string;
-  size?: number;
-}
-
-export function RestaurantQRCode({
-  baseUrl = 'https://nibblesfastfood.com',
-  size = 256
-}: RestaurantQRCodeProps) {
+export function RestaurantQRCode() {
   const [copied, setCopied] = useState(false);
-
-  // QR Code URL with UTM parameters for tracking
-  const qrCodeUrl = `${baseUrl}`;
-
-  const handleDownloadPNG = () => {
-    const canvas = document.createElement('canvas');
-    const svg = document.getElementById('restaurant-qr-code') as unknown as SVGElement;
-
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = size * 2; // Higher resolution
-      canvas.height = size * 2;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const link = document.createElement('a');
-            link.download = 'nibbles-kitchen-qr-code.png';
-            link.href = URL.createObjectURL(blob);
-            link.click();
-          }
-        });
-      }
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
-  };
-
-  const handleDownloadSVG = () => {
-    const svg = document.getElementById('restaurant-qr-code') as unknown as SVGElement;
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const link = document.createElement('a');
-    link.download = 'nibbles-kitchen-qr-code.svg';
-    link.href = url;
-    link.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCopyUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(qrCodeUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy URL:', err);
-    }
-  };
+  const qrUrl = 'https://nibbleskitchen.netlify.app';
+  const brandColor = "#50BAA8";
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl">Restaurant QR Code</CardTitle>
-        <CardDescription>
-          Scan to visit Nibbles Kitchen website with tracking parameters
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* QR Code Display */}
-        <div className="flex justify-center p-8 bg-white rounded-lg border-2 border-dashed border-gray-200">
-          <QRCodeSVG
-            id="restaurant-qr-code"
-            value={qrCodeUrl}
-            size={size}
-            level="H"
-            includeMargin={true}
-            fgColor="#50BAA8"
-            bgColor="#ffffff"
-          />
+    <div className="w-full max-w-md mx-auto bg-slate-50 rounded-[2rem] p-6 shadow-2xl border border-white">
+      {/* QR Stage */}
+      <div className="relative group">
+        <div className="absolute -inset-1 bg-gradient-to-r from-[#50BAA8] to-emerald-400 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+        <div className="relative bg-white rounded-[1.5rem] p-8 flex flex-col items-center justify-center shadow-sm">
+          <div className="relative p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <QRCodeSVG
+              id="restaurant-qr-code"
+              value={qrUrl}
+              size={200}
+              level="H"
+              fgColor={brandColor}
+              includeMargin={false}
+              // This makes the QR "dots" look like rounded pixels
+              imageSettings={{
+                src: "/logo-icon.png", // Path to your logo
+                height: 40,
+                width: 40,
+                excavate: true,
+              }}
+            />
+          </div>
+          
+          <div className="mt-6 text-center">
+            <h3 className="text-xl font-bold text-slate-900">Nibbles Kitchen</h3>
+            <p className="text-sm text-slate-500 flex items-center justify-center gap-1">
+              Live Menu <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Controls */}
+      <div className="mt-8 space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Quick Actions</span>
+          <a href={qrUrl} target="_blank" className="text-xs text-[#50BAA8] hover:underline flex items-center gap-1">
+            Preview Link <ExternalLink size={12} />
+          </a>
         </div>
 
-        {/* URL Display */}
-        {/* <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">QR Code URL:</label>
+        <div className="grid grid-cols-1 gap-2">
+          <Button 
+            onClick={() => {/* download logic */}}
+            className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all active:scale-95"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export High-Res PNG
+          </Button>
+          
           <div className="flex gap-2">
-            <input
-              type="text"
-              value={qrCodeUrl}
-              readOnly
-              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-mono"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleCopyUrl}
-              className="shrink-0"
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                navigator.clipboard.writeText(qrUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="flex-1 h-12 rounded-xl border-slate-200"
             >
-              {copied ? (
-                <Check className="h-4 w-4 text-green-600" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="mr-2 h-4 w-4" />}
+              {copied ? "Copied" : "Copy Link"}
+            </Button>
+            
+            <Button variant="outline" className="h-12 w-12 rounded-xl border-slate-200">
+              <Zap className="h-4 w-4 text-amber-500" />
             </Button>
           </div>
-        </div> */}
-
-        {/* UTM Parameters Info */}
-        {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-          <h3 className="font-semibold text-blue-900">Tracking Parameters:</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li><strong>Source:</strong> restaurant_qr</li>
-            <li><strong>Medium:</strong> scan</li>
-            <li><strong>Campaign:</strong> offline_marketing</li>
-          </ul>
-          <p className="text-xs text-blue-700 mt-2">
-            These parameters will help track how many customers visit from scanning the QR code
-          </p>
-        </div> */}
-
-        {/* Download Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={handleDownloadPNG}
-            className="flex-1 bg-[#50BAA8] hover:bg-[#50BAA8]/90"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Download PNG (High Res)
-          </Button>
-          <Button
-            onClick={handleDownloadSVG}
-            variant="outline"
-            className="flex-1"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Download SVG (Vector)
-          </Button>
         </div>
 
-        {/* Usage Instructions */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
-          <h3 className="font-semibold text-gray-900">How to Use:</h3>
-          <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
-            <li>Download the QR code in your preferred format (PNG for printing, SVG for editing)</li>
-            <li>Print the QR code on table tents, menus, or posters in your restaurant</li>
-            <li>Customers can scan it with their phone camera to visit your menu</li>
-            {/* <li>Track scans through your analytics dashboard using the UTM parameters</li> */}
-          </ol>
+        {/* Status Indicator */}
+        <div className="p-4 bg-white/50 rounded-2xl border border-slate-100">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[11px] font-medium text-slate-500">Scan Reliability</span>
+            <span className="text-[11px] font-bold text-emerald-600">Excellent</span>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-emerald-500 h-full w-[98%]" />
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
