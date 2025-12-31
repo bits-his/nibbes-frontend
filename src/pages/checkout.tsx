@@ -20,7 +20,6 @@ import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
-import { usePrint } from "@/hooks/usePrint"
 
 // Extend Window interface for Interswitch
 declare global {
@@ -77,7 +76,6 @@ export default function Checkout() {
   const { toast} = useToast()
   const { user, loading } = useAuth()
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
-  const { printInvoice } = usePrint()
   const [cart, setCart] = useState<CartItem[]>([])
   const [walkInOrder, setWalkInOrder] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("card")
@@ -757,16 +755,13 @@ export default function Checkout() {
         tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
       }
       
-      // Print invoice
-      printInvoice(orderDataForPrint)
+      // Printing is handled automatically by backend - no frontend printing needed
       
       localStorage.removeItem("pendingWalkInOrder")
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
       
-      // Delay redirect slightly to allow invoice to print
-      setTimeout(() => {
-        setLocation("/docket")
-      }, 1500)
+      // Redirect to docket
+      setLocation("/docket")
     },
     onError: () => {
       toast({

@@ -5,7 +5,7 @@ interface OrderData {
   createdAt: string
   customerName: string
   orderType: string
-  items: Array<{
+  items: Array<{  
     name: string
     quantity: number
     price: string | number
@@ -260,6 +260,7 @@ export const usePrint = () => {
             <span class="summary-label">Payment mode:</span> ${orderData.paymentMethod || 'N/A'}
           </div>
         </div>
+        <div class="dashed-separator"></div>  
 
         <!-- Individual Item Notes Sections -->
         <div class="notes-section">

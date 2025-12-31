@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Filter, Eye, CalendarIcon, Printer } from "lucide-react";
+import { Search, Filter, Eye, CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,6 @@ import type { OrderWithItems } from "@shared/schema";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
-import { usePrint } from "@/hooks/usePrint";
 
 export default function OrderManagement() {
   const { toast } = useToast();
@@ -154,8 +153,6 @@ export default function OrderManagement() {
       });
     },
   });
-
-  const { printInvoice } = usePrint();
 
   const filteredOrders = orders?.filter((order) => {
     const matchesSearch =
@@ -403,33 +400,6 @@ const getStatusBadge = (status: string) => {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                // Prepare order data for printing
-                                const orderData = {
-                                  orderNumber: order.orderNumber,
-                                  createdAt: order.createdAt,
-                                  customerName: order.customerName,
-                                  orderType: order.orderType,
-                                  items: order.orderItems.map((item: any) => ({
-                                    name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
-                                    quantity: item.quantity,
-                                    price: item.price,
-                                    specialInstructions: item.specialInstructions
-                                  })),
-                                  total: parseFloat(order.totalAmount || '0'),
-                                  paymentMethod: order.paymentMethod || 'N/A',
-                                  paymentStatus: order.paymentStatus || 'N/A',
-                                  tendered: parseFloat(order.totalAmount || '0')
-                                }
-                                printInvoice(orderData)
-                              }}
-                              title="Print Receipt"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </Button>
                             <Select
                               value={order.status}
                               onValueChange={(status) =>
@@ -526,35 +496,6 @@ const getStatusBadge = (status: string) => {
                 <span className="font-bold text-2xl">
                   ₦{parseFloat(selectedOrder.totalAmount).toLocaleString()}
                 </span>
-              </div>
-
-              <div className="flex justify-end pt-4 border-t">
-                <Button
-                  onClick={() => {
-                    // Prepare order data for printing
-                    const orderData = {
-                      orderNumber: selectedOrder.orderNumber,
-                      createdAt: selectedOrder.createdAt,
-                      customerName: selectedOrder.customerName,
-                      orderType: selectedOrder.orderType,
-                      items: selectedOrder.orderItems.map((item: any) => ({
-                        name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
-                        quantity: item.quantity,
-                        price: item.price,
-                        specialInstructions: item.specialInstructions
-                      })),
-                      total: parseFloat(selectedOrder.totalAmount),
-                      paymentMethod: selectedOrder.paymentMethod || 'N/A',
-                      paymentStatus: selectedOrder.paymentStatus || 'N/A',
-                      tendered: parseFloat(selectedOrder.totalAmount)
-                    }
-                    printInvoice(orderData)
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Printer className="w-4 h-4" />
-                  Print Invoice
-                </Button>
               </div>
             </div>
           )}
