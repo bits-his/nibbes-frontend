@@ -21,7 +21,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
 import { PDFViewer } from "@react-pdf/renderer"
-import ThermalReceipt from "@/components/ThermalReceipt"
+import WalkInReceipt from "@/components/WalkInReceipt"
 
 // Extend Window interface for Interswitch
 declare global {
@@ -1312,7 +1312,7 @@ export default function Checkout() {
           <div className="bg-white rounded-lg shadow-lg p-4" style={{ height: 'calc(100vh - 200px)' }}>
             {pdfReceiptData ? (
               <PDFViewer width="100%" height="100%" showToolbar={true}>
-                <ThermalReceipt orderData={pdfReceiptData} />
+                <WalkInReceipt orderData={pdfReceiptData} />
               </PDFViewer>
             ) : (
               <div className="flex items-center justify-center h-full">

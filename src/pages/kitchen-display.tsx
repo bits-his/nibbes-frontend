@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Clock, ChefHat, Search } from "lucide-react";
+import { Clock, ChefHat, Search, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
-// import { usePrint } from "@/hooks/kitchendisplay";
+import { autoPrintKitchenTicket } from "@/utils/kitchenPrint";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
@@ -50,36 +50,32 @@ export default function KitchenDisplay() {
             description: `Order #${data.orderNumber} has been placed.`,
           });
           
-          // Automatically print kitchen display for new orders
-          // Find the order in the current orders list or use data.order
+          // Automatically print kitchen ticket for new orders
           const order = data.order || orders?.find(o => o.id === (data.orderId || data.order?.id));
           if (order) {
-            console.log(`🖨️ Frontend: Triggering print for order ${order.orderNumber}`);
+            console.log(`🖨️ Kitchen: Auto-printing ticket for order #${order.orderNumber}`);
             try {
-              // Transform OrderWithItems to OrderData format
-              const orderData = {
-                orderNumber: order.orderNumber,
+              // Transform OrderWithItems to kitchen ticket format
+              const kitchenTicketData = {
+                orderNumber: order.orderNumber.toString(),
                 createdAt: order.createdAt,
                 customerName: order.customerName,
-                orderType: order.orderType,
-                items: order.orderItems.map((item: OrderWithItems['orderItems'][0]) => ({
-                  name: item.menuItem.name,
+                items: order.orderItems.map((item: any) => ({
+                  name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
                   quantity: item.quantity,
                   price: item.price,
                   specialInstructions: item.specialInstructions || null,
                 })),
-                total: parseFloat(order.totalAmount) || 0,
-                paymentMethod: order.paymentMethod || 'N/A',
-                paymentStatus: order.paymentStatus,
-                tendered: parseFloat(order.totalAmount) || 0,
               };
-              // printInvoice(orderData);
+
+              // Auto-print kitchen ticket - COMMENTED OUT PER REQUEST
+              // autoPrintKitchenTicket(kitchenTicketData);
             } catch (error) {
-              console.error('Failed to print kitchen order:', error);
+              console.error('❌ Failed to print kitchen ticket:', error);
               // Don't show error to user, just log it
             }
           } else {
-            console.warn('Order not found for printing:', data);
+            console.warn('⚠️ Order not found for printing:', data);
           }
         }
       } else if (data.type === "menu_item_update") {
@@ -118,6 +114,38 @@ export default function KitchenDisplay() {
       });
     },
   });
+
+  // Function to print kitchen ticket for a specific order
+  const printKitchenTicket = (order: OrderWithItems) => {
+    try {
+      // Transform OrderWithItems to kitchen ticket format
+      const kitchenTicketData = {
+        orderNumber: order.orderNumber.toString(),
+        createdAt: order.createdAt,
+        customerName: order.customerName,
+        items: order.orderItems.map((item: any) => ({
+          name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
+          quantity: item.quantity,
+          price: item.price,
+          specialInstructions: item.specialInstructions || null,
+        })),
+      };
+
+      // Print kitchen ticket
+      autoPrintKitchenTicket(kitchenTicketData);
+      toast({
+        title: "Print Sent",
+        description: `Kitchen ticket for order #${order.orderNumber} sent to printer.`,
+      });
+    } catch (error) {
+      console.error('❌ Failed to print kitchen ticket:', error);
+      toast({
+        title: "Print Error",
+        description: "Failed to print kitchen ticket.",
+        variant: "destructive",
+      });
+    }
+  };
 
 const getStatusBadge = (status: string) => {
   const statusColors: Record<string, string> = {
@@ -256,6 +284,17 @@ const getStatusBadge = (status: string) => {
                   )}
 
                   <div className="pt-2 sm:pt-3 border-t space-y-2">
+                    {/* Print button for kitchen ticket */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full flex items-center gap-2"
+                      onClick={() => printKitchenTicket(order)}
+                    >
+                      <Printer className="w-4 h-4" />
+                      Print Ticket
+                    </Button>
+
                     {order.status === "pending" && (
                       <Button
                         className="w-full text-sm sm:text-base"

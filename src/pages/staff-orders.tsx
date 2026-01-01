@@ -27,6 +27,7 @@ export default function StaffOrders() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -54,9 +55,14 @@ export default function StaffOrders() {
   const categories = ["All", ...(categoriesData || [])];
 
   const filteredItems = menuItems?.filter(
-    (item) =>
-      item.available && // Only show available items for walk-in orders
-      (selectedCategory === "All" || item.category === selectedCategory)
+    (item) => {
+      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+      const matchesSearch = searchQuery === "" || 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      return item.available && matchesCategory && matchesSearch;
+    }
   );
 
   const addToCart = (menuItem: MenuItem) => {
@@ -197,6 +203,19 @@ export default function StaffOrders() {
         <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">
           <div className="p-4 md:p-6 border-b">
             <h1 className="font-serif text-2xl md:text-3xl font-bold mb-3 md:mb-4">Walk-in Orders</h1>
+            
+            {/* Search Bar */}
+            <div className="mb-4">
+              <Input
+                type="text"
+                placeholder="Search menu items by name or description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            
+            {/* Category Filters */}
             <div className="flex gap-2 overflow-x-auto pb-2">
               {categories.map((category) => (
                 <Badge
