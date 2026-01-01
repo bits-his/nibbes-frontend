@@ -21,37 +21,6 @@ interface OrderData {
   tendered?: number
 }
 
-const convertToThermalPreview = (orderData: OrderData): ThermalPrinterPreviewProps => {
-  const items = orderData.items || []
-  const tendered = orderData.tendered || orderData.total || 0
-  const balance = tendered - (orderData.total || 0)
-
-  return {
-    data: items.map(item => {
-      const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price || 0
-      const quantity = item.quantity || 1
-      const amount = price * quantity
-      
-      return {
-        name: item.name,
-        amount: amount,
-        quantity: quantity,
-      }
-    }),
-    total: orderData.total || 0,
-    name: orderData.customerName,
-    receiptNo: orderData.orderNumber,
-    modeOfPayment: orderData.paymentMethod || 'N/A',
-    balance: balance,
-    amountPaid: tendered,
-    paymentStatus: orderData.paymentStatus,
-    info: {
-      createdAt: orderData.createdAt,
-    },
-    title: 'RECEIPT',
-  }
-}
-
 export const usePrint = () => {
   const printInvoice = useCallback((orderData: OrderData) => {
     const printWindow = window.open('', '_blank', 'width=300,height=600')
@@ -292,30 +261,7 @@ export const usePrint = () => {
             <span class="summary-label">Payment mode:</span> ${orderData.paymentMethod || 'N/A'}
           </div>
         </div>
-        <div class="dashed-separator"></div>  
-
-        <!-- Individual Item Notes Sections -->
-        <div class="notes-section">
-          ${items.map((item: any, index: number) => {
-            const itemName = item.name || item.menuItemName || 'Unknown Item'
-            const quantity = item.quantity || 1
-            const displayName = `${itemName} x ${quantity}`
-            const specialInstructions = item.specialInstructions || 'notes...'
-            const orderNumber = `#${orderData.orderNumber}`
-            
-            return `
-              <div class="item-note-box">
-                <div class="item-note-header-wrapper">
-                  <div class="item-note-header">${displayName}</div>
-                  <div class="item-note-time">${timeStr}</div>
-                </div>
-                <div class="item-note-content">${specialInstructions}</div>
-                <div class="item-note-order-number">${orderNumber}</div>
-              </div>
-              ${index < items.length - 1 ? '<div class="dashed-separator"></div>' : ''}
-            `
-          }).join('')}
-        </div>
+       
         
         <script>
           window.onload = function() {
@@ -331,5 +277,5 @@ export const usePrint = () => {
     printWindow.document.close()
   }, [])
   
-  return { printInvoice, convertToThermalPreview }
+  return { printInvoice }
 }

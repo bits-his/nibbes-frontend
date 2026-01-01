@@ -36,10 +36,11 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { usePrint } from "@/hooks/usePrint";
+import { ThermalPrinterPreview } from "@/components/ThermalPrinterPreview";
 
 export default function OrderManagement() {
   const { toast } = useToast();
-  const { printInvoice } = usePrint();
+  const { printInvoice, convertToThermalPreview } = usePrint();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
@@ -47,6 +48,8 @@ export default function OrderManagement() {
     to: new Date(new Date().setHours(23, 59, 59, 999))   // End of today
   });
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
+  const [showThermalPreview, setShowThermalPreview] = useState(false);
+  const [thermalPreviewData, setThermalPreviewData] = useState<any>(null);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -204,7 +207,10 @@ export default function OrderManagement() {
 
   const handlePrintPreview = (order: OrderWithItems) => {
     const printData = convertOrderForPrint(order);
-    printInvoice(printData);
+    // Show thermal preview in dialog
+    const thermalData = convertToThermalPreview(printData);
+    setThermalPreviewData(thermalData);
+    setShowThermalPreview(true);
   };
 
   const filteredOrders = orders?.filter((order) => {
@@ -598,6 +604,52 @@ const getStatusBadge = (status: string) => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Thermal Printer Preview Dialog */}
+      <Dialog open={showThermalPreview} onOpenChange={setShowThermalPreview}>
+        <DialogContent className="max-w-md" data-testid="dialog-thermal-preview">
+          <DialogHeader>
+            <DialogTitle>Thermal Printer Preview</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center items-start bg-gray-100 p-4 rounded-lg overflow-auto max-h-[80vh]">
+            {thermalPreviewData && (
+              <div className="bg-white shadow-lg">
+                <ThermalPrinterPreview {...thermalPreviewData} />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (thermalPreviewData) {
+                  const printData = {
+                    orderNumber: thermalPreviewData.receiptNo || '',
+                    createdAt: thermalPreviewData.info?.createdAt || new Date().toISOString(),
+                    customerName: thermalPreviewData.name || '',
+                    orderType: '',
+                    items: (thermalPreviewData.data || []).map(item => ({
+                      name: item.item_name || item.name || '',
+                      quantity: item.qty || item.quantity || 1,
+                      price: (item.amount || 0) / (item.qty || item.quantity || 1),
+                    })),
+                    total: thermalPreviewData.total || 0,
+                    paymentMethod: thermalPreviewData.modeOfPayment || 'Cash',
+                    paymentStatus: thermalPreviewData.paymentStatus || 'Full Payment',
+                    tendered: thermalPreviewData.amountPaid || 0,
+                  };
+                  printInvoice(printData);
+                }
+              }}
+            >
+              Print
+            </Button>
+            <Button variant="outline" onClick={() => setShowThermalPreview(false)}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
