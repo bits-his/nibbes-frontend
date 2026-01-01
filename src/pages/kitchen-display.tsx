@@ -10,6 +10,20 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
+// Function to print kitchen order PDFs
+async function printKitchenOrder(orderId: string | number): Promise<void> {
+  try {
+    const response = await apiRequest('POST', `/api/kitchen/print/${orderId}`);
+    if (!response.ok) {
+      throw new Error('Failed to print kitchen order');
+    }
+    console.log(`✅ Kitchen order ${orderId} sent to printer`);
+  } catch (error) {
+    console.error('Error printing kitchen order:', error);
+    throw error;
+  }
+}
+
 export default function KitchenDisplay() {
   const { toast } = useToast();
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -47,6 +61,19 @@ export default function KitchenDisplay() {
             title: "New Order!",
             description: `Order #${data.orderNumber} has been placed.`,
           });
+          
+          // Automatically print kitchen display PDFs for new orders
+          // Use orderId from data if available, otherwise try order.id
+          const orderId = data.orderId || data.order?.id;
+          if (orderId) {
+            console.log(`🖨️ Frontend: Triggering print for order ${orderId}`);
+            printKitchenOrder(String(orderId)).catch((error) => {
+              console.error('Failed to print kitchen order:', error);
+              // Don't show error to user, just log it
+            });
+          } else {
+            console.warn('No order ID found in WebSocket message:', data);
+          }
         }
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
