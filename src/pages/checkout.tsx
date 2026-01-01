@@ -20,6 +20,8 @@ import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
+import { PDFViewer } from "@react-pdf/renderer"
+import ThermalReceipt from "@/components/ThermalReceipt"
 
 // Extend Window interface for Interswitch
 declare global {
@@ -76,6 +78,11 @@ export default function Checkout() {
   const { toast} = useToast()
   const { user, loading } = useAuth()
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
+  
+  // PDF Receipt State - Show inline instead of new tab
+  const [showPdfReceipt, setShowPdfReceipt] = useState(false)
+  const [pdfReceiptData, setPdfReceiptData] = useState<any>(null)
+  
   const [cart, setCart] = useState<CartItem[]>([])
   const [walkInOrder, setWalkInOrder] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("card")
@@ -315,84 +322,147 @@ export default function Checkout() {
     ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
     : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
 
-  // Check location using browser geolocation
-  const checkLocation = () => {
+  // Helper function to try getting location with specific options
+  const tryGetLocation = (options: PositionOptions): Promise<GeolocationPosition> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser"))
+        return
+      }
+      navigator.geolocation.getCurrentPosition(resolve, reject, options)
+    })
+  }
+
+  // Reverse geocode coordinates to address
+  const reverseGeocode = async (latitude: number, longitude: number): Promise<string> => {
+    try {
+      // Try OpenStreetMap Nominatim first
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+        {
+          headers: {
+            'User-Agent': 'NibblesKitchen/1.0' // Nominatim requires a user agent
+          }
+        }
+      )
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.display_name) {
+          return data.display_name
+        }
+      }
+    } catch (error) {
+      console.warn("Nominatim geocoding failed:", error)
+    }
+
+    // Fallback to coordinates if geocoding fails
+    return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+  }
+
+  // Check location using browser geolocation with retry logic
+  const checkLocation = async () => {
     setLocationLoading(true)
     setLocationError(null)
 
     if (!navigator.geolocation) {
-      setLocationError("Geolocation is not supported by your browser")
+      setLocationError("Geolocation is not supported by your browser. Please enter your address manually below.")
       setLocationLoading(false)
       return
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords
-
-        try {
-          // Reverse geocode to get address
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          )
-          const data = await response.json()
-
-          const address =
-            data.display_name ||
-            `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-
-          const locationInfo = { latitude, longitude, address }
-          setLocationData(locationInfo)
-          setTempAddress(address)
-
-          // Store location in localStorage
-          localStorage.setItem("location", JSON.stringify(locationInfo))
-
-          // Show success message
-          toast({
-            title: "Location Detected",
-            description: address,
-          })
-        } catch (error) {
-          console.error("Error getting address:", error)
-          // If reverse geocoding fails, still store coordinates
-          const locationInfo = {
-            latitude,
-            longitude,
-            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+    try {
+      let position: GeolocationPosition | null = null
+      
+      // First attempt: High accuracy with 10 second timeout
+      try {
+        console.log("Attempting high-accuracy location detection...")
+        position = await tryGetLocation({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        })
+        console.log("High-accuracy location obtained:", position)
+      } catch (highAccuracyError: any) {
+        console.warn("High-accuracy location failed:", highAccuracyError.message)
+        
+        // Second attempt: Low accuracy with 30 second timeout
+        if (highAccuracyError.code === 2 || highAccuracyError.code === 3) {
+          console.log("Retrying with low-accuracy location detection...")
+          try {
+            position = await tryGetLocation({
+              enableHighAccuracy: false,
+              timeout: 30000,
+              maximumAge: 60000 // Accept cached location up to 1 minute old
+            })
+            console.log("Low-accuracy location obtained:", position)
+          } catch (lowAccuracyError: any) {
+            console.error("Low-accuracy location also failed:", lowAccuracyError.message)
+            throw lowAccuracyError // Re-throw to be caught by outer catch
           }
-          setLocationData(locationInfo)
-          setTempAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
-          localStorage.setItem("location", JSON.stringify(locationInfo))
-          toast({
-            title: "Location Detected",
-            description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-          })
-        } finally {
-          setLocationLoading(false)
+        } else {
+          throw highAccuracyError // Re-throw permission denied or other errors
         }
-      },
-      (error) => {
-        let errorMessage = ""
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage =
-              "Location access denied. Please allow location access in your browser settings."
-            break
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = "Location information is unavailable."
-            break
-          case error.TIMEOUT:
-            errorMessage = "The request to get location timed out."
-            break
-          default:
-            errorMessage = "An unknown error occurred."
-            break
-        }
-        setLocationError(errorMessage)
-        setLocationLoading(false)
       }
-    )
+
+      if (!position) {
+        throw new Error("Unable to obtain location")
+      }
+
+      const { latitude, longitude } = position.coords
+      console.log("Location coordinates:", { latitude, longitude })
+
+      // Get address from coordinates
+      const address = await reverseGeocode(latitude, longitude)
+      console.log("Reverse geocoded address:", address)
+
+      const locationInfo = { latitude, longitude, address }
+      setLocationData(locationInfo)
+      setTempAddress(address)
+
+      // Store location in localStorage
+      localStorage.setItem("location", JSON.stringify(locationInfo))
+
+      // Show success message
+      toast({
+        title: "Location Detected ✓",
+        description: address,
+      })
+
+    } catch (error: any) {
+      console.error("Location detection error:", error)
+      
+      let errorMessage = ""
+      let helpText = ""
+      
+      if (error.code === 1) {
+        // PERMISSION_DENIED
+        errorMessage = "Location access denied."
+        helpText = "Please enable location access in your browser settings and try again, or enter your address manually below."
+      } else if (error.code === 2) {
+        // POSITION_UNAVAILABLE
+        errorMessage = "Location information is unavailable."
+        helpText = "Your device cannot determine your location. This may happen if:\n• Location services are disabled on your device\n• You're using a desktop computer without GPS\n• Your network connection is blocking location services\n\nPlease enter your delivery address manually below."
+      } else if (error.code === 3) {
+        // TIMEOUT
+        errorMessage = "Location request timed out."
+        helpText = "The location request took too long. Please check your internet connection and try again, or enter your address manually below."
+      } else {
+        errorMessage = "Unable to detect location."
+        helpText = "Please enter your delivery address manually below."
+      }
+      
+      setLocationError(`${errorMessage} ${helpText}`)
+      
+      // Show toast with error
+      toast({
+        title: "Location Detection Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setLocationLoading(false)
+    }
   }
 
   const calculateTotal = () => {
@@ -712,6 +782,9 @@ export default function Checkout() {
             longitude: locationData.longitude,
             address: locationData.address,
           },
+          // Include delivery pricing information
+          geoPricingId: geoPricingId,
+          deliveryFee: deliveryFee,
         }),
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
@@ -742,7 +815,7 @@ export default function Checkout() {
         description: `Order #${data.orderNumber} has been created and sent to kitchen.`,
       })
       
-      // Show invoice before redirecting to docket
+      // Prepare order data for printing
       const orderDataForPrint = {
         orderNumber: data.orderNumber,
         createdAt: data.createdAt || new Date().toISOString(),
@@ -755,13 +828,34 @@ export default function Checkout() {
         tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
       }
       
-      // Printing is handled automatically by backend - no frontend printing needed
+      // 🖨️ Show PDF receipt inline for walk-in orders
+      console.log('🖨️ Showing PDF receipt for walk-in order #' + data.orderNumber)
+      
+      // Prepare receipt data
+      const receiptData = {
+        orderNumber: orderDataForPrint.orderNumber,
+        createdAt: orderDataForPrint.createdAt,
+        customerName: orderDataForPrint.customerName,
+        items: orderDataForPrint.items,
+        total: orderDataForPrint.total,
+        paymentMethod: orderDataForPrint.paymentMethod,
+        tendered: orderDataForPrint.tendered
+      }
+      
+      console.log('📄 Setting PDF receipt data:', receiptData)
+      
+      // Show PDF inline on the same page
+      setPdfReceiptData(receiptData)
+      setShowPdfReceipt(true)
+      
+      // Clear walk-in order so the payment form doesn't show
+      setWalkInOrder(null)
+      
+      console.log('📄 PDF receipt should now be visible')
+      console.log('📄 walkInOrder cleared, showPdfReceipt:', true)
       
       localStorage.removeItem("pendingWalkInOrder")
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
-      
-      // Redirect to docket
-      setLocation("/docket")
     },
     onError: () => {
       toast({
@@ -1187,6 +1281,50 @@ export default function Checkout() {
     )
   }
 
+  // Show PDF Receipt inline (after order is created)
+  if (showPdfReceipt && pdfReceiptData) {
+    console.log('📄 Rendering PDF Receipt section')
+    console.log('📄 pdfReceiptData:', pdfReceiptData)
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-6 flex items-center justify-between">
+            <Button
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                console.log('🔙 Back button clicked')
+                setShowPdfReceipt(false)
+                setPdfReceiptData(null)
+                setLocation("/staff")
+              }}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Walk-in Orders
+            </Button>
+            
+            <div className="text-lg font-semibold text-foreground">
+              Receipt for Order #{pdfReceiptData?.orderNumber || 'N/A'}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-4" style={{ height: 'calc(100vh - 200px)' }}>
+            {pdfReceiptData ? (
+              <PDFViewer width="100%" height="100%" showToolbar={true}>
+                <ThermalReceipt orderData={pdfReceiptData} />
+              </PDFViewer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p>Loading receipt...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (cart.length === 0) {
     return null
   }
@@ -1316,8 +1454,82 @@ export default function Checkout() {
                           Please enter your delivery address to calculate delivery fee
                         </AlertDescription>
                       </Alert>
+
+                      {/* Error message - More prominent */}
+                      {locationError && (
+                        <Alert variant="destructive" className="border-red-400 bg-red-50">
+                          <AlertDescription className="text-red-900 whitespace-pre-line">
+                            <strong className="block mb-2">{locationError.split('.')[0]}.</strong>
+                            {locationError.split('.').slice(1).join('.').trim()}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
                       <div className="space-y-3">
-                        {/* Auto-detect location button */}
+                        {/* Manual address input - Now primary */}
+                        <div>
+                          <label className="text-sm font-semibold mb-2 block text-foreground">
+                            Delivery Address
+                          </label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
+                              value={tempAddress}
+                              onChange={(e) => setTempAddress(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && tempAddress.trim()) {
+                                  const newLocationData = {
+                                    address: tempAddress.trim(),
+                                    latitude: 0,
+                                    longitude: 0
+                                  }
+                                  setLocationData(newLocationData)
+                                  localStorage.setItem("location", JSON.stringify(newLocationData))
+                                  setLocationError(null)
+                                }
+                              }}
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (tempAddress.trim()) {
+                                  const newLocationData = {
+                                    address: tempAddress.trim(),
+                                    latitude: 0,
+                                    longitude: 0
+                                  }
+                                  setLocationData(newLocationData)
+                                  localStorage.setItem("location", JSON.stringify(newLocationData))
+                                  setLocationError(null)
+                                  toast({
+                                    title: "Address Set",
+                                    description: "Delivery address has been set successfully.",
+                                  })
+                                }
+                              }}
+                              disabled={!tempAddress.trim() || isCalculatingDelivery}
+                              className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90"
+                            >
+                              {isCalculatingDelivery ? "Calculating..." : "Set Address"}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            💡 Tip: Include landmarks for easier delivery (e.g., "Near Central Mosque, Kano")
+                          </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-orange-200" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-orange-50 px-2 text-orange-600">Or use auto-detect</span>
+                          </div>
+                        </div>
+
+                        {/* Auto-detect location button - Now secondary */}
                         <div className="flex justify-center">
                           <Button
                             type="button"
@@ -1334,72 +1546,40 @@ export default function Checkout() {
                             ) : (
                               <>
                                 <MapPin className="w-4 h-4 mr-2" />
-                                Use My Current Location
+                                Auto-Detect My Location
                               </>
                             )}
                           </Button>
                         </div>
 
-                        {/* Error message */}
-                        {locationError && (
-                          <Alert variant="destructive" className="border-red-300 bg-red-50">
-                            <AlertDescription className="text-red-900">
-                              {locationError}
-                            </AlertDescription>
-                          </Alert>
-                        )}
-
-                        {/* Divider */}
-                        <div className="relative">
-                          <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-orange-200" />
+                        {/* Help section */}
+                        <details className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
+                          <summary className="cursor-pointer font-semibold text-foreground mb-2">
+                            📱 How to enable location services
+                          </summary>
+                          <div className="space-y-2 mt-2 pl-2">
+                            <div>
+                              <strong>On Chrome (Desktop):</strong>
+                              <ol className="list-decimal list-inside pl-2 mt-1">
+                                <li>Click the lock icon in the address bar</li>
+                                <li>Find "Location" and select "Allow"</li>
+                                <li>Refresh the page and try again</li>
+                              </ol>
+                            </div>
+                            <div>
+                              <strong>On Mobile (iOS/Android):</strong>
+                              <ol className="list-decimal list-inside pl-2 mt-1">
+                                <li>Go to Settings → Privacy → Location Services</li>
+                                <li>Enable Location Services</li>
+                                <li>Find your browser and set to "While Using"</li>
+                                <li>Return to this page and try again</li>
+                              </ol>
+                            </div>
+                            <div className="pt-2 border-t">
+                              <strong>Still not working?</strong> No problem! Just enter your address manually above.
+                            </div>
                           </div>
-                          <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-orange-50 px-2 text-orange-600">Or enter manually</span>
-                          </div>
-                        </div>
-
-                        {/* Manual address input */}
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
-                            value={tempAddress}
-                            onChange={(e) => setTempAddress(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && tempAddress.trim()) {
-                                const newLocationData = {
-                                  address: tempAddress.trim(),
-                                  latitude: 0,
-                                  longitude: 0
-                                }
-                                setLocationData(newLocationData)
-                                localStorage.setItem("location", JSON.stringify(newLocationData))
-                              }
-                            }}
-                            className="flex-1"
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              if (tempAddress.trim()) {
-                                const newLocationData = {
-                                  address: tempAddress.trim(),
-                                  latitude: 0,
-                                  longitude: 0
-                                }
-                                setLocationData(newLocationData)
-                                localStorage.setItem("location", JSON.stringify(newLocationData))
-                              }
-                            }}
-                            disabled={!tempAddress.trim() || isCalculatingDelivery}
-                            className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90"
-                          >
-                            {isCalculatingDelivery ? "Calculating..." : "Set Location"}
-                          </Button>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Delivery fee will be calculated automatically based on your location
-                        </p>
+                        </details>
                       </div>
                     </CardContent>
                   </Card>

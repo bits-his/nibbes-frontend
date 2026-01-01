@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Filter, Eye, CalendarIcon } from "lucide-react";
+import { Search, Filter, Eye, CalendarIcon, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -399,6 +399,34 @@ const getStatusBadge = (status: string) => {
                               data-testid={`button-view-${order.id}`}
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                // Prepare order data for PDF preview
+                                const orderData = {
+                                  orderNumber: order.orderNumber,
+                                  createdAt: order.createdAt,
+                                  customerName: order.customerName,
+                                  items: order.orderItems.map(item => ({
+                                    name: item.menuItem.name,
+                                    quantity: item.quantity,
+                                    price: item.price,
+                                    specialInstructions: item.specialInstructions
+                                  })),
+                                  total: parseFloat(order.totalAmount),
+                                  paymentMethod: order.paymentMethod || 'N/A',
+                                  tendered: parseFloat(order.totalAmount)
+                                };
+                                // Open receipt in new tab
+                                const receiptUrl = `/print-receipt?order_id=${order.id}&order_number=${order.orderNumber}&type=order_management`;
+                                window.open(receiptUrl, '_blank');
+                              }}
+                              data-testid={`button-print-${order.id}`}
+                              title="Print Receipt"
+                            >
+                              <Printer className="w-4 h-4" />
                             </Button>
                             <Select
                               value={order.status}

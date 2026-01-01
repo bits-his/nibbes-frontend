@@ -47,6 +47,7 @@ import ContactPage from "@/pages/contact";
 import TVDisplay from "@/pages/tv-display";
 import CompletedOrders from "@/pages/completed-orders";
 import Transactions from "@/pages/transactions";
+import PrintReceipt from "@/pages/print-receipt";
 
 // Define user type
 interface User {
@@ -373,6 +374,7 @@ function Router() {
       <Route path="/staff/checkout" component={Checkout} />
       <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
       <Route path="/tv-display" component={TVDisplay} />
+      <Route path="/print-receipt" component={PrintReceipt} />
       <Route
         path="/order-status"
         component={() => (

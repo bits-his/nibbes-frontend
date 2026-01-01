@@ -14,7 +14,7 @@ export default function QRCodePage() {
         ogUrl={`${baseUrl}/qr-code`}
       />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <RestaurantQRCode baseUrl={baseUrl} size={300} />
+        <RestaurantQRCode />
       </div>
     </>
   );
