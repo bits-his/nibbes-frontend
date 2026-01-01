@@ -71,6 +71,7 @@ export default function KitchenDisplay() {
                 total: parseFloat(order.totalAmount) || 0,
                 paymentMethod: order.paymentMethod || 'N/A',
                 paymentStatus: order.paymentStatus,
+                tendered: parseFloat(order.totalAmount) || 0,
               };
               printInvoice(orderData);
             } catch (error) {
