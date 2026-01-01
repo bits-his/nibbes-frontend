@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import { useState, useCallback } from 'react'
+=======
+import { useCallback } from 'react'
+import type { ThermalPrinterPreviewProps } from '@/components/ThermalPrinterPreview'
+>>>>>>> 43e38346f22db1bd1960dd79546e753a0c33cc33
 
 interface OrderData {
   orderNumber: string
@@ -20,7 +25,41 @@ interface OrderData {
   tendered?: number
 }
 
+<<<<<<< HEAD
 // Hook version for use in React components
+=======
+const convertToThermalPreview = (orderData: OrderData): ThermalPrinterPreviewProps => {
+  const items = orderData.items || []
+  const tendered = orderData.tendered || orderData.total || 0
+  const balance = tendered - (orderData.total || 0)
+
+  return {
+    data: items.map(item => {
+      const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price || 0
+      const quantity = item.quantity || 1
+      const amount = price * quantity
+      
+      return {
+        name: item.name,
+        amount: amount,
+        quantity: quantity,
+      }
+    }),
+    total: orderData.total || 0,
+    name: orderData.customerName,
+    receiptNo: orderData.orderNumber,
+    modeOfPayment: orderData.paymentMethod || 'N/A',
+    balance: balance,
+    amountPaid: tendered,
+    paymentStatus: orderData.paymentStatus,
+    info: {
+      createdAt: orderData.createdAt,
+    },
+    title: 'RECEIPT',
+  }
+}
+
+>>>>>>> 43e38346f22db1bd1960dd79546e753a0c33cc33
 export const usePrint = () => {
   const [pdfData, setPdfData] = useState<any>(null)
   const [showPdfModal, setShowPdfModal] = useState(false)
@@ -265,6 +304,7 @@ export const printReceipt = (orderData: OrderData) => {
           <span class="summary-label">Total Amount</span>
           <span>${formatCurrency(totalAmount)}</span>
         </div>
+<<<<<<< HEAD
         <div class="summary-row">
           <span class="summary-label">Tendered</span>
           <span>${formatCurrency(tendered)}</span>
@@ -319,4 +359,22 @@ export const printReceipt = (orderData: OrderData) => {
       }, 250)
     }
   }
+=======
+        
+        <script>
+          window.onload = function() {
+            window.print()
+            setTimeout(() => window.close(), 500)
+          }
+        </script>
+      </body>
+      </html>
+    `
+    
+    printWindow.document.write(invoiceHTML)
+    printWindow.document.close()
+  }, [])
+  
+  return { printInvoice, convertToThermalPreview }
+>>>>>>> 43e38346f22db1bd1960dd79546e753a0c33cc33
 }
