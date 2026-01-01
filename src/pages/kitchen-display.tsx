@@ -9,11 +9,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
-import { usePrint } from "@/hooks/kitchendisplay";
+// import { usePrint } from "@/hooks/kitchendisplay";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
-  const { printInvoice } = usePrint();
+  // const { printInvoice } = usePrint();
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -72,7 +72,7 @@ export default function KitchenDisplay() {
                 paymentMethod: order.paymentMethod || 'N/A',
                 paymentStatus: order.paymentStatus,
               };
-              printInvoice(orderData);
+              // printInvoice(orderData);
             } catch (error) {
               console.error('Failed to print kitchen order:', error);
               // Don't show error to user, just log it

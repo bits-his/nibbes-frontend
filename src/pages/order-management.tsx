@@ -1,10 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-<<<<<<< HEAD
-import { Search, Filter, Eye, CalendarIcon, Printer } from "lucide-react";
-=======
 import { Search, Filter, Eye, CalendarIcon, Printer, MoreVertical } from "lucide-react";
->>>>>>> 43e38346f22db1bd1960dd79546e753a0c33cc33
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
