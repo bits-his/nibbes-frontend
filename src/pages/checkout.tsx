@@ -1239,9 +1239,22 @@ export default function Checkout() {
 
               <div className="border-t pt-6">
                 {!multiPaymentEnabled && (
-                  <div className="flex justify-between text-2xl font-bold mb-6">
-                    <span>Total Amount</span>
-                    <span className="text-[#4EB5A4]">₦{(walkInOrder.total || subtotal || 0).toLocaleString()}</span>
+                  <div className="space-y-3 mb-6">
+                    {/* Subtotal */}
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {/* VAT */}
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>VAT (7.5%)</span>
+                      <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {/* Total */}
+                    <div className="flex justify-between text-2xl font-bold border-t pt-3">
+                      <span>Total</span>
+                      <span className="text-[#4EB5A4]">₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </div>
                 )}
 

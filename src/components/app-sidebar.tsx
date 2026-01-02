@@ -114,7 +114,7 @@ const menuItems: MenuItem[] = [
     url: "/transactions",
     icon: CreditCard,
     roles: ["admin"],
-    permissions: ["manage_store", "sales_inventory"],
+    permissions: ["store_management", "sales_inventory"],
   },
   {
     title: "Kitchen Requests",
