@@ -9,9 +9,11 @@ import type { OrderWithItems } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { getGuestSession } from "@/lib/guestSession";
 import { formatDistanceToNow } from "date-fns";
+import { useLocation } from "wouter";
 
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const guestSession = getGuestSession();
 
@@ -281,8 +283,8 @@ const getStatusCardColor = (status: string) => {
                 </div>
               </div>
             )}
-            <Button asChild>
-              <a href="#/">Back to Menu</a>
+            <Button onClick={() => setLocation('/')}>
+              Back to Menu
             </Button>
           </div>
         )}

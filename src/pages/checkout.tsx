@@ -517,7 +517,8 @@ export default function Checkout() {
 
       // Generate transaction reference
       const txnRef = `NKO-${createdOrder.orderNumber}-${Date.now()}`
-      const amount = Math.round((createdOrder.totalAmount || calculateTotal()) * 100) // Amount in kobo
+      // Always use calculateTotal() which includes VAT (7.5%) to ensure correct payment amount
+      const amount = Math.round(calculateTotal() * 100) // Amount in kobo (includes VAT)
 
       // Store order info
       localStorage.setItem('pendingPaymentOrder', JSON.stringify({
