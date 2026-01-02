@@ -37,10 +37,18 @@ export const usePrint = () => {
     const dateStr = orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const timeStr = orderDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-    // Calculate totals
-    const totalAmount = orderData.total || 0
-    const tendered = orderData.tendered || totalAmount
-    const balance = tendered - totalAmount
+    // Calculate totals with VAT
+    // Calculate subtotal from items (item prices without VAT)
+    const calculatedSubtotal = orderData.items?.reduce((sum: number, item: any) => {
+      const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price || 0
+      return sum + (price * (item.quantity || 1))
+    }, 0) || 0
+    
+    // Always calculate VAT from subtotal and add to get total
+    // Ensure all values are positive
+    const subtotal = Math.abs(calculatedSubtotal)
+    const vat = Math.abs(subtotal * 0.075) // 7.5% VAT
+    const totalAmount = subtotal + vat
 
     // Format currency
     const formatCurrency = (amount: number) => {
@@ -77,7 +85,7 @@ export const usePrint = () => {
             padding: 5mm;
             font-family: 'Roboto', sans-serif;
             font-size: 14px;
-            font-weight: bold;
+            font-weight: normal;
             line-height: 1.4;
           }
           .header-section {
@@ -126,7 +134,6 @@ export const usePrint = () => {
           .items-table td {
             padding: 4px 0;
             vertical-align: top;
-            font-weight: bold;
             font-size: 14px;
           }
           .item-sno {
@@ -135,11 +142,12 @@ export const usePrint = () => {
           }
           .item-name {
             padding-left: 8px;
+            font-weight: normal;
           }
           .item-amount {
             text-align: right;
             width: 80px;
-            font-weight: bold;
+            font-weight: normal;
           }
           .summary-section {
             margin: 12px 0;
@@ -154,7 +162,7 @@ export const usePrint = () => {
             font-size: 14px;
           }
           .summary-label {
-            font-weight: bold;
+            font-weight: normal;
             font-size: 14px;
           }
           .summary-value {
@@ -162,15 +170,25 @@ export const usePrint = () => {
             font-weight: bold;
             font-size: 14px;
           }
+          .summary-vat-label {
+            font-weight: normal;
+            font-size: 14px;
+          }
+          .summary-vat-value {
+            text-align: right;
+            font-weight: bold;
+            font-size: 14px;
+          }
           .payment-mode {
             margin-top: 8px;
-            font-weight: bold;
+            font-weight: normal;
             font-size: 14px;
             display: flex;
             justify-content: space-between;
           }
           .payment-mode-value {
             text-align: right;
+            font-weight: normal;
           }
           .notes-section {
             margin-top: 16px;
@@ -178,10 +196,11 @@ export const usePrint = () => {
           .item-note-box {
             border: 1px solid #000;
             border-radius: 8px;
-            padding: 8px;
-            margin: 8px 0;
+            padding: 12px;
+            margin-top: 20px;
+            margin-bottom: 8px;
             position: relative;
-            min-height: 60px;
+            min-height: 80px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -193,19 +212,19 @@ export const usePrint = () => {
             margin-bottom: 4px;
           }
           .item-note-header {
-            font-weight: bold;
+            font-weight: normal;
           }
           .item-note-time {
             font-size: 12px;
-            color: #666;
-            font-weight: bold;
+            color: #000;
+            font-weight: normal;
           }
           .item-note-content {
             font-size: 12px;
-            color: #666;
+            color: #000;
             margin-top: auto;
             padding-bottom: 20px;
-            font-weight: bold;
+            font-weight: normal;
           }
           .item-note-order-number {
             position: absolute;
@@ -231,6 +250,33 @@ export const usePrint = () => {
           }
           .footer-name {
             font-weight: normal;
+          }
+          .print-actions {
+            margin-top: 16px;
+            text-align: center;
+            padding: 12px;
+            border-top: 1px dashed #000;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+          }
+          .print-actions button {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            border: 1px solid #000;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: 'Roboto', sans-serif;
+          }
+          .print-actions button:hover {
+            background: #f0f0f0;
+          }
+          @media print {
+            .print-actions {
+              display: none;
+            }
           }
         </style>
       </head>
@@ -281,16 +327,16 @@ export const usePrint = () => {
         <!-- Summary Section -->
         <div class="summary-section">
           <div class="summary-row">
+            <span class="summary-label">Subtotal</span>
+            <span class="summary-value">${formatCurrency(subtotal)}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-vat-label">VAT (7.5%)</span>
+            <span class="summary-vat-value">${formatCurrency(vat)}</span>
+          </div>
+          <div class="summary-row">
             <span class="summary-label">Total Amount</span>
             <span class="summary-value">${formatCurrency(totalAmount)}</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Tendered</span>
-            <span class="summary-value">${formatCurrency(tendered)}</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Balance</span>
-            <span class="summary-value">${formatCurrency(balance)}</span>
           </div>
           <div class="payment-mode">
             <span class="summary-label">Payment mode:</span>
@@ -329,23 +375,12 @@ export const usePrint = () => {
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibbles kitchen</div>
         </div>
-        
-        <script>
-          // Ensure document is fully loaded before printing
-          if (document.readyState === 'complete') {
-            setTimeout(function() {
-              window.print()
-              setTimeout(function() { window.close() }, 500)
-            }, 100)
-          } else {
-            window.onload = function() {
-              setTimeout(function() {
-                window.print()
-                setTimeout(function() { window.close() }, 500)
-              }, 100)
-            }
-          }
-        </script>
+
+        <!-- Print Actions (hidden when printing) -->
+        <div class="print-actions">
+          <button onclick="window.print()">Print Again</button>
+          <button onclick="window.close()">Close Window</button>
+        </div>
       </body>
       </html>
     `
@@ -362,8 +397,11 @@ export const usePrint = () => {
       setTimeout(() => {
         printWindow.focus()
         printWindow.print()
-        setTimeout(() => printWindow.close(), 500)
-      }, 200)
+        // Auto-close disabled - users can print multiple times and close manually when done
+        // setTimeout(() => {
+        //   printWindow.close()
+        // }, 1000)
+      }, 300)
     }
     
     // Check if already loaded, otherwise wait for load event

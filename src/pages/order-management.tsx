@@ -471,17 +471,18 @@ const getStatusBadge = (status: string) => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => handleDirectPrint(order)}
-                                >
-                                  <Printer className="w-4 h-4 mr-2" />
-                                  Print Directly
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
                                   onClick={() => handlePrintPreview(order)}
                                 >
                                   <Printer className="w-4 h-4 mr-2" />
                                   Print Preview
                                 </DropdownMenuItem>
+                                {/* Direct printing disabled - use print preview instead */}
+                                {/* <DropdownMenuItem
+                                  onClick={() => handleDirectPrint(order)}
+                                >
+                                  <Printer className="w-4 h-4 mr-2" />
+                                  Print Directly
+                                </DropdownMenuItem> */}
                               </DropdownMenuContent>
                             </DropdownMenu>
                             <Select
@@ -536,17 +537,18 @@ const getStatusBadge = (status: string) => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={() => handleDirectPrint(selectedOrder)}
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Print Directly
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
                       onClick={() => handlePrintPreview(selectedOrder)}
                     >
                       <Printer className="w-4 h-4 mr-2" />
                       Print Preview
                     </DropdownMenuItem>
+                    {/* Direct printing disabled - use print preview instead */}
+                    {/* <DropdownMenuItem
+                      onClick={() => handleDirectPrint(selectedOrder)}
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print Directly
+                    </DropdownMenuItem> */}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

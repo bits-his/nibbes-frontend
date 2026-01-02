@@ -314,8 +314,10 @@ export default function Checkout() {
     calculateDeliveryFee()
   }, [form.watch("orderType"), locationData])
 
+  // For walk-in orders, calculate subtotal from items (total already includes VAT)
+  // For regular orders, calculate from cart
   const subtotal = walkInOrder 
-    ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
+    ? (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0)
     : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
 
   // Helper function to try getting location with specific options
@@ -827,13 +829,17 @@ export default function Checkout() {
       // 🖨️ Show print preview immediately for walk-in orders
       console.log('🖨️ Showing print preview for walk-in order #' + data.orderNumber)
       
-      // Clear walk-in order so the payment form doesn't show
-      setWalkInOrder(null)
-      
       // Show print preview immediately with walk-in receipt type (no card list)
       printInvoice(orderDataForPrint, 'walk-in')
       
-      localStorage.removeItem("pendingWalkInOrder")
+      // Clear walk-in order and redirect after a short delay to allow print window to open
+      setTimeout(() => {
+        setWalkInOrder(null)
+        localStorage.removeItem("pendingWalkInOrder")
+        // Redirect to staff page to avoid blank page
+        setLocation("/staff")
+      }, 500)
+      
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
     },
     onError: () => {
@@ -1240,21 +1246,40 @@ export default function Checkout() {
               <div className="border-t pt-6">
                 {!multiPaymentEnabled && (
                   <div className="space-y-3 mb-6">
-                    {/* Subtotal */}
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Subtotal</span>
-                      <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {/* VAT */}
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>VAT (7.5%)</span>
-                      <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {/* Total */}
-                    <div className="flex justify-between text-2xl font-bold border-t pt-3">
-                      <span>Total</span>
-                      <span className="text-[#4EB5A4]">₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
+                    {/* VAT - show for both walk-in and regular orders */}
+                    {walkInOrder && walkInOrder.total ? (
+                      // Walk-in order: show breakdown with VAT (total already includes VAT)
+                      <>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Subtotal (excl. VAT)</span>
+                          <span>₦{(walkInOrder.total / 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT (7.5%)</span>
+                          <span>₦{(walkInOrder.total - (walkInOrder.total / 1.075)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-2xl font-bold border-t pt-3">
+                          <span>Total</span>
+                          <span className="text-[#4EB5A4]">₦{walkInOrder.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </>
+                    ) : (
+                      // Regular checkout - calculate and show VAT
+                      <>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Subtotal</span>
+                          <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT (7.5%)</span>
+                          <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-2xl font-bold border-t pt-3">
+                          <span>Total</span>
+                          <span className="text-[#4EB5A4]">₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -1577,8 +1602,8 @@ export default function Checkout() {
                   </Card>
                 )}
 
-                {/* Payment Method Card */}
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                {/* Payment Method Card - Removed: Payment automatically processed via Interswitch when order is completed */}
+                {/* <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <CardTitle className="text-lg">3. Payment Method</CardTitle>
                   </CardHeader>
@@ -1612,7 +1637,6 @@ export default function Checkout() {
                       })}
                     </RadioGroup>
 
-                    {/* Payment method specific information */}
                     {selectedPaymentMethod === 'card' && (
                       <Alert className="border-purple-200 bg-purple-50">
                         <Lock className="h-4 w-4" />
@@ -1645,7 +1669,7 @@ export default function Checkout() {
                       </Alert>
                     )}
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
 
               {/* Right column - Order Summary */}

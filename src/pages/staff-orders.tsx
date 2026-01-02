@@ -121,7 +121,7 @@ export default function StaffOrders() {
     localStorage.setItem('pendingWalkInOrder', JSON.stringify({
       customerName: form.getValues('customerName'),
       customerPhone: form.getValues('customerPhone'),
-      total: subtotal,
+      total: subtotal * 1.075, // Include 7.5% VAT
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
         quantity: item.quantity,
@@ -400,10 +400,21 @@ export default function StaffOrders() {
 
               {/* Desktop submit section - hidden on mobile */}
               <div className="p-4 md:p-6 border-t space-y-3 md:space-y-4 hidden md:block">
-                <div className="flex items-center justify-between text-base md:text-xl">
+                {/* Subtotal */}
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                {/* VAT */}
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>VAT (7.5%)</span>
+                  <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                {/* Total */}
+                <div className="flex items-center justify-between text-base md:text-xl border-t pt-3">
                   <span className="font-semibold">Total</span>
                   <span className="font-bold" data-testid="text-total">
-                    ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:gap-3">
@@ -435,7 +446,8 @@ export default function StaffOrders() {
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 md:hidden z-10">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-semibold">Total: ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-xs text-muted-foreground">Subtotal: ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} + VAT (7.5%): ₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              <div className="font-semibold">Total: ₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? 's' : ''}</div>
             </div>
             <Button

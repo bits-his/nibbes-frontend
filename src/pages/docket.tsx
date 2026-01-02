@@ -69,8 +69,9 @@ export default function DocketPage() {
         data.type === "new_order" || 
         data.type === "order_status_change"
       ) {
-        // Invalidate the combined query to refresh all orders
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/combined"] });
+        // Invalidate both authenticated user orders and guest orders
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/guest/orders"] });
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
@@ -97,6 +98,7 @@ export default function DocketPage() {
           
           // Refresh orders to show updated status
           queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/guest/orders"] });
         }
       }
     };
