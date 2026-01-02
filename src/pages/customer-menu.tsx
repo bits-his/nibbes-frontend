@@ -18,21 +18,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
-import type { MenuItem, CartItem } from "@shared/schema";
+import type { MenuItem } from "@shared/schema";
 import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
 import { queryClient } from "@/lib/queryClient";
+import { SEO } from "@/components/SEO";
+import { useCart } from "@/context/CartContext";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    // Load cart from localStorage on initial render
-    if (typeof window !== "undefined") {
-      const savedCart = localStorage.getItem("cart");
-      return savedCart ? JSON.parse(savedCart) : [];
-    }
-    return [];
-  });
+  const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart } = useCart();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartOpen, setCartOpen] = useState(false);
@@ -43,6 +38,12 @@ export default function CustomerMenu() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Initialize and refresh menu data on component mount
+  useEffect(() => {
+    // Force refresh the menu data when component mounts to ensure fresh data
+    queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+  }, []);
 
   // WebSocket connection for real-time menu updates
   useEffect(() => {
@@ -85,18 +86,19 @@ export default function CustomerMenu() {
   }, []);
   const [showQRCode, setShowQRCode] = useState(false);
 
-  const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
+  const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
   });
 
-  const categories = [
-    "All",
-    "Main Course",
-    "Appetizer",
-    "Dessert",
-    "Drinks",
-    "Snacks",
-  ];
+  // Extract unique categories from menu items
+  const categories = menuItems
+    ? ["All", ...Array.from(new Set(menuItems.map(item => item.category)))]
+    : ["All"];
+
+  console.log("Available categories:", categories); // Debug log
+
+  // Use loading state from menu only
+  const isLoading = menuLoading;
 
   const filteredItems = menuItems?.filter(
     (item) =>
@@ -106,61 +108,30 @@ export default function CustomerMenu() {
         item.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("cart", JSON.stringify(cart));
-    }
-  }, [cart]);
-
   const addToCart = (menuItem: MenuItem) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.menuItem.id === menuItem.id);
-      if (existing) {
-        toast({
-          title: "Quantity Increased",
-          description: `${menuItem.name} quantity increased in cart.`,
-          duration: 1000, 
-        });
-        return prev.map((item) =>
-          item.menuItem.id === menuItem.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      toast({
-        title: "Added to Cart",
-        description: `${menuItem.name} has been added to your cart.`,
-        duration: 1000, 
-      });
-      return [...prev, { menuItem, quantity: 1 }];
+    addToCartContext({ menuItem: menuItem as any });
+    toast({
+      title: "Added to Cart",
+      description: `${menuItem.name} has been added to your cart.`,
+      duration: 1000,
     });
   };
 
-  const updateQuantity = (menuItemId: number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.menuItem.id === menuItemId
-            ? { ...item, quantity: item.quantity + delta }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
+  const updateQuantity = (menuItemId: string, delta: number) => {
+    const item = cart.find(item => item.menuItem.id === menuItemId);
+    if (item) {
+      const newQuantity = item.quantity + delta;
+      if (newQuantity <= 0) {
+        removeFromCart(menuItemId);
+      } else {
+        updateQuantityContext(menuItemId, newQuantity);
+      }
+    }
   };
 
-  const removeFromCart = (menuItemId: number) => {
-    setCart((prev) => prev.filter((item) => item.menuItem.id !== menuItemId));
-  };
-
-  const updateInstructions = (menuItemId: number, instructions: string) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.menuItem.id === menuItemId
-          ? { ...item, specialInstructions: instructions }
-          : item
-      )
-    );
+  const updateInstructions = (menuItemId: string, instructions: string) => {
+    // CartContext doesn't have updateSpecialInstructions yet, so we'll skip this for now
+    // or you can add it to the context
   };
 
   const subtotal = cart.reduce(
@@ -200,7 +171,10 @@ export default function CustomerMenu() {
           localStorage.setItem("location", JSON.stringify(locationInfo));
 
           // Show success message
-          alert(`Location detected: ${address}`);
+          toast({
+            title: "Location Detected",
+            description: address,
+          });
         } catch (error) {
           console.error("Error getting address:", error);
           // If reverse geocoding fails, still store coordinates
@@ -211,9 +185,10 @@ export default function CustomerMenu() {
           };
           setLocationData(locationInfo);
           localStorage.setItem("location", JSON.stringify(locationInfo));
-          alert(
-            `Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          );
+          toast({
+            title: "Location Detected",
+            description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          });
         } finally {
           setLocationLoading(false);
         }
@@ -251,94 +226,52 @@ export default function CustomerMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative sm:h-[70vh] h-[60vh] flex items-center justify-center overflow-hidden">
+    <>
+      <SEO
+        title="Home - Order Authentic Nigerian Cuisine Online"
+        description="Browse our menu of delicious Nigerian dishes. Order jollof rice, suya, pounded yam, egusi soup, pepper soup, fried rice and more. Fast online ordering with pickup service. Fresh meals prepared daily."
+        keywords="Nigerian food menu, order jollof rice online, suya delivery, Nigerian restaurant menu, African food online, pounded yam, egusi soup, order Nigerian food, online food ordering"
+        ogUrl="https://nibbleskitchen.netlify.app/"
+        canonicalUrl="https://nibbleskitchen.netlify.app/"
+      />
+      <div className="min-h-screen bg-background">
+        {/* Hero Section */}
+      <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
           <img
             src={heroImage}
-            alt="Nibbles Kitchen"
+            alt="Nibbles"
             className="w-full h-full object-cover object-center"
             loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-          <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
-            Order Fresh from Nibbles Kitchen
-          </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-8">
-            Authentic Nigerian cuisine delivered to your table
-          </p>
-
-          {/* Location Section */}
-          <div className="mb-6 p-4 rounded-lg bg-white/10 backdrop-blur-sm max-w-md mx-auto">
-            <div className="flex flex-col items-center gap-3">
-              {locationData ? (
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <MapPin className="w-5 h-5 text-green-400" />
-                    <span className="text-white font-medium">Location Set</span>
-                  </div>
-                  <p className="text-white/80 text-sm line-clamp-2">
-                    {locationData.address}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-white/80 text-sm">
-                  Help us locate you for delivery
-                </p>
-              )}
-
-              <Button
-                size="sm"
-                variant="secondary"
-                className="w-full max-w-xs"
-                onClick={checkLocation}
-                disabled={locationLoading}
-                data-testid="button-check-location"
-              >
-                {locationLoading ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                    Detecting...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-4 h-4 mr-2" />
-                    {locationData ? "Update Location" : "Check My Location"}
-                  </>
-                )}
-              </Button>
-
-              {locationError && (
-                <p className="text-red-300 text-sm text-center mt-2">
-                  {locationError}
-                </p>
-              )}
-            </div>
+        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto w-full">
+          {/* Brand Taglines */}
+          <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
+            {/* Main Tagline */}
+            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
+              <span className="block mb-2">Fast. Premium. Affordable.</span>
+            </h1>
+            
+            {/* Secondary Tagline */}
+            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl text-white/95 font-semibold drop-shadow-lg">
+              Quality food that moves fast.
+            </p>
+            
+            {/* Call to Action Tagline */}
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 font-medium drop-shadow-md">
+              Eat more. Pay less. Move on.
+            </p>
           </div>
-          <Button
-            size="lg"
-            variant="default"
-            className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 backdrop-blur-md bg-white/20 border-2 border-white/30 hover:bg-white/30"
-            onClick={() =>
-              document
-                .getElementById("menu")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-            data-testid="button-browse-menu"
-          >
-            Browse Menu
-          </Button>
         </div>
       </section>
 
       {/* Category Navigation and Search */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-3 xs:px-4 py-2 sm:py-3">
           {/* Desktop Layout */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2 sm:gap-3">
             {/* Search Bar */}
             <div className="flex-1 max-w-md">
               <div className="relative w-full">
@@ -348,21 +281,21 @@ export default function CustomerMenu() {
                   placeholder="Search menu items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9"
+                  className="w-full pl-9 text-sm py-2 sm:py-3"
                   data-testid="input-search"
                 />
               </div>
             </div>
 
             <div className="flex-1 overflow-x-auto min-w-0">
-              <div className="flex gap-2">
-                {categories.map((category) => (
+              <div className="flex gap-1 sm:gap-2">
+                {(categories || ["All"]).map((category: string) => (
                   <Badge
                     key={category}
                     variant={
                       selectedCategory === category ? "default" : "secondary"
                     }
-                    className="cursor-pointer whitespace-nowrap px-4 py-2 hover-elevate"
+                    className="cursor-pointer whitespace-nowrap px-2 sm:px-3 py-1 text-xs sm:py-1.5 hover-elevate"
                     onClick={() => setSelectedCategory(category)}
                     data-testid={`filter-${category
                       .toLowerCase()
@@ -374,7 +307,7 @@ export default function CustomerMenu() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-1 sm:gap-2">
               <Button
                 size="icon"
                 variant="default"
@@ -382,9 +315,9 @@ export default function CustomerMenu() {
                 onClick={() => setCartOpen(true)}
                 data-testid="button-cart"
               >
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-4 h-4" />
                 {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[0.5rem] flex items-center justify-center">
                     {cart.length}
                   </span>
                 )}
@@ -393,31 +326,31 @@ export default function CustomerMenu() {
           </div>
 
           {/* Mobile Layout */}
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden space-y-1.5 sm:space-y-2">
             {/* Search Bar - Full width on mobile */}
             <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Search menu items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9"
+                className="w-full pl-7 sm:pl-8 text-xs py-1.5"
                 data-testid="input-search-mobile"
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
               {/* Scrollable Category Buttons */}
-              <div className="flex-1 overflow-x-auto -mx-4 px-4 mr-[1px]">
-                <div className="flex gap-2 w-max">
-                  {categories.map((category) => (
+              <div className="flex-1 overflow-x-auto -mx-3 px-3 mr-[1px]">
+                <div className="flex gap-1.5 sm:gap-2 w-max">
+                  {(categories || ["All"]).map((category: string) => (
                     <Badge
                       key={category}
                       variant={
                         selectedCategory === category ? "default" : "secondary"
                       }
-                      className="cursor-pointer whitespace-nowrap px-4 py-2 hover-elevate flex-shrink-0"
+                      className="cursor-pointer whitespace-nowrap px-2 py-1 text-xs hover-elevate flex-shrink-0 min-w-[50px]"
                       onClick={() => setSelectedCategory(category)}
                       data-testid={`filter-mobile-${category
                         .toLowerCase()
@@ -433,12 +366,13 @@ export default function CustomerMenu() {
               <Button
                 size="icon"
                 variant="default"
-                className="relative shrink-0 ml-2"
+                className="relative shrink-0 ml-1"
                 onClick={() => setCartOpen(true)}
+                aria-label="Open cart"
               >
                 <ShoppingCart className="w-5 h-5" />
                 {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center font-bold">
                     {cart.length}
                   </span>
                 )}
@@ -449,38 +383,34 @@ export default function CustomerMenu() {
       </div>
 
       {/* Menu Grid */}
-      <section id="menu" className="max-w-7xl mx-auto px-4 py-12">
-        <h2 className="font-serif text-3xl font-semibold mb-8">Our Menu</h2>
+      <section id="menu" className="max-w-7xl mx-auto px-3 xs:px-4 py-4 sm:py-6">
+        <h2 className="font-serif text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold mb-3 sm:mb-4">Our Menu</h2>
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <Card key={i} className="overflow-hidden">
                 <div className="aspect-square bg-muted animate-pulse" />
-                <CardContent className="p-6">
-                  <div className="h-6 bg-muted rounded animate-pulse mb-2" />
-                  <div className="h-4 bg-muted rounded animate-pulse mb-4" />
-                  <div className="h-8 bg-muted rounded animate-pulse" />
+                <CardContent className="p-2.5 sm:p-3.5">
+                  <div className="h-3.5 sm:h-4 bg-muted rounded animate-pulse mb-1.5 sm:mb-2" />
+                  <div className="h-2.5 sm:h-3 bg-muted rounded animate-pulse mb-2.5 sm:mb-3" />
+                  <div className="h-5 sm:h-6 bg-muted rounded animate-pulse" />
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             {filteredItems?.map((item) => {
               const isInCart = cart.some(
-                (cartItem) => cartItem.menuItem.id === item.id
+                (cartItem) => String(cartItem.menuItem.id) === String(item.id)
               );
+              const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
               return (
                 <Card
                   key={item.id}
-                  className={`overflow-hidden hover-elevate transition-all cursor-pointer ${
+                  className={`overflow-hidden hover-elevate transition-all ${
                     isInCart ? "ring-2 ring-primary" : ""
                   }`}
-                  onClick={() => {
-                    if (item.available) {
-                      addToCart(item);
-                    }
-                  }}
                   data-testid={`card-menu-item-${item.id}`}
                 >
                   <div className="aspect-square overflow-hidden relative">
@@ -490,47 +420,65 @@ export default function CustomerMenu() {
                       className="w-full h-full object-cover"
                     />
                     {isInCart && (
-                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-                        <Plus className="w-4 h-4" />
+                      <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                        {cartItem?.quantity}
                       </div>
                     )}
                   </div>
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1">
+                      <h3 className="text-sm font-semibold mb-0.5 sm:mb-1">
                         {item.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                         {item.description}
                       </p>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xl font-bold">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold">
                         ₦{parseFloat(item.price).toLocaleString()}
                       </span>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent the card click event from firing when button is clicked
-                          addToCart(item);
-                        }}
-                        disabled={!item.available}
-                        data-testid={`button-add-${item.id}`}
-                        variant={isInCart ? "secondary" : "default"}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        {isInCart
-                          ? `Added (${
-                              cart.find(
-                                (cartItem) => cartItem.menuItem.id === item.id
-                              )?.quantity
-                            })`
-                          : "Add to Cart"}
-                      </Button>
+                      {isInCart ? (
+                        <div className="flex items-center gap-1 border rounded-lg">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => item.id && updateQuantity(String(item.id), -1)}
+                            data-testid={`button-minus-${item.id}`}
+                            className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
+                          >
+                            <Minus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
+                          </Button>
+                          <span className="font-semibold min-w-[14px] sm:min-w-[16px] text-center text-xs">
+                            {cartItem?.quantity}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => item.id && updateQuantity(String(item.id), 1)}
+                            data-testid={`button-plus-${item.id}`}
+                            className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
+                          >
+                            <Plus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => addToCart(item)}
+                          disabled={!item.available}
+                          data-testid={`button-add-${item.id}`}
+                          className="text-xs px-2 py-1.5"
+                        >
+                          <Plus className="w-2.5 h-2.5 mr-1" />
+                          Add
+                        </Button>
+                      )}
                     </div>
                     {!item.available && (
                       <Badge
                         variant="secondary"
-                        className="w-full justify-center"
+                        className="w-full justify-center text-xs"
                       >
                         Currently Unavailable
                       </Badge>
@@ -550,9 +498,9 @@ export default function CustomerMenu() {
             className="flex-1 bg-black/50 backdrop-blur-sm"
             onClick={() => setCartOpen(false)}
           />
-          <div className="w-full max-w-md bg-background border-l flex flex-col">
-            <div className="p-6 border-b flex items-center justify-between">
-              <h2 className="text-2xl font-semibold">Your Cart</h2>
+          <div className="w-full max-w-[95vw] md:max-w-md bg-background border-l flex flex-col">
+            <div className="p-3 sm:p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Your Cart</h2>
               <Button
                 size="icon"
                 variant="ghost"
@@ -563,10 +511,10 @@ export default function CustomerMenu() {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
               {cart.length === 0 ? (
                 <div className="text-center py-12">
-                  <ShoppingCart className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">Your cart is empty</p>
                 </div>
               ) : (
@@ -575,18 +523,18 @@ export default function CustomerMenu() {
                     key={item.menuItem.id}
                     data-testid={`cart-item-${item.menuItem.id}`}
                   >
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex gap-3">
+                    <CardContent className="p-2.5 sm:p-3 space-y-2">
+                      <div className="flex gap-2">
                         <img
                           src={item.menuItem.imageUrl}
                           alt={item.menuItem.name}
-                          className="w-16 h-16 rounded-lg object-cover"
+                          className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold truncate">
+                          <h4 className="font-semibold text-sm truncate">
                             {item.menuItem.name}
                           </h4>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             ₦{parseFloat(item.menuItem.price).toLocaleString()}
                           </p>
                         </div>
@@ -595,8 +543,9 @@ export default function CustomerMenu() {
                           variant="ghost"
                           onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
                           data-testid={`button-remove-${item.menuItem.id}`}
+                          className="h-7 sm:h-8 w-7 sm:w-8"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                         </Button>
                       </div>
 
@@ -606,11 +555,12 @@ export default function CustomerMenu() {
                           variant="outline"
                           onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
                           data-testid={`button-decrease-${item.menuItem.id}`}
+                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
                         >
-                          <Minus className="w-4 h-4" />
+                          <Minus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                         </Button>
                         <span
-                          className="w-12 text-center font-medium"
+                          className="w-7 sm:w-8 text-center font-medium text-sm"
                           data-testid={`quantity-${item.menuItem.id}`}
                         >
                           {item.quantity}
@@ -620,8 +570,9 @@ export default function CustomerMenu() {
                           variant="outline"
                           onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
                           data-testid={`button-increase-${item.menuItem.id}`}
+                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                         </Button>
                       </div>
 
@@ -631,7 +582,7 @@ export default function CustomerMenu() {
                         onChange={(e) =>
                           item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
                         }
-                        className="text-sm"
+                        className="text-xs py-1.5"
                         rows={2}
                         data-testid={`input-instructions-${item.menuItem.id}`}
                       />
@@ -642,10 +593,10 @@ export default function CustomerMenu() {
             </div>
 
             {cart.length > 0 && (
-              <div className="p-6 border-t space-y-4">
-                <div className="flex items-center justify-between text-lg">
-                  <span className="font-semibold">Subtotal</span>
-                  <span className="font-bold" data-testid="text-subtotal">
+              <div className="p-3 sm:p-4 border-t space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm sm:text-base">Subtotal</span>
+                  <span className="font-bold text-sm sm:text-base" data-testid="text-subtotal">
                     ₦
                     {subtotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -654,8 +605,8 @@ export default function CustomerMenu() {
                   </span>
                 </div>
                 <Button
-                  size="lg"
-                  className="w-full"
+                  size="sm"
+                  className="w-full text-xs sm:text-sm py-2"
                   onClick={handleCheckout}
                   data-testid="button-checkout"
                 >
@@ -713,6 +664,7 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
-    </div>
+      </div>
+    </>
   );
 }

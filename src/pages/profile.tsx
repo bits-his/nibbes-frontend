@@ -33,7 +33,8 @@ interface UserProfile {
   id: string;
   username: string;
   email: string;
-  role: 'admin' | 'kitchen' | 'customer';
+  role: string;
+  permissions?: string[];
   createdAt: string;
   updatedAt: string;
   phone?: string;
@@ -178,7 +179,8 @@ const ProfilePage: React.FC = () => {
     try {
       const response = await apiRequest('POST', '/api/auth/change-password', {
         currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword
       });
 
       if (response.ok) {
@@ -664,7 +666,7 @@ const ProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600">Receive updates about your orders and account</p>
                     </div>
                   </div>
-                  <Switch 
+                  {/* <Switch 
                     checked={profile.notificationsEnabled} 
                     onCheckedChange={(checked) => setProfile(prev => prev ? {...prev, notificationsEnabled: checked} : null)}
                   />
@@ -678,7 +680,7 @@ const ProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600">Switch between light and dark themes</p>
                     </div>
                   </div>
-                  <Switch />
+                  <Switch /> */}
                 </div>
               </div>
             </CardContent>

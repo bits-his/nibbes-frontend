@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Filter, Eye, CalendarIcon } from "lucide-react";
+import { Search, Filter, Eye, CalendarIcon, Printer, MoreVertical } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,15 +23,23 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
+import { usePrint } from "@/hooks/usePrint";
 
 export default function OrderManagement() {
   const { toast } = useToast();
+  const { printInvoice } = usePrint();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
@@ -86,17 +94,18 @@ export default function OrderManagement() {
         const fromDate = new Date(dateRange.from);
         fromDate.setHours(0, 0, 0, 0);
         params.append('from', fromDate.toISOString());
-      }
-      if (dateRange.to) {
-        // Set time to end of the day (23:59:59.999)
-        const toDate = new Date(dateRange.to);
+
+        // If no 'to' date is set, use the same date as 'from' (single day selection)
+        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
         toDate.setHours(23, 59, 59, 999);
         params.append('to', toDate.toISOString());
+
+        console.log(`📅 Frontend fetching orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
       }
-      
+
       const queryString = params.toString();
       const url = queryString ? `/api/orders?${queryString}` : '/api/orders';
-      
+
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -117,17 +126,16 @@ export default function OrderManagement() {
         const fromDate = new Date(dateRange.from);
         fromDate.setHours(0, 0, 0, 0);
         params.append('from', fromDate.toISOString());
-      }
-      if (dateRange.to) {
-        // Set time to end of the day (23:59:59.999)
-        const toDate = new Date(dateRange.to);
+
+        // If no 'to' date is set, use the same date as 'from' (single day selection)
+        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
         toDate.setHours(23, 59, 59, 999);
         params.append('to', toDate.toISOString());
       }
-      
+
       const queryString = params.toString();
       const url = queryString ? `/api/orders/stats?${queryString}` : '/api/orders/stats';
-      
+
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -153,6 +161,55 @@ export default function OrderManagement() {
       });
     },
   });
+
+  const printInvoiceMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await apiRequest("POST", `/api/print/invoice/${orderId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Invoice sent to printer successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to print invoice. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper function to convert OrderWithItems to print format
+  const convertOrderForPrint = (order: OrderWithItems) => {
+    return {
+      orderNumber: order.orderNumber.toString(),
+      createdAt: order.createdAt,
+      customerName: order.customerName,
+      orderType: order.orderType,
+      items: order.orderItems.map(item => ({
+        name: item.menuItem?.name || 'Unknown Item',
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+        specialInstructions: item.specialInstructions || null
+      })),
+      total: parseFloat(order.totalAmount),
+      paymentMethod: order.paymentMethod || 'N/A',
+      paymentStatus: order.paymentStatus || 'paid',
+      tendered: parseFloat(order.totalAmount)
+    };
+  };
+
+  const handlePrintPreview = (order: OrderWithItems) => {
+    const printData = convertOrderForPrint(order);
+    printInvoice(printData, 'receipt');
+  };
+
+  const handleDirectPrint = (order: OrderWithItems) => {
+    printInvoiceMutation.mutate(String(order.id));
+  };
 
   const filteredOrders = orders?.filter((order) => {
     const matchesSearch =
@@ -297,6 +354,22 @@ const getStatusBadge = (status: string) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
+                  <div className="p-3 border-b">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        const today = new Date();
+                        setDateRange({
+                          from: new Date(today.setHours(0, 0, 0, 0)),
+                          to: new Date(today.setHours(23, 59, 59, 999))
+                        });
+                      }}
+                    >
+                      Reset to Today
+                    </Button>
+                  </div>
                   <Calendar
                     initialFocus
                     mode="range"
@@ -381,9 +454,36 @@ const getStatusBadge = (status: string) => {
                               variant="ghost"
                               onClick={() => setSelectedOrder(order)}
                               data-testid={`button-view-${order.id}`}
+                              title="View order details"
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  data-testid={`button-print-${order.id}`}
+                                  title="Print options"
+                                >
+                                  <Printer className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleDirectPrint(order)}
+                                >
+                                  <Printer className="w-4 h-4 mr-2" />
+                                  Print Directly
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handlePrintPreview(order)}
+                                >
+                                  <Printer className="w-4 h-4 mr-2" />
+                                  Print Preview
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             <Select
                               value={order.status}
                               onValueChange={(status) =>
@@ -421,7 +521,36 @@ const getStatusBadge = (status: string) => {
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="max-w-2xl" data-testid="dialog-order-details">
           <DialogHeader>
-            <DialogTitle>Order #{selectedOrder?.orderNumber}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Order #{selectedOrder?.orderNumber}</DialogTitle>
+              {selectedOrder && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Print
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => handleDirectPrint(selectedOrder)}
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print Directly
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handlePrintPreview(selectedOrder)}
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print Preview
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-6">

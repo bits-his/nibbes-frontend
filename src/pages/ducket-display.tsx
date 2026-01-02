@@ -5,6 +5,24 @@ import { useQuery } from "@tanstack/react-query";
 import type { OrderWithItems } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
+const getStatusBadge = (status: string) => {
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+    preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
+    ready: "px-6 py-3 capitalize",
+    completed: "bg-red-200 px-6 py-3 capitalize text-red-800",
+    cancelled: "bg-black-200 px-6 py-3 capitalize text-black-800",
+  };
+
+  const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3";
+
+  return (
+    <Badge variant="default" className={config}>
+      {status}
+    </Badge>
+  );
+};
+
 export default function DucketDisplay() {
   const { data: orders, refetch } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active/customer"],
@@ -67,9 +85,7 @@ export default function DucketDisplay() {
               </CardHeader>
               <CardContent>
                 <div className="flex justify-between items-center mb-2">
-                  <Badge variant="default" className="capitalize">
-                    {order.status}
-                  </Badge>
+                  {getStatusBadge(order.status)}
                   <span className="text-sm text-muted-foreground">
                     {new Date(order.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>

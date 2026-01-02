@@ -9,6 +9,7 @@ export const menuItemSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   imageUrl: z.string().optional(),
   available: z.boolean().default(true),
+  quantity: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -20,6 +21,7 @@ export const insertMenuItemSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   imageUrl: z.string().optional(),
   available: z.boolean().default(true),
+  quantity: z.number().optional(),
 });
 
 // Create an alias for the form schema

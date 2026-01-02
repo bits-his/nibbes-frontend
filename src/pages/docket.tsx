@@ -6,61 +6,52 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { getGuestSession } from "@/lib/guestSession";
 import { formatDistanceToNow } from "date-fns";
-import { getSession, getArchivedGuestId } from "@/utils/session";
 
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const { user } = useAuth();
+  const guestSession = getGuestSession();
 
-  // Get user-specific orders (including cancelled and completed), guest orders, and archived guest orders
-  const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders/combined"],
+  // Get user-specific or guest-specific active orders
+  const { data: orders, isLoading, refetch } = useQuery<OrderWithItems[]>({
+    queryKey: user ? ["/api/orders/active/customer"] : ["/api/guest/orders", guestSession?.guestId],
     queryFn: async () => {
-      const session = getSession();
-      const archivedGuestId = getArchivedGuestId();
-      
-      let allOrders: OrderWithItems[] = [];
-
-      // Fetch orders based on session type
-      if (session.type === "user") {
-        // Fetch user orders
-        try {
-          const response = await apiRequest('GET', `/api/orders?user_id=${session.id}`);
-          const userOrders = await response.json();
-          allOrders.push(...userOrders);
-        } catch (error) {
-          console.error("Failed to fetch user orders:", error);
-        }
+      if (user) {
+        // Authenticated user - fetch their orders
+        const response = await apiRequest('GET', '/api/orders/active/customer');
+        return response.json();
+      } else if (guestSession) {
+        // Guest user - fetch orders by guestId
+        const response = await apiRequest('GET', `/api/guest/orders?guestId=${guestSession.guestId}`);
+        const data = await response.json();
+        return data.orders || [];
       }
-
-      if (session.type === "guest") {
-        // Fetch guest orders
-        try {
-          const response = await apiRequest('GET', `/api/orders?guest_id=${session.id}`);
-          const guestOrders = await response.json();
-          allOrders.push(...guestOrders);
-        } catch (error) {
-          console.error("Failed to fetch guest orders:", error);
-        }
-      }
-
-      // Fetch archived guest orders (if any)
-      if (archivedGuestId) {
-        try {
-          const response = await apiRequest('GET', `/api/orders?guest_id=${archivedGuestId}`);
-          const archivedOrders = await response.json();
-          allOrders.push(...archivedOrders);
-        } catch (error) {
-          console.error("Failed to fetch archived guest orders:", error);
-        }
-      }
-
-      // Sort orders by createdAt in descending order (newest first)
-      return allOrders.sort((a: OrderWithItems, b: OrderWithItems) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      return [];
     },
+    enabled: !!(user || guestSession), // Only run query if user or guest session exists
+    // Remove all polling options since we're using WebSockets for real-time updates
   });
+
+  // Filter orders to only show paid orders
+  const activeOrders = orders?.filter(order => {
+    // Exclude orders with pending payment (waiting for payment confirmation)
+    if (order.paymentStatus === 'pending') {
+      return false;
+    }
+    return true;
+  });
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(permission => {
+        console.log("Notification permission:", permission);
+      });
+    }
+  }, []);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -83,6 +74,30 @@ export default function DocketPage() {
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      } else if (data.type === "order_ready_notification") {
+        // Check if this notification is for the current user/guest
+        const isForCurrentUser = 
+          (user && data.customerEmail === user.email) ||
+          (guestSession && data.guestId === guestSession.guestId);
+        
+        if (isForCurrentUser) {
+          // Show browser notification
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("Order Ready! 🎉", {
+              body: data.message,
+              icon: "/logo.png",
+              badge: "/logo.png",
+              tag: `order-${data.orderNumber}`,
+              requireInteraction: true
+            });
+          }
+          
+          // Also show toast notification
+          console.log("🎉 Your order is ready!", data.message);
+          
+          // Refresh orders to show updated status
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+        }
       }
     };
 
@@ -120,11 +135,11 @@ const getStatusIcon = (status: string) => {
 
 const getStatusBadge = (status: string) => {
   const statusColors: Record<string, string> = {
-    pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
-    preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
-    ready: "px-6 py-3 capitalize ",
-    completed: "bg-green-200 px-6 py-3 capitalize text-green-800",
-    cancelled: "bg-red-200 px-6 py-3 capitalize text-red-800",
+    pending: "bg-red-200 px-6 py-3 capitalize text-red-800",
+    preparing: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+    ready: "bg-green-200 px-6 py-3 capitalize text-green-800",
+    completed: "bg-gray-300 px-6 py-3 capitalize text-gray-800",
+    cancelled: "bg-gray-400 px-6 py-3 capitalize text-gray-900",
   };
 
   const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3 ";
@@ -135,18 +150,34 @@ const getStatusBadge = (status: string) => {
     </Badge>
   );
 };
+
+const getStatusCardColor = (status: string) => {
+  const cardColors: Record<string, string> = {
+    pending: "bg-red-100 border-red-400",
+    preparing: "bg-yellow-100 border-yellow-400",
+    ready: "bg-green-200 border-green-400",
+    completed: "bg-gray-200 border-gray-400",
+    cancelled: "bg-gray-300 border-gray-500",
+  };
+
+  return cardColors[status] || "bg-gray-200 border-gray-400";
+};
   
   return (
     <div className="min-h-screen bg-background p-6">
-      <div className="max-w-screen-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <ClipboardList className="w-8 h-8 text-primary" />
-            <h1 className="font-serif text-4xl font-bold">Order Docket</h1>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ClipboardList className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            {user?.role === "admin" ? (
+              <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Order Docket</h1>
+            ) : (
+              <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">My Orders</h1>
+            )}
           </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="px-4 py-2 text-base">
-              Orders: {orders?.length || 0}
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-normal">
+            <Badge variant="outline" className="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base whitespace-nowrap">
+              Orders: {activeOrders?.length || 0}
             </Badge>
             <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
           </div>
@@ -174,19 +205,14 @@ const getStatusBadge = (status: string) => {
             {orders.map((order) => (
               <Card 
                 key={order.id} 
-                className="overflow-hidden border-2"
+                className={`overflow-hidden border-2 hover:shadow-lg transition-shadow ${getStatusCardColor(order.status)}`}
               >
-                <CardHeader className="p-6 bg-card space-y-3">
+                <CardHeader className="p-6 space-y-3">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-4xl font-bold mb-1">
                         #{order.orderNumber}
                       </div>
-                      {order.guestId && (
-                        <div className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full mb-1">
-                          Guest Order
-                        </div>
-                      )}
                       <div className="text-sm text-muted-foreground flex items-center gap-2">
                         <Clock className="w-4 h-4" />
                         {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
@@ -195,15 +221,15 @@ const getStatusBadge = (status: string) => {
                     {getStatusBadge(order.status)}
                   </div>
 
-                  {/* <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
                     <Badge variant="outline">{order.orderType}</Badge>
                     <span className="font-medium">{order.customerName}</span>
-                  </div> */}
+                  </div>
                 </CardHeader>
 
                 <CardContent className="p-6 space-y-4">
                   <div className="space-y-2">
-                    {order.orderItems.map((item) => (
+                    {order.orderItems?.map((item) => (
                       <div key={item.id} className="flex justify-between gap-3">
                         <div className="flex-1">
                           <div className="font-semibold text-lg">
@@ -219,7 +245,7 @@ const getStatusBadge = (status: string) => {
                     ))}
                   </div>
 
-                  {order.notes && (
+                  {order.notes && order.orderItems && order.orderItems.length > 0 && (
                     <div className="pt-3 border-t">
                       <p className="text-sm text-muted-foreground">
                         <span className="font-semibold">Notes:</span> {order.notes}
@@ -233,10 +259,26 @@ const getStatusBadge = (status: string) => {
         ) : (
           <div className="text-center py-24">
             <ClipboardList className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
-            <h2 className="text-2xl font-semibold mb-2">No Orders</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-2xl font-semibold mb-2">No Orders Yet</h2>
+            <p className="text-muted-foreground mb-6">
               Your orders will appear here when you place them
             </p>
+            {guestSession && !user && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6 max-w-md mx-auto">
+                <h3 className="font-semibold text-lg mb-2">Create an Account?</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You ordered as a guest. Create an account to track all your orders and get exclusive offers!
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button asChild variant="default">
+                    <a href="#/signup">Create Account</a>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <a href="#/login">Sign In</a>
+                  </Button>
+                </div>
+              </div>
+            )}
             <Button asChild>
               <a href="#/">Back to Menu</a>
             </Button>

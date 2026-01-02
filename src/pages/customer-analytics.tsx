@@ -12,19 +12,16 @@ import { apiRequest } from "@/lib/queryClient"
 import { toast } from "@/hooks/use-toast"
 
 interface CustomerAnalytics {
-  id: string
-  customerEmail: string
+  customerId: string
+  customerEmail: string | null
   customerName: string
-  totalOrders: number
-  totalSpent: number
-  favoriteItems: Array<{
-    name: string
-    totalQuantity: number
-    orderCount: number
-  }> | null
-  lastOrderDate: string
-  createdAt: string
-  updatedAt: string
+  orderCount: number
+  totalSpent: string
+  avgOrderValue: string
+  lastOrderDate: string | null
+  firstOrderDate: string | null
+  favoriteItems?: Array<{name: string, orderCount: number, totalQuantity: number}>;
+  totalOrders?: number
 }
 
 interface OrderItem {
@@ -80,20 +77,29 @@ const CustomerAnalyticsPage: React.FC = () => {
       try {
         setLoading(true);
         const params = new URLSearchParams()
-        if (dateRange.from) params.append("from", dateRange.from)
-        if (dateRange.to) params.append("to", dateRange.to)
+
+        // Only add date parameters if they have actual values
+        if (dateRange.from && dateRange.from.trim() !== "") {
+          params.append("from", dateRange.from)
+        }
+        if (dateRange.to && dateRange.to.trim() !== "") {
+          params.append("to", dateRange.to)
+        }
 
         const queryString = params.toString()
         const url = `/api/analytics/customers${queryString ? `?${queryString}` : ""}`
 
-        console.log("API call to:", url)
+        console.log("📊 Fetching customer analytics from:", url)
         const response = await apiRequest("GET", url)
-        console.log("API response:", response)
 
         if (response.ok) {
           const result = await response.json()
-          setCustomers(result.data || [])
+          const customersData = result.customers || result.data || []
+          console.log('✅ Customers loaded:', customersData.length, 'customers')
+          setCustomers(customersData)
         } else {
+          console.error('❌ API error:', response.status)
+          setCustomers([]) // Set empty array on error
           toast({
             title: "Error",
             description: `Failed to load customer analytics: ${response.status}`,
@@ -101,7 +107,8 @@ const CustomerAnalyticsPage: React.FC = () => {
           })
         }
       } catch (error) {
-        console.error("Error loading customer analytics:", error)
+        console.error("❌ Error loading customer analytics:", error)
+        setCustomers([]) // Set empty array on error
         toast({
           title: "Error",
           description: "Failed to load customer analytics. Please try again.",
@@ -128,7 +135,9 @@ const CustomerAnalyticsPage: React.FC = () => {
 
           switch(message.event) {
             case 'customer-analytics-update':
-              setCustomers(message.data.analytics || []);
+              if (message.data && message.data.analytics) {
+                setCustomers(message.data.analytics);
+              }
               break;
             case 'customer-order-added':
               // Reload analytics when new order is added
@@ -176,20 +185,28 @@ const CustomerAnalyticsPage: React.FC = () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (dateRange.from) params.append("from", dateRange.from)
-      if (dateRange.to) params.append("to", dateRange.to)
+
+      // Only add date parameters if they have actual values
+      if (dateRange.from && dateRange.from.trim() !== "") {
+        params.append("from", dateRange.from)
+      }
+      if (dateRange.to && dateRange.to.trim() !== "") {
+        params.append("to", dateRange.to)
+      }
 
       const queryString = params.toString()
       const url = `/api/analytics/customers${queryString ? `?${queryString}` : ""}`
 
-      console.log("API call to:", url)
+      console.log("🔄 Manually refreshing customer analytics from:", url)
       const response = await apiRequest("GET", url)
-      console.log("API response:", response)
 
       if (response.ok) {
         const result = await response.json()
-        setCustomers(result.data)
+        const customersData = result.customers || result.data || []
+        console.log('✅ Customers refreshed:', customersData.length, 'customers')
+        setCustomers(customersData)
       } else {
+        console.error('❌ Refresh error:', response.status)
         toast({
           title: "Error",
           description: "Failed to load customer analytics",
@@ -197,7 +214,7 @@ const CustomerAnalyticsPage: React.FC = () => {
         })
       }
     } catch (error: any) {
-      console.error("API call failed:", error)
+      console.error("❌ API call failed:", error)
       toast({
         title: "Error",
         description: error?.message || error || "Failed to load customer analytics. Please try again.",
@@ -208,9 +225,7 @@ const CustomerAnalyticsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => {
-    loadCustomerAnalytics()
-  }, [dateRange])
+  // REMOVED DUPLICATE useEffect - data loading is handled by the main useEffect above
 
   const handleRefreshAnalytics = async () => {
     try {
@@ -240,18 +255,27 @@ const CustomerAnalyticsPage: React.FC = () => {
     }
   }
 
-  const handleCustomerSelect = async (email: string) => {
+  const handleCustomerSelect = async (email: string | null) => {
+    if (!email) {
+      return; // Early return if email is null
+    }
+    
     try {
       const params = new URLSearchParams()
-      if (dateRange.from) params.append("from", dateRange.from)
-      if (dateRange.to) params.append("to", dateRange.to)
+
+      // Only add date parameters if they have actual values
+      if (dateRange.from && dateRange.from.trim() !== "") {
+        params.append("from", dateRange.from)
+      }
+      if (dateRange.to && dateRange.to.trim() !== "") {
+        params.append("to", dateRange.to)
+      }
 
       const queryString = params.toString()
       const url = `/api/analytics/customers/${email}${queryString ? `?${queryString}` : ""}`
 
-      console.log("API call to detail:", url)
+      console.log("👤 Fetching customer details from:", url)
       const response = await apiRequest("GET", url)
-      console.log("API detail response:", response)
 
       if (response.ok) {
         const result = await response.json()
@@ -282,23 +306,41 @@ const CustomerAnalyticsPage: React.FC = () => {
     }
   }
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  console.log("🔍 Rendering with customers state:", customers?.length || 0, "customers");
+  console.log("📊 Customers data:", customers);
+  console.log("🔎 Search term:", searchTerm);
 
-  const sortedCustomers = [...filteredCustomers].sort((a, b) => b.totalOrders - a.totalOrders)
+  const filteredCustomers = customers && Array.isArray(customers) ? customers.filter(
+    (customer) => {
+      const searchLower = searchTerm.toLowerCase().trim();
+      const name = (customer.customerName || "").toLowerCase();
+      const email = (customer.customerEmail || "").toLowerCase();
 
-  // const totalRevenue = customers.reduce((sum, customer) => sum + Number.parseFloat(customer.totalSpent.toString()), 0)
+      // If search is empty, show all customers
+      if (searchLower === "") return true;
 
-  const totalOrders = customers.reduce((sum, customer) => sum + customer.totalOrders, 0)
+      // Check if name or email includes the search term
+      return name.includes(searchLower) || email.includes(searchLower);
+    }
+  ) : []
+
+  console.log("🔍 Filtered customers:", filteredCustomers?.length || 0, "from", customers?.length || 0, "total");
+
+  const sortedCustomers = filteredCustomers && Array.isArray(filteredCustomers) ? [...filteredCustomers].sort((a, b) => parseFloat(b.totalSpent) - parseFloat(a.totalSpent)) : []
+
+  console.log("📋 Sorted customers:", sortedCustomers?.length || 0);
+
+  // const totalRevenue = customers.reduce((sum, customer) => sum + Number.parseFloat(parseFloat(customer.totalSpent).toString()), 0)
+
+  const totalOrders = customers && Array.isArray(customers) ? customers.reduce((sum, customer) => sum + customer.orderCount, 0) : 0
   const topCustomer =
-    customers.length > 0
-      ? customers.reduce((top, customer) => (customer.totalOrders > top.totalOrders ? customer : top), customers[0])
+    customers && Array.isArray(customers) && customers.length > 0
+      ? customers.reduce((top, customer) => (customer.orderCount > top.orderCount ? customer : top), customers[0])
       : null
 
-  const topFiveCustomers = [...customers].sort((a, b) => b.totalOrders - a.totalOrders).slice(0, 5)
+  console.log("📈 Stats - Total Orders:", totalOrders, "Top Customer:", topCustomer?.customerName || "None");
+
+  const topFiveCustomers = customers && Array.isArray(customers) ? [...customers].sort((a, b) => parseFloat(b.totalSpent) - parseFloat(a.totalSpent)).slice(0, 5) : []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -403,7 +445,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-slate-900">{customers.length}</div>
+                  <div className="text-3xl font-bold text-slate-900">{customers?.length || 0}</div>
                   <p className="text-xs text-slate-500 mt-2">Active customers</p>
                 </CardContent>
               </Card>
@@ -436,7 +478,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                   <CardContent>
                     <div className="p-2 rounded-lg bg-white border border-amber-200 text-center hover:shadow-md transition">
                       <p className="font-bold text-slate-900 text-base">{topCustomer.customerName}</p>
-                      <p className="text-xs text-slate-500 mt-1">{topCustomer.totalOrders} orders</p>
+                      <p className="text-xs text-slate-500 mt-1">{topCustomer.orderCount} orders</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -454,14 +496,18 @@ const CustomerAnalyticsPage: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-2">
-                    {topFiveCustomers.map((customer) => (
+                    {topFiveCustomers && topFiveCustomers.length > 0 ? topFiveCustomers.map((customer) => (
                       <div
-                        key={customer.id}
+                        key={customer.customerId}
                         className="p-2 rounded-lg bg-white border border-amber-200 hover:shadow-md transition text-center"
                       >
                         <p className="font-semibold text-slate-900 text-sm truncate">{customer.customerName}</p>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="col-span-full text-center py-2 text-slate-500 text-sm">
+                        No top customers yet
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -496,7 +542,7 @@ const CustomerAnalyticsPage: React.FC = () => {
                       <p className="text-slate-600 font-medium">Loading customer data...</p>
                     </div>
                   </div>
-                ) : sortedCustomers.length === 0 ? (
+                ) : sortedCustomers && sortedCustomers.length === 0 ? (
                   <div className="flex justify-center items-center h-72">
                     <div className="text-center">
                       <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
@@ -518,9 +564,9 @@ const CustomerAnalyticsPage: React.FC = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedCustomers.map((customer) => (
+                        {sortedCustomers && sortedCustomers.length > 0 ? sortedCustomers.map((customer) => (
                           <TableRow
-                            key={customer.id}
+                            key={customer.customerId}
                             className="hover:bg-slate-50 border-b border-slate-100 transition-colors"
                           >
                             <TableCell className="py-4">
@@ -534,12 +580,12 @@ const CustomerAnalyticsPage: React.FC = () => {
                             <TableCell className="text-slate-600 text-sm">{customer.customerEmail}</TableCell>
                             <TableCell className="text-right">
                               <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold">
-                                {customer.totalOrders}
+                                {customer.orderCount}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right font-medium text-slate-900">
                               ₦
-                              {Number.parseFloat(customer.totalSpent.toString()).toLocaleString("en-US", {
+                              {Number.parseFloat(parseFloat(customer.totalSpent).toString()).toLocaleString("en-US", {
                                 maximumFractionDigits: 0,
                               })}
                             </TableCell>
@@ -562,18 +608,22 @@ const CustomerAnalyticsPage: React.FC = () => {
                               )}
                             </TableCell>
                             <TableCell className="text-slate-600 text-sm">
-                              {new Date(customer.lastOrderDate).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
+                              {customer.lastOrderDate 
+                                ? new Date(customer.lastOrderDate).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : "N/A"}
                             </TableCell>
                             <TableCell className="text-center">
                               <Button
                                 size="sm"
                                 className="bg-teal-600 hover:bg-teal-700 text-white transition group"
                                 onClick={() => {
-                                  handleCustomerSelect(customer.customerEmail)
-                                  setActiveTab("details")
+                                  if (customer.customerEmail) {
+                                    handleCustomerSelect(customer.customerEmail)
+                                    setActiveTab("details")
+                                  }
                                 }}
                               >
                                 <span className="flex items-center gap-1">
@@ -583,7 +633,13 @@ const CustomerAnalyticsPage: React.FC = () => {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                              No customers found
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </div>

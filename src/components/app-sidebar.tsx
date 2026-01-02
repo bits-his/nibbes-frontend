@@ -11,6 +11,9 @@ import {
   User,
   BarChart3,
   Package,
+  Store,
+  CreditCard,
+  ShoppingCart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,12 +28,13 @@ import {
 } from "@/components/ui/sidebar";
 import React from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
 
 interface User {
   id: string;
   username: string;
   email: string;
-  role: "admin" | "kitchen" | "customer";
+  role: string; // Allow any role string
 }
 
 interface MenuItem {
@@ -38,6 +42,7 @@ interface MenuItem {
   url: string;
   icon: React.ElementType;
   roles: string[];
+  permissions?: string[]; // Optional permissions required
 }
 
 const menuItems: MenuItem[] = [
@@ -45,60 +50,215 @@ const menuItems: MenuItem[] = [
     title: "Customer Menu",
     url: "/",
     icon: Home,
-    roles: ["admin", "customer"],
+    roles: ["admin", "customer", "kitchen"],
+    permissions: ["customer_menu"],
   },
-  { title: "Docket Display", url: "/docket", icon: Users, roles: ["customer"] },
+  {
+    title: "Docket Display", // Will be dynamic based on user role
+    url: "/docket",
+    icon: ClipboardList,
+    roles: ["customer", "admin"],
+    permissions: ["docket_display"],
+  },
   {
     title: "Kitchen Display",
     url: "/kitchen",
     icon: ChefHat,
-    roles: ["kitchen"],
+    roles: ["kitchen", "admin"],
+    permissions: ["kitchen_display"],
   },
   {
     title: "Walk-in Orders",
     url: "/staff",
     icon: Users,
     roles: ["admin", "kitchen"],
+    permissions: ["walk_in_orders"],
   },
   {
     title: "Order Management",
     url: "/orders",
     icon: LayoutDashboard,
     roles: ["admin"],
+    permissions: ["order_management"],
+  },
+  {
+    title: "Archived Orders",
+    url: "/completed-orders",
+    icon: ClipboardList,
+    roles: ["admin"],
+    permissions: ["order_management"],
   },
   {
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
     roles: ["admin", "kitchen"],
+    permissions: ["menu_management"],
   },
-  { title: "User Management", url: "/users", icon: Users, roles: ["admin"] },
-  { title: "Sales Inventory", url: "/inventory", icon: Package, roles: ["admin", "kitchen"] },
-  { title: "Analytics & Reports", url: "/dashboard/analytics", icon: BarChart3, roles: ["admin"] },
-  { title: "Customer Analytics", url: "/customer-analytics", icon: BarChart3, roles: ["admin"] },
-  { title: "Customer Insights", url: "/dashboard/customers", icon: BarChart3, roles: ["admin"] },
-  { title: "QR Code", url: "/qr-code", icon: ClipboardList, roles: ["admin"] },
-  { title: "Profile", url: "/profile", icon: User, roles: ["admin", "kitchen", "customer"] },
+  {
+    title: "Store Inventory",
+    url: "/inventory",
+    icon: Package,
+    roles: ["admin", "kitchen"],
+    permissions: ["sales_inventory"],
+  },
+  {
+    title: "Main Kitchen",
+    url: "/store-management",
+    icon: Store,
+    roles: ["admin", "kitchen"],
+    permissions: ["store_management"],
+  },
+  {
+    title: "Transactions",
+    url: "/transactions",
+    icon: CreditCard,
+    roles: ["admin"],
+    permissions: ["manage_store", "sales_inventory"],
+  },
+  {
+    title: "Kitchen Requests",
+    url: "/kitchen-requests",
+    icon: ShoppingCart,
+    roles: ["admin", "kitchen"],
+    permissions: ["kitchen_display", "sales_inventory"],
+  },
+  {
+    title: "Analytics & Reports",
+    url: "/dashboard/analytics",
+    icon: BarChart3,
+    roles: ["admin"],
+    permissions: ["analytics_reports"],
+  },
+  {
+    title: "Customer Analytics",
+    url: "/customer-analytics",
+    icon: BarChart3,
+    roles: ["admin"],
+    permissions: ["customer_analytics"],
+  },
+  {
+    title: "Customer Insights",
+    url: "/dashboard/customers",
+    icon: BarChart3,
+    roles: ["admin"],
+    permissions: ["customer_insights"],
+  },
+  {
+    title: "QR Code",
+    url: "/qr-code",
+    icon: ClipboardList,
+    roles: ["admin"],
+    permissions: ["qr_code"],
+  },
+  {
+    title: "EM Card",
+    url: "/emcard",
+    icon: CreditCard,
+    roles: ["admin"], 
+    permissions: ["menu_management"],
+  },
+  {
+    title: "User Management",
+    url: "/users",
+    icon: Users,
+    roles: ["admin"],
+    permissions: ["user_management"],
+  },
+  {
+    title: "Profile",
+    url: "/profile",
+    icon: User,
+    roles: ["admin", "kitchen", "customer"],
+    permissions: ["profile"],
+  },
 ];
-
-const getMenuItems = (user: User | null) =>
-  user
-    ? menuItems.filter((item) => item.roles.includes(user.role))
-    : menuItems.filter((item) => item.roles.includes("customer"));
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const [loading, setLoading] = React.useState(true);
+  const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
   const [selectedUrl, setSelectedUrl] = React.useState(location);
   
-  React.useEffect(() => setLoading(false), []);
+  // Fetch user permissions
+  React.useEffect(() => {
+    const fetchPermissions = async () => {
+      if (user) {
+        try {
+          const response = await apiRequest("GET", "/api/permissions/me");
+          const data = await response.json();
+          const perms = data.permissions?.map((p: any) => p.name) || [];
+          setUserPermissions(perms);
+        } catch (error) {
+          console.error("Failed to fetch permissions:", error);
+          setUserPermissions([]);
+        }
+      }
+      setLoading(false);
+    };
+
+    fetchPermissions();
+  }, [user]);
+
   React.useEffect(() => {
     setSelectedUrl(location);
   }, [location]);
 
-  const availableMenuItems = getMenuItems(user);
+  // Filter menu items by permissions only (permissions control what users see)
+  const getMenuItems = (user: User | null, permissions: string[]) => {
+    if (!user) {
+      return menuItems.filter((item) => item.roles.includes("customer"));
+    }
+
+    // For custom roles (not in the predefined roles), allow access based on permissions only
+    const predefinedRoles = ["admin", "kitchen", "customer"];
+    const isPredefinedRole = predefinedRoles.includes(user.role);
+
+    return menuItems.filter((item) => {
+      // If user has a predefined role, check both role and permissions
+      if (isPredefinedRole) {
+        // Check if user's role is allowed
+        if (!item.roles.includes(user.role)) {
+          return false;
+        }
+
+        // If item has permission requirements, check them
+        if (item.permissions && item.permissions.length > 0) {
+          // User needs at least one of the required permissions
+          return item.permissions.some(perm => permissions.includes(perm));
+        }
+
+        // No permission requirements, just role is enough
+        return true;
+      } else {
+        // For custom roles, only check permissions
+        if (item.permissions && item.permissions.length > 0) {
+          // User needs at least one of the required permissions
+          return item.permissions.some(perm => permissions.includes(perm));
+        }
+        
+        // If no permissions required, allow access by default for custom roles
+        return true;
+      }
+    });
+  };
+
+  // Get dynamic title based on user role
+  const getMenuItemTitle = (item: MenuItem, userRole: string | undefined) => {
+    // Special case for Docket Display - show different names for different roles
+    if (item.url === "/docket") {
+      if (userRole === "admin") {
+        return "Docket Display";
+      } else {
+        return "My Orders";
+      }
+    }
+    return item.title;
+  };
+
+  const availableMenuItems = getMenuItems(user, userPermissions);
 
   const handleLogout = () => {
     logout();
@@ -141,11 +301,11 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel className="flex justify-center py-6 px-4 border-b border-white/2 h-300">
               <div className="relative group">
-                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md group-hover:blur-lg transition-all duration-300"></div>
+                <div className="absolute inset-0 bg-white/10 rounded-full blur-md group-hover:blur-lg transition-all duration-300"></div>
                 <img
                   src="/nibbles.jpg"
-                  alt="Nibbles Kitchen Logo"
-                  className="relative h-30 w-40 rounded-2xl object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
+                  alt="Nibbles Logo"
+                  className="relative h-30 w-40 rounded-full object-cover shadow-lg border-2 border-white/20 transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
             </SidebarGroupLabel>
@@ -154,12 +314,17 @@ export function AppSidebar() {
             {user && (
               <div className="px-4 py-3 mb-2">
                 <div className="text-center">
-                  <p className="font-semibold text-[#50BAAB] text-sm truncate">
-                    {user.email}
+                  <p className="font-semibold text-[#4EB5A4] text-sm truncate">
+                    {user.username || user.email}
                   </p>
-                  <p className="text-[#50BAA8]/70 text-xs capitalize mt-1">
+                  {/* <p className="text-[#4EB5A4]/70 text-xs capitalize mt-1">
                     {user.role}
-                  </p>
+                  </p> */}
+                  {/* {userPermissions.length > 0 && (
+                    <p className="text-[#4EB5A4]/50 text-xs mt-1">
+                      {userPermissions.length} permissions
+                    </p>
+                  )} */}
                 </div>
               </div>
             )}
@@ -198,7 +363,7 @@ export function AppSidebar() {
                           <span className={`font-medium transition-all duration-200 ${
                             isActive ? "text-white" : "text-/90"
                           }`}>
-                            {item.title}
+                            {getMenuItemTitle(item, user?.role)}
                           </span>
                           
                           {/* Active indicator dot */}

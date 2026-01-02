@@ -20,9 +20,8 @@ export function Docket() {
     refetchInterval: 5000, // Fallback polling every 5 seconds
   });
 
-  const activeOrders = orders?.filter((order) => 
-    order.status !== "completed" && order.status !== "cancelled"
-  );
+  // Show all orders including completed ones
+  const activeOrders = orders;
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -75,16 +74,19 @@ export function Docket() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-      pending: { variant: "secondary", label: "Pending" },
-      preparing: { variant: "default", label: "Preparing" },
-      ready: { variant: "default", label: "Ready" },
-      completed: { variant: "secondary", label: "Completed" },
+    const statusColors: Record<string, string> = {
+      pending: "bg-yellow-200 text-yellow-800",
+      preparing: "bg-orange-200 text-orange-800",
+      ready: "",
+      completed: "bg-red-200 text-red-800",
+      cancelled: "bg-black-200 text-black-800",
     };
-    const config = variants[status] || { variant: "secondary", label: status };
+
+    const config = statusColors[status] || "bg-gray-500 text-gray-800";
+
     return (
-      <Badge variant={config.variant} className="text-xs">
-        {config.label}
+      <Badge variant="default" className={`text-xs capitalize ${config}`}>
+        {status}
       </Badge>
     );
   };
@@ -98,7 +100,7 @@ export function Docket() {
         </h2>
         <div className="flex items-center gap-1">
           <Badge variant="outline" className="text-xs">
-            {activeOrders?.length || 0} Active
+            {activeOrders?.length || 0} Orders
           </Badge>
           <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" title="Live updates" />
         </div>
@@ -156,7 +158,7 @@ export function Docket() {
       ) : (
         <div className="text-center py-4">
           <ChefHat className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">No active orders</p>
+          <p className="text-sm text-muted-foreground">No orders yet</p>
         </div>
       )}
     </div>

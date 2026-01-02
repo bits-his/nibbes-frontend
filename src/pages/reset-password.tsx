@@ -87,7 +87,7 @@ export default function ResetPassword() {
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Nibbles Kitchen</CardTitle>
+          <CardTitle className="text-2xl">Nibbles</CardTitle>
           <CardDescription>Enter your new password</CardDescription>
         </CardHeader>
         <form onSubmit={handleResetPassword}>

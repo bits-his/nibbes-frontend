@@ -1,9 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Update backend URL - use Vite's environment variable or default to production URL
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+// Local Development Backend (for development - comment out for production)
+// export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.1.136:5050';
+// export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://192.168.1.136:5050/ws';
 
-// WebSocket URL - use Vite's environment variable or default to production WebSocket URL
+// Online Production Backend (currently active)
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
 export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
 
 async function throwIfResNotOk(res: Response) {
@@ -83,8 +85,9 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes (300,000 ms)
+      retry: 1, // Retry once if the request fails
+      retryDelay: 1000, // Wait 1 second before retry
     },
     mutations: {
       retry: false,

@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
-import React, { useEffect, useState, useRef, createElement } from "react";
-import { queryClient } from "./lib/queryClient";
+import React, { useEffect, useState, useRef, createElement, lazy } from "react";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,24 +20,42 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import GuestCheckout from "@/pages/guest-checkout";
 import QRCodePage from "@/pages/qr-code";
 import ProfilePage from "@/pages/profile";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import AnalyticsPage from "@/pages/analytics";
 import { useAuth } from "./hooks/useAuth";
+import { useAutoLogout } from "./hooks/useAutoLogout";
 import { CartProvider } from "@/context/CartContext";
+import { getGuestSession } from "@/lib/guestSession";
+import { InstallPWA } from "@/components/InstallPWA";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
 import InventoryPage from "@/pages/inventory";
 import CustomerAnalyticsDashboard from "@/pages/customer-analytics-enhanced";
+import StoreManagement from "@/pages/store-management";
+import EMcard from "@/pages/EMcard";
+import ManagerReportsList from "@/pages/ManagerReportsList";
+import ManagerReportDetail from "@/pages/ManagerReportDetail";
+import ManagerReportsDashboard from "@/pages/ManagerReportsDashboard";
+import ManagerReportsByStaff from "@/pages/ManagerReportsByStaff";
+import KitchenRequests from "@/pages/KitchenRequests";
+import AboutPage from "@/pages/about";
+import ContactPage from "@/pages/contact";
+import TVDisplay from "@/pages/tv-display";
+import CompletedOrders from "@/pages/completed-orders";
+import Transactions from "@/pages/transactions";
+import PrintReceipt from "@/pages/print-receipt";
 
 // Define user type
 interface User {
   id: string;
   username: string;
   email: string;
-  role: "admin" | "kitchen" | "customer";
+  role: string; // Allow any role string
+  permissions?: string[]; // Add permissions array
   phone?: string;
   avatar?: string;
   notificationsEnabled?: boolean;
@@ -64,31 +82,102 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Check if user is already logged in (from localStorage)
     const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
+    const sessionStartTime = localStorage.getItem("sessionStartTime");
 
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-      } catch (e) {
-        // If there's an error parsing, clear the stored data
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+    const initializeUser = async () => {
+      // Check if session has expired (past midnight)
+      if (sessionStartTime) {
+        const sessionStart = new Date(parseInt(sessionStartTime));
+        const now = new Date();
+        const sessionStartDay = sessionStart.getDate();
+        const currentDay = now.getDate();
+
+        // If the day has changed, session expired
+        if (currentDay !== sessionStartDay) {
+          console.log('Session expired - clearing data and redirecting to login');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('sessionStartTime');
+          localStorage.removeItem('cart');
+          localStorage.removeItem('pendingCheckoutCart');
+          setUser(null);
+          setLoading(false);
+          window.location.href = '/login';
+          return;
+        }
       }
-    }
 
-    setLoading(false);
+      if (token && userData) {
+        try {
+          let parsedUser = JSON.parse(userData);
+          
+          // If the user doesn't have permissions loaded, fetch them
+          if (!parsedUser.permissions || parsedUser.permissions.length === 0) {
+            // Fetch user permissions and update the user object
+            try {
+              const response = await apiRequest('GET', '/api/permissions/me');
+              const data = await response.json();
+              if (data) {
+                const permissionNames = data.permissions?.map((p: any) => p.name) || [];
+                
+                // Update user with permissions
+                parsedUser = { ...parsedUser, permissions: permissionNames };
+                localStorage.setItem("user", JSON.stringify(parsedUser));
+              }
+            } catch (error) {
+              console.error("Error fetching permissions:", error);
+            }
+          }
+          
+          setUser(parsedUser);
+        } catch (e) {
+          // If there's an error parsing, clear the stored data
+          console.error("Error parsing user data:", e);
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setUser(null);
+        }
+      }
+      
+      setLoading(false);
+    };
+
+    initializeUser();
   }, []);
 
-  const login = (userData: User, token: string) => {
-    setUser(userData);
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(userData));
+  const login = async (userData: User, token: string) => {
+    try {
+      // Update token first
+      localStorage.setItem("token", token);
+      
+      // Fetch user permissions and update the user data before storing
+      const response = await apiRequest('GET', '/api/permissions/me');
+      const data = await response.json();
+      
+      if (data) {
+        const permissionNames = data.permissions?.map((p: any) => p.name) || [];
+        
+        // Update user with permissions
+        const userWithPermissions = { ...userData, permissions: permissionNames };
+        setUser(userWithPermissions);
+        localStorage.setItem("user", JSON.stringify(userWithPermissions));
+      } else {
+        // If permission fetch fails, still store the user without permissions
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+      }
+    } catch (error) {
+      console.error("Error fetching permissions on login:", error);
+      // If there's an error, still store the user without permissions
+      setUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData));
+    }
   };
 
   const logout = () => {
@@ -99,6 +188,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem('pendingCheckoutCart'); // Also clear any pending checkout cart
     localStorage.removeItem('location'); // Clear location data as well
   };
+
+  // Use auto logout hook
+  useAutoLogout(!!user);
 
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
@@ -111,21 +203,62 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 const ProtectedRoute: React.FC<{
   children: React.ReactNode;
   allowedRoles?: string[];
-}> = ({ children, allowedRoles }) => {
+  requiredPermissions?: string[]; // New: Check for required permissions
+}> = ({ children, allowedRoles, requiredPermissions }) => {
   const [location, setLocation] = useLocation();
   const { user, loading } = React.useContext(AuthContext);
 
+  // Predefined roles that use the old role-based system
+  const predefinedRoles = ["admin", "kitchen", "customer"];
+  const isPredefinedRole = user && predefinedRoles.includes(user.role);
+
+  // Check if user has required permissions
+  const hasRequiredPermissions = () => {
+    if (!requiredPermissions || requiredPermissions.length === 0) {
+      return true; // No permissions required
+    }
+
+    // Check permissions from user object (could be loaded on login or separately)
+    if (user && user.permissions) {
+      return requiredPermissions.some(perm => 
+        user.permissions && user.permissions.includes(perm)
+      );
+    }
+    
+    return false; // No permissions available
+  };
+
+  // Check if user has required roles (for backward compatibility)
+  const hasRequiredRoles = () => {
+    if (!allowedRoles || allowedRoles.length === 0) {
+      return true; // No roles required
+    }
+    
+    return user ? allowedRoles.includes(user.role) : false;
+  };
+
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        // Redirect to login if not authenticated
-        setLocation("/login");
-      } else if (allowedRoles && !allowedRoles.includes(user.role)) {
-        // Redirect to unauthorized page if user doesn't have required role
+    if (!loading && user) {
+      let hasAccess = false;
+
+      if (requiredPermissions && requiredPermissions.length > 0) {
+        // For permission-based access (new approach)
+        hasAccess = hasRequiredPermissions();
+      } else if (isPredefinedRole) {
+        // For predefined roles, check both role and permissions if needed
+        hasAccess = hasRequiredRoles();
+      } else {
+        // For custom roles, if no specific permissions required, allow access
+        hasAccess = true;
+      }
+
+      if (!hasAccess) {
         setLocation("/unauthorized");
       }
+    } else if (!loading && !user) {
+      setLocation("/login");
     }
-  }, [user, loading, allowedRoles, setLocation]);
+  }, [user, loading, requiredPermissions, allowedRoles, isPredefinedRole, setLocation]);
 
   if (loading) {
     return (
@@ -139,7 +272,14 @@ const ProtectedRoute: React.FC<{
     return null; // Redirect happens in useEffect
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  // Check permissions if required
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    if (!hasRequiredPermissions()) {
+      return null; // Redirect happens in useEffect
+    }
+  } 
+  // For predefined roles, check roles as fallback
+  else if (isPredefinedRole && allowedRoles && !hasRequiredRoles()) {
     return null; // Redirect happens in useEffect
   }
 
@@ -214,31 +354,41 @@ function Router() {
         )}
       />
       <Route
+        path="/guest-checkout"
+        component={() => (
+          <PublicRoute>
+            <GuestCheckout />
+          </PublicRoute>
+        )}
+      />
+      <Route
         path="/unauthorized"
         component={() => <div className="p-6">Unauthorized Access</div>}
       />
 
       {/* Public routes */}
       <Route path="/" component={CustomerMenu} />
-      <Route
-        path="/checkout"
-        component={Checkout}
-      />
+      <Route path="/about" component={AboutPage} />
+      <Route path="/contact" component={ContactPage} />
+      <Route path="/checkout" component={Checkout} />
+      <Route path="/staff/checkout" component={Checkout} />
+      <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
+      <Route path="/tv-display" component={TVDisplay} />
+      <Route path="/print-receipt" component={PrintReceipt} />
       <Route
         path="/order-status"
         component={() => (
-          <ProtectedRoute allowedRoles={["customer", "admin"]}>
+          <PublicRoute>
             <OrderStatus />
-          </ProtectedRoute>
+          </PublicRoute>
         )}
       />
 
-      {/* Protected routes with role checks inside the components or via ProtectedRoute */}
-      {/* Admins can access all pages, other roles only specific pages */}
+      {/* Protected routes with permission checks */}
       <Route
         path="/kitchen"
         component={() => (
-          <ProtectedRoute allowedRoles={["kitchen", "admin"]}>
+          <ProtectedRoute requiredPermissions={["kitchen_display"]}>
             <KitchenDisplay />
           </ProtectedRoute>
         )}
@@ -246,7 +396,7 @@ function Router() {
       <Route
         path="/staff"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["walk_in_orders"]}>
             <StaffOrders />
           </ProtectedRoute>
         )}
@@ -254,15 +404,23 @@ function Router() {
       <Route
         path="/orders"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["order_management"]}>
             <OrderManagement />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/completed-orders"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["order_management"]}>
+            <CompletedOrders />
           </ProtectedRoute>
         )}
       />
       <Route
         path="/menu"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
             <MenuManagement />
           </ProtectedRoute>
         )}
@@ -270,19 +428,23 @@ function Router() {
       <Route
         path="/users"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["user_management"]}>
             <UserManagement />
           </ProtectedRoute>
         )}
       />
       <Route
         path="/docket"
-        component={DucketDisplay}
+        component={() => (
+          <PublicRoute>
+            <DucketDisplay />
+          </PublicRoute>
+        )}
       />
       <Route
         path="/qr-code"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["qr_code"]}>
             <QRCodePage />
           </ProtectedRoute>
         )}
@@ -291,16 +453,61 @@ function Router() {
       <Route
         path="/profile"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen", "customer"]}>
+          <ProtectedRoute requiredPermissions={["profile"]}>
             <ProfilePage />
           </ProtectedRoute>
         )}
       />
-      
+
+      <Route
+        path="/emcard"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <EMcard />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-list"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportsList />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-list/:reportId"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportDetail />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-dashboard"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportsDashboard />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/manager-reports-by-staff/:staffName"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["menu_management"]}>
+            <ManagerReportsByStaff />
+          </ProtectedRoute>
+        )}
+      />
+
       <Route
         path="/customer-analytics"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["customer_analytics"]}>
             <CustomerAnalyticsPage />
           </ProtectedRoute>
         )}
@@ -309,7 +516,7 @@ function Router() {
       <Route
         path="/dashboard/analytics"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["analytics_reports"]}>
             <AnalyticsPage />
           </ProtectedRoute>
         )}
@@ -318,8 +525,36 @@ function Router() {
       <Route
         path="/inventory"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin", "kitchen"]}>
+          <ProtectedRoute requiredPermissions={["sales_inventory"]}>
             <InventoryPage />
+          </ProtectedRoute>
+        )}
+      />
+
+      
+      <Route
+        path="/store-management"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["store_management"]}>
+            <StoreManagement />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/kitchen-requests"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["kitchen_display", "sales_inventory"]}>
+            <KitchenRequests />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/transactions"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["manage_store", "sales_inventory"]}>
+            <Transactions />
           </ProtectedRoute>
         )}
       />
@@ -327,7 +562,7 @@ function Router() {
       <Route
         path="/dashboard/customers"
         component={() => (
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute requiredPermissions={["customer_insights"]}>
             <CustomerAnalyticsDashboard />
           </ProtectedRoute>
         )}
@@ -342,6 +577,7 @@ function Router() {
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
+  const guestSession = getGuestSession();
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -354,13 +590,15 @@ function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [location]);
 
-  // Don't show sidebar on login, signup, forgot password, and reset password pages
+  // Don't show sidebar on login, signup, forgot password, reset password, guest checkout, and tv-display pages
   const showSidebar =
     location !== "/login" &&
     location !== "/signup" &&
     location !== "/forgot-password" &&
     location !== "/reset-password" &&
-    location !== "/unauthorized";
+    location !== "/guest-checkout" &&
+    location !== "/unauthorized" &&
+    location !== "/tv-display";
 
   return (
     <div className="flex h-screen w-full">
@@ -377,7 +615,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-[#50BAA8] font-medium">
-                {user ? user.email || user.username : "Guest"}
+                {user ? (user.username || user.email) : guestSession ? `${guestSession.guestName} (Guest)` : "Guest"}
               </div>
               <div className="text-[#50BAA8]">
                 <svg
@@ -425,6 +663,7 @@ function App() {
               </Layout>
             </SidebarProvider>
             <Toaster />
+            <InstallPWA />
           </TooltipProvider>
         </CartProvider>
       </AuthProvider>

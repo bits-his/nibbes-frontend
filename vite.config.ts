@@ -30,6 +30,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"), // ✅ fixed here
     emptyOutDir: true,
+    manifest: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Optimize bundle size by splitting vendor code
+          'react-vendor': ['react', 'react-dom', 'wouter'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select'],
+        },
+      },
+    },
   },
   server: {
     fs: {

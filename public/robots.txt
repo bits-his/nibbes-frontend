@@ -1,0 +1,32 @@
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Public pages that should be crawled
+Allow: /about
+Allow: /contact
+Allow: /order-status
+
+# Disallow admin and internal pages from being indexed
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /kitchen
+Disallow: /staff
+Disallow: /orders
+Disallow: /menu
+Disallow: /users
+Disallow: /docket
+Disallow: /qr-code
+Disallow: /profile
+Disallow: /customer-analytics
+Disallow: /dashboard/*
+Disallow: /inventory
+Disallow: /store-management
+Disallow: /checkout
+Disallow: /guest-checkout
+Disallow: /unauthorized
+
+# Sitemap location
+Sitemap: https://nibbleskitchen.netlify.app/sitemap.xml

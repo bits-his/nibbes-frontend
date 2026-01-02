@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge } from "lucide-react"
+import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge, UserRound, ChefHat, UserCheck2, Shield } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
@@ -25,7 +26,7 @@ interface User {
   id: string
   username: string
   email: string
-  role: "admin" | "kitchen" | "customer"
+  role: string  // Role will be a string since it can come from API
   createdAt: string
 }
 
@@ -37,12 +38,22 @@ interface Permission {
   updatedAt: string
 }
 
+interface Role {
+  id: string
+  roleName: string
+  description: string
+  permissions: string // JSON string
+  createdAt: string
+  updatedAt: string
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
   const [permissionsLoading, setPermissionsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState<string>("all") // Added role filter
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -51,32 +62,75 @@ export default function UserManagement() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"admin" | "kitchen" | "customer">("customer")
+  const [role, setRole] = useState<string>("customer")
   const [showPassword, setShowPassword] = useState(false)
   const [editUsername, setEditUsername] = useState("")
   const [editEmail, setEditEmail] = useState("")
-  const [editRole, setEditRole] = useState<"admin" | "kitchen" | "customer">("customer")
+  const [editRole, setEditRole] = useState<string>("customer")
   const [selectedUserPermissions, setSelectedUserPermissions] = useState<string[]>([])
 
-  const filteredUsers = useMemo(() => {
-    if (!searchTerm) return users
+  // Roles management state
+  const [roles, setRoles] = useState<Role[]>([])
+  const [showRolesDialog, setShowRolesDialog] = useState(false)
+  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
+  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [roleName, setRoleName] = useState("")
+  const [roleDescription, setRoleDescription] = useState("")
+  const [selectedRolePermissions, setSelectedRolePermissions] = useState<string[]>([])
+  
+  // Delete confirmation dialogs
+  const [showDeleteUserDialog, setShowDeleteUserDialog] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
 
-    const term = searchTerm.toLowerCase()
-    return users.filter((user) => user.username.toLowerCase().includes(term) || user.email.toLowerCase().includes(term))
-  }, [users, searchTerm])
+  const filteredUsers = useMemo(() => {
+    let result = users;
+
+    // Apply role filter
+    if (roleFilter !== "all") {
+      result = result.filter(user => user.role === roleFilter);
+    }
+
+    // Apply search term filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter((user) => user.username.toLowerCase().includes(term) || user.email.toLowerCase().includes(term));
+    }
+
+    return result;
+  }, [users, searchTerm, roleFilter])
+
+  // Calculate user statistics
+  const userStats = useMemo(() => {
+    const adminCount = users.filter(user => user.role === "admin").length;
+    const kitchenCount = users.filter(user => user.role === "kitchen").length;
+    const customerCount = users.filter(user => user.role === "customer").length;
+    const customRoleCount = users.filter(user => !["admin", "kitchen", "customer"].includes(user.role)).length;
+    
+    return {
+      total: users.length,
+      admin: adminCount,
+      kitchen: kitchenCount,
+      customer: customerCount,
+      customRoles: customRoleCount
+    };
+  }, [users])
 
   const { toast } = useToast()
 
   useEffect(() => {
     fetchUsers()
     fetchPermissions()
+    fetchRoles()
   }, [])
 
   const fetchUsers = async () => {
     try {
       setLoading(true)
       const response = await apiRequest("GET", "/api/users")
-      const data = await response.json()
+      const data = await response.json(); const permissionsArray = Array.isArray(data) ? data : (data.permissions || [])
       setUsers(data)
     } catch (error: any) {
       toast({
@@ -92,9 +146,9 @@ export default function UserManagement() {
   const fetchPermissions = async () => {
     try {
       setPermissionsLoading(true)
-      const response = await apiRequest("GET", "/api/users-permissions")
-      const data = await response.json()
-      setPermissions(data)
+      const response = await apiRequest("GET", "/api/permissions")
+      const data = await response.json(); const permissionsArray = Array.isArray(data) ? data : (data.permissions || [])
+      setPermissions(permissionsArray)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -108,8 +162,8 @@ export default function UserManagement() {
 
   const fetchUserPermissions = async (userId: string) => {
     try {
-      const response = await apiRequest("GET", `/api/users/${userId}/permissions`)
-      const data = await response.json()
+      const response = await apiRequest("GET", `/api/permissions/user/${userId}`)
+      const data = await response.json(); const permissionsArray = Array.isArray(data) ? data : (data.permissions || [])
       return data.map((perm: Permission) => perm.name)
     } catch (error: any) {
       toast({
@@ -153,19 +207,24 @@ export default function UserManagement() {
     }
   }
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) {
-      return
-    }
+  const handleDeleteUserClick = (user: User) => {
+    setUserToDelete(user)
+    setShowDeleteUserDialog(true)
+  }
+
+  const handleDeleteUserConfirm = async () => {
+    if (!userToDelete) return
 
     try {
-      await apiRequest("DELETE", `/api/users/${userId}`)
+      await apiRequest("DELETE", `/api/users/${userToDelete.id}`)
 
       toast({
         title: "Success",
         description: "User deleted successfully",
       })
 
+      setShowDeleteUserDialog(false)
+      setUserToDelete(null)
       fetchUsers()
     } catch (error: any) {
       toast({
@@ -240,7 +299,7 @@ export default function UserManagement() {
     // Add new permissions
     for (const permissionName of permissionsToAdd) {
       try {
-        await apiRequest("POST", `/api/users/${userId}/permissions`, {
+        await apiRequest("POST", `/api/permissions/user/${userId}`, {
           permissionName
         })
       } catch (error) {
@@ -251,7 +310,7 @@ export default function UserManagement() {
     // Remove permissions
     for (const permissionName of permissionsToRemove) {
       try {
-        await apiRequest("DELETE", `/api/users/${userId}/permissions`, {
+        await apiRequest("DELETE", `/api/permissions/user/${userId}`, {
           permissionName
         })
       } catch (error) {
@@ -284,8 +343,142 @@ export default function UserManagement() {
       case "customer":
         return "bg-green-500/15 text-green-600 border border-green-200"
       default:
-        return "bg-gray-500/15 text-gray-600 border border-gray-200"
+        return "bg-purple-500/15 text-purple-600 border border-purple-200" // For custom roles
     }
+  }
+
+  // Roles management functions
+  const fetchRoles = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/roles")
+      const data = await response.json()
+      setRoles(data)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch roles",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreateRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    try {
+      await apiRequest("POST", "/api/roles", {
+        roleName,
+        description: roleDescription,
+        permissions: selectedRolePermissions,
+      })
+
+      toast({
+        title: "Success",
+        description: "Role created successfully",
+      })
+
+      setRoleName("")
+      setRoleDescription("")
+      setSelectedRolePermissions([])
+      setShowAddRoleDialog(false)
+      fetchRoles()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditRole = async (role: Role) => {
+    setEditingRole(role)
+    setRoleName(role.roleName)
+    setRoleDescription(role.description)
+
+    // Parse permissions JSON string
+    try {
+      const perms = JSON.parse(role.permissions)
+      setSelectedRolePermissions(perms)
+    } catch {
+      setSelectedRolePermissions([])
+    }
+
+    setShowEditRoleDialog(true)
+  }
+
+  const handleUpdateRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!editingRole) return
+
+    try {
+      await apiRequest("PATCH", `/api/roles/${editingRole.id}`, {
+        roleName,
+        description: roleDescription,
+        permissions: selectedRolePermissions,
+      })
+
+      toast({
+        title: "Success",
+        description: "Role updated successfully",
+      })
+
+      setShowEditRoleDialog(false)
+      setEditingRole(null)
+      setRoleName("")
+      setRoleDescription("")
+      setSelectedRolePermissions([])
+      fetchRoles()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteRoleClick = (role: Role) => {
+    setRoleToDelete(role)
+    setShowDeleteRoleDialog(true)
+  }
+
+  const handleDeleteRoleConfirm = async () => {
+    if (!roleToDelete) return
+
+    try {
+      await apiRequest("DELETE", `/api/roles/${roleToDelete.id}`)
+
+      toast({
+        title: "Success",
+        description: "Role deleted successfully",
+      })
+
+      setShowDeleteRoleDialog(false)
+      setRoleToDelete(null)
+      fetchRoles()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRolePermissionChange = (permissionName: string) => {
+    setSelectedRolePermissions(prev => {
+      if (prev.includes(permissionName)) {
+        return prev.filter(p => p !== permissionName)
+      } else {
+        return [...prev, permissionName]
+      }
+    })
+  }
+
+  const isRolePermissionSelected = (permissionName: string) => {
+    return selectedRolePermissions.includes(permissionName)
   }
 
   return (
@@ -298,12 +491,98 @@ export default function UserManagement() {
               <Users className="w-6 h-6 text-[#50BAA8]" />
             </div>
             <h1 className="text-4xl font-bold text-slate-900">User Management</h1>
+          
+          {/* <Button
+            onClick={() => {
+              fetchRoles()
+              setShowRolesDialog(true)
+            }}
+            variant="outline"
+            className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
+          >
+            <Shield className="w-5 h-5" />
+            Roles 
+          </Button> */}
           </div>
           <p className="text-slate-600 ml-11">Manage users, roles, and permissions across your system</p>
         </div>
 
-        {/* Search and Action Bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
+
+        {/* User Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Total Users</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1">{userStats.total}</p>
+                </div>
+                <div className="p-3 bg-slate-100 rounded-full">
+                  <Users className="w-6 h-6 text-slate-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Admins</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-1">{userStats.admin}</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <UserRound className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Kitchen</p>
+                  <p className="text-3xl font-bold text-[#50BAA8] mt-1">{userStats.kitchen}</p>
+                </div>
+                <div className="p-3 bg-[#50BAA8]/10 rounded-full">
+                  <ChefHat className="w-6 h-6 text-[#50BAA8]" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Customers</p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">{userStats.customer}</p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <UserCheck2 className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Custom Roles</p>
+                  <p className="text-3xl font-bold text-purple-600 mt-1">{userStats.customRoles}</p>
+                </div>
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <Shield className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search, Role Filter, and Action Bar */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-8">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
             <Input
@@ -314,6 +593,34 @@ export default function UserManagement() {
               className="pl-12 h-11 bg-white border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
             />
           </div>
+
+          {/* Role Filter */}
+          <div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full lg:w-[180px] h-11 border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20">
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {roles.map((roleItem) => (
+                  <SelectItem key={roleItem.id} value={roleItem.roleName}>
+                    {roleItem.roleName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => {
+              fetchRoles()
+              setShowRolesDialog(true)
+            }}
+            variant="outline"
+            className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
+          >
+            <Shield className="w-5 h-5" />
+            Roles
+          </Button>
 
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
             <DialogTrigger asChild>
@@ -391,9 +698,11 @@ export default function UserManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="kitchen">Kitchen</SelectItem>
-                      <SelectItem value="customer">Customer</SelectItem>
+                      {roles.map((roleItem) => (
+                        <SelectItem key={roleItem.id} value={roleItem.roleName}>
+                          {roleItem.roleName}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -415,10 +724,11 @@ export default function UserManagement() {
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-200 bg-slate-50">
             <CardTitle className="text-xl text-slate-900 flex items-center space-x-2">
-              Users List
-              {/* <Badge variant="" className="text-slate-700 ml-2">
-                {filteredUsers.length}
-              </Badge> */}
+              <span>Users List</span>
+              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full border border-slate-200 text-slate-700 bg-slate-50">
+                {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} 
+                {roleFilter !== 'all' && ` (${roleFilter})`}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -487,7 +797,7 @@ export default function UserManagement() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUserClick(user)}
                               className="border-red-200 text-red-600 hover:bg-red-50 gap-2"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -551,9 +861,11 @@ export default function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="kitchen">Kitchen</SelectItem>
-                    <SelectItem value="customer">Customer</SelectItem>
+                    {roles.map((roleItem) => (
+                      <SelectItem key={roleItem.id} value={roleItem.roleName}>
+                        {roleItem.roleName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -615,7 +927,337 @@ export default function UserManagement() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Roles Management Dialog */}
+        <Dialog open={showRolesDialog} onOpenChange={setShowRolesDialog}>
+          <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl flex items-center gap-2">
+                <Shield className="w-6 h-6 text-[#50BAA8]" />
+                Roles Management
+              </DialogTitle>
+              <DialogDescription>Create and manage custom roles with specific permissions</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => {
+                    setRoleName("")
+                    setRoleDescription("")
+                    setSelectedRolePermissions([])
+                    setShowAddRoleDialog(true)
+                  }}
+                  className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Role
+                </Button>
+              </div>
+
+              {roles.length === 0 ? (
+                <div className="text-center py-12">
+                  <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-600 font-medium">No roles created yet</p>
+                  <p className="text-slate-500 text-sm">Create your first custom role to get started</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50">
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Role Name</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Description</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Permissions</th>
+                        <th className="text-right py-3 px-4 font-semibold text-slate-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roles.map((role) => {
+                        let permCount = 0
+                        try {
+                          const perms = JSON.parse(role.permissions)
+                          permCount = perms.length
+                        } catch {
+                          permCount = 0
+                        }
+
+                        return (
+                          <tr key={role.id} className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className="py-3 px-4">
+                              <span className="font-medium text-slate-900">{role.roleName}</span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 text-sm max-w-xs truncate">
+                              {role.description}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#50BAA8]/10 text-[#50BAA8]">
+                                {permCount} permissions
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditRole(role)}
+                                  className="border-slate-200 hover:bg-slate-100"
+                                >
+                                  <Edit2 className="w-3 h-3 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteRoleClick(role)}
+                                  className="border-red-200 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Role Dialog */}
+        <Dialog open={showAddRoleDialog} onOpenChange={setShowAddRoleDialog}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Create New Role</DialogTitle>
+              <DialogDescription>Define a custom role with specific permissions</DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleCreateRole} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="role-name" className="text-slate-700 font-medium">
+                  Role Name
+                </Label>
+                <Input
+                  id="role-name"
+                  value={roleName}
+                  onChange={(e) => setRoleName(e.target.value)}
+                  placeholder="e.g., Driver, Manager, Cashier"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role-description" className="text-slate-700 font-medium">
+                  Description
+                </Label>
+                <Input
+                  id="role-description"
+                  value={roleDescription}
+                  onChange={(e) => setRoleDescription(e.target.value)}
+                  placeholder="Brief description of this role"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-slate-600" />
+                  <Label className="text-slate-700 font-medium">
+                    Permissions
+                  </Label>
+                </div>
+
+                {permissionsLoading ? (
+                  <div className="flex items-center justify-center h-24">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-slate-200 border-t-[#50BAA8] rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-slate-600 text-sm">Loading permissions...</p>
+                    </div>
+                  </div>
+                ) : permissions.length === 0 ? (
+                  <p className="text-slate-500 text-sm">No permissions available</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-4 border border-slate-200 rounded-md bg-slate-50">
+                    {permissions.map((permission) => (
+                      <div key={permission.id} className="flex items-center space-x-2 p-2 hover:bg-white rounded">
+                        <Checkbox
+                          id={`role-perm-${permission.id}`}
+                          checked={isRolePermissionSelected(permission.name)}
+                          onCheckedChange={() => handleRolePermissionChange(permission.name)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label
+                            htmlFor={`role-perm-${permission.id}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {permission.name}
+                          </Label>
+                          {permission.description && (
+                            <p className="text-xs text-slate-500">
+                              {permission.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowAddRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white">
+                  Create Role
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Role Dialog */}
+        <Dialog open={showEditRoleDialog} onOpenChange={setShowEditRoleDialog}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Edit Role</DialogTitle>
+              <DialogDescription>Update role details and permissions</DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleUpdateRole} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="edit-role-name" className="text-slate-700 font-medium">
+                  Role Name
+                </Label>
+                <Input
+                  id="edit-role-name"
+                  value={roleName}
+                  onChange={(e) => setRoleName(e.target.value)}
+                  placeholder="e.g., Driver, Manager, Cashier"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-role-description" className="text-slate-700 font-medium">
+                  Description
+                </Label>
+                <Input
+                  id="edit-role-description"
+                  value={roleDescription}
+                  onChange={(e) => setRoleDescription(e.target.value)}
+                  placeholder="Brief description of this role"
+                  required
+                  className="border-slate-200 focus:border-[#50BAA8] focus:ring-[#50BAA8]/20"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-slate-600" />
+                  <Label className="text-slate-700 font-medium">
+                    Permissions
+                  </Label>
+                </div>
+
+                {permissionsLoading ? (
+                  <div className="flex items-center justify-center h-24">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-slate-200 border-t-[#50BAA8] rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-slate-600 text-sm">Loading permissions...</p>
+                    </div>
+                  </div>
+                ) : permissions.length === 0 ? (
+                  <p className="text-slate-500 text-sm">No permissions available</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-4 border border-slate-200 rounded-md bg-slate-50">
+                    {permissions.map((permission) => (
+                      <div key={permission.id} className="flex items-center space-x-2 p-2 hover:bg-white rounded">
+                        <Checkbox
+                          id={`edit-role-perm-${permission.id}`}
+                          checked={isRolePermissionSelected(permission.name)}
+                          onCheckedChange={() => handleRolePermissionChange(permission.name)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label
+                            htmlFor={`edit-role-perm-${permission.id}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {permission.name}
+                          </Label>
+                          {permission.description && (
+                            <p className="text-xs text-slate-500">
+                              {permission.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowEditRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-[#50BAA8] hover:bg-[#3d9a8f] text-white">
+                  Update Role
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={showDeleteUserDialog} onOpenChange={setShowDeleteUserDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete user "{userToDelete?.username}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUserConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Role Confirmation Dialog */}
+      <AlertDialog open={showDeleteRoleDialog} onOpenChange={setShowDeleteRoleDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete role "{(roleToDelete as any)?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRoleConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

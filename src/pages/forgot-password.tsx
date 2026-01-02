@@ -89,7 +89,13 @@ export default function ForgotPassword() {
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Nibbles Kitchen</CardTitle>
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full blur opacity-20"></div>
+              <img src="/nibbles.jpg" alt="Nibbles Logo" className="h-20 w-auto object-contain relative rounded-full" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl">Nibbles</CardTitle>
           <CardDescription>
             {showPasswordInputs 
               ? "Enter your new password" 

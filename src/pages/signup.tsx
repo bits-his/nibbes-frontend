@@ -17,6 +17,7 @@ export default function Signup() {
   const { login } = useAuth()
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -45,6 +46,7 @@ export default function Signup() {
       const response = await apiRequest("POST", "/api/auth/register", {
         username,
         email,
+        phoneNumber,
         password,
       })
       const data = await response.json()
@@ -77,13 +79,13 @@ export default function Signup() {
         <CardHeader className="text-center pb-8">
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-teal-600 rounded-lg blur opacity-20"></div>
-              <img src="/nibbles.jpg" alt="Nibbles Kitchen Logo" className="h-20 w-auto object-contain relative" />
+              <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full blur opacity-20"></div>
+              <img src="/nibbles.jpg" alt="Nibbles Logo" className="h-20 w-auto object-contain relative rounded-full" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold text-slate-900 sr-only">Nibbles Kitchen</CardTitle>
+          <CardTitle className="text-3xl font-bold text-slate-900 sr-only">Nibbles</CardTitle>
           <CardDescription className="text-base text-slate-600 mt-2">
-            Join Nibbles Kitchen and start managing your orders
+            Join Nibbles and start managing your orders
           </CardDescription>
         </CardHeader>
 
@@ -121,6 +123,21 @@ export default function Signup() {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber" className="text-sm font-semibold text-slate-700">
+                Phone Number
+              </Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                placeholder="Enter your phone number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 required
                 className="h-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
               />

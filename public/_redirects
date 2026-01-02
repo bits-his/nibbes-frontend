@@ -1,0 +1,10 @@
+# Netlify Redirects for SPA + API Proxy
+
+# API proxy to backend
+/api/*  https://server.brainstorm.ng/nibbleskitchen/:splat  200
+
+# WebSocket proxy
+/ws  https://server.brainstorm.ng/nibbleskitchen/ws  200
+
+# SPA fallback - serve index.html for all other routes
+/*  /index.html  200

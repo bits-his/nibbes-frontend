@@ -13,7 +13,20 @@ export default function OrderStatus() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const orderId = new URLSearchParams(search).get("id");
+  const paymentStatus = new URLSearchParams(search).get("payment");
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [showPaymentMessage, setShowPaymentMessage] = useState(false);
+
+  // Show payment confirmation message if coming from payment gateway
+  useEffect(() => {
+    if (paymentStatus) {
+      setShowPaymentMessage(true);
+      // Remove payment parameter from URL after showing message
+      setTimeout(() => {
+        setShowPaymentMessage(false);
+      }, 5000);
+    }
+  }, [paymentStatus]);
 
   const { data: order, isLoading } = useQuery<OrderWithItems>({
     queryKey: ["/api/orders", orderId],
@@ -95,10 +108,28 @@ export default function OrderStatus() {
       case "ready":
         return "Your order is ready for pickup!";
       case "completed":
-        return "Order completed. Thank you for choosing Nibbles Kitchen!";
+        return "Order completed. Thank you for choosing Nibbles!";
       default:
         return "Order status unknown.";
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusColors: Record<string, string> = {
+      pending: "bg-yellow-200 px-6 py-3 capitalize text-yellow-800",
+      preparing: "bg-orange-200 px-6 py-3 capitalize text-orange-800",
+      ready: "px-6 py-3 capitalize",
+      completed: "bg-red-200 px-6 py-3 capitalize text-red-800",
+      cancelled: "bg-black-200 px-6 py-3 capitalize text-black-800",
+    };
+
+    const config = statusColors[status] || "bg-gray-500 text-gray-800 px-6 py-3";
+
+    return (
+      <Badge variant="default" className={config}>
+        {status}
+      </Badge>
+    );
   };
 
   return (
@@ -125,6 +156,23 @@ export default function OrderStatus() {
           </Card>
         ) : order ? (
           <div className="space-y-6">
+            {/* Payment Confirmation Message */}
+            {showPaymentMessage && (
+              <Card className="border-green-500 bg-green-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <div>
+                      <h3 className="font-semibold text-green-900">Payment Successful!</h3>
+                      <p className="text-sm text-green-700">
+                        Your payment has been confirmed. Your order is being prepared.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Order Status Card */}
             <Card>
               <CardHeader>
@@ -137,9 +185,9 @@ export default function OrderStatus() {
                 <div className="flex items-center gap-4 p-6 bg-muted rounded-lg">
                   {getStatusIcon(order.status)}
                   <div className="flex-1">
-                    <Badge variant="default" className="mb-2 capitalize">
-                      {order.status}
-                    </Badge>
+                    <div className="mb-2">
+                      {getStatusBadge(order.status)}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {getStatusMessage(order.status)}
                     </p>

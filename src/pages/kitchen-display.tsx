@@ -1,17 +1,33 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Clock, ChefHat } from "lucide-react";
+import { Clock, ChefHat, Search, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { autoPrintKitchenTicket } from "@/utils/kitchenPrint";
+import { usePrint } from "@/hooks/usePrint";
+import { ThermalPrinterPreview } from "@/components/ThermalPrinterPreview";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
+    const { printInvoice, convertToThermalPreview } = usePrint();
+
+  // const { printInvoice } = usePrint();
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+    const [showThermalPreview, setShowThermalPreview] = useState(false);
+  const [thermalPreviewData, setThermalPreviewData] = useState<any>(null);
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active"],
@@ -19,7 +35,7 @@ export default function KitchenDisplay() {
       const response = await apiRequest('GET', '/api/orders/active');
       const data = await response.json();
       // Sort orders by createdAt in descending order (newest first)
-      return data.sort((a: OrderWithItems, b: OrderWithItems) => 
+      return data.sort((a: OrderWithItems, b: OrderWithItems) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     },
@@ -39,12 +55,40 @@ export default function KitchenDisplay() {
       const data = JSON.parse(event.data);
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
-        
+
         if (data.type === "new_order") {
           toast({
             title: "New Order!",
             description: `Order #${data.orderNumber} has been placed.`,
           });
+          
+          // Automatically print kitchen ticket for new orders
+          const order = data.order || orders?.find(o => o.id === (data.orderId || data.order?.id));
+          if (order) {
+            console.log(`🖨️ Kitchen: Auto-printing ticket for order #${order.orderNumber}`);
+            try {
+              // Transform OrderWithItems to kitchen ticket format
+              const kitchenTicketData = {
+                orderNumber: order.orderNumber.toString(),
+                createdAt: order.createdAt,
+                customerName: order.customerName,
+                items: order.orderItems.map((item: any) => ({
+                  name: item.menuItem?.name || 'Unknown Item',
+                  quantity: item.quantity,
+                  price: item.price,
+                  specialInstructions: item.specialInstructions || null,
+                })),
+              };
+
+              // Auto-print kitchen ticket - COMMENTED OUT PER REQUEST
+              // autoPrintKitchenTicket(kitchenTicketData);
+            } catch (error) {
+              console.error('❌ Failed to print kitchen ticket:', error);
+              // Don't show error to user, just log it
+            }
+          } else {
+            console.warn('⚠️ Order not found for printing:', data);
+          }
         }
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
@@ -82,6 +126,32 @@ export default function KitchenDisplay() {
       });
     },
   });
+const convertOrderForPrint = (order: OrderWithItems) => {
+    return {
+      orderNumber: order.orderNumber.toString(),
+      createdAt: order.createdAt,
+      customerName: order.customerName,
+      orderType: order.orderType,
+      items: order.orderItems.map(item => ({
+        name: item.menuItem?.name || 'Unknown Item',
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+        specialInstructions: item.specialInstructions || null
+      })),
+      total: parseFloat(order.totalAmount),
+      paymentMethod: order.paymentMethod || 'N/A',
+      paymentStatus: order.paymentStatus || 'paid',
+      tendered: parseFloat(order.totalAmount)
+    };
+  };
+  // Function to print kitchen ticket for a specific order
+  const handlePrintPreview = (order: OrderWithItems) => {
+    const printData = convertOrderForPrint(order);
+    // Show thermal preview in dialog
+    const thermalData = convertToThermalPreview(printData);
+    setThermalPreviewData(thermalData);
+    setShowThermalPreview(true);
+  };
 
 const getStatusBadge = (status: string) => {
   const statusColors: Record<string, string> = {
@@ -101,35 +171,62 @@ const getStatusBadge = (status: string) => {
   );
 };
 
-  const activeOrders = orders?.filter((order) => 
-    order.status !== "completed" && order.status !== "cancelled"
-  );
+  // Filter orders based on search term
+  const filteredOrders = orders?.filter((order) => {
+    if (!searchTerm) return true; // If no search term, show all orders
+    // Check if the search term matches the order number (case insensitive)
+    return order.orderNumber.toString().toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
+
+  const activeOrders = filteredOrders?.filter((order) => {
+    // Exclude completed and cancelled orders
+    if (order.status === "completed" || order.status === "cancelled") {
+      return false;
+    }
+    // Exclude orders with pending payment (waiting for Interswitch confirmation)
+    if (order.paymentStatus === 'pending' && order.status === 'pending') {
+      return false;
+    }
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6">
       <div className="max-w-screen-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <ChefHat className="w-8 h-8 text-primary" />
-            <h1 className="font-serif text-4xl font-bold">Kitchen Display</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ChefHat className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Kitchen Display</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="px-4 py-2 text-base">
-              Active Orders: {activeOrders?.length || 0}
-            </Badge>
-            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            {/* Search Input - Made responsive */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by order number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full"
+              />
+            </div>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Badge variant="outline" className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base whitespace-nowrap">
+                Active: {activeOrders?.length || 0}
+              </Badge>
+              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+            </div>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
               <Card key={i} className="overflow-hidden">
-                <CardHeader className="p-6">
-                  <div className="h-12 bg-muted rounded animate-pulse mb-2" />
-                  <div className="h-6 bg-muted rounded animate-pulse" />
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="h-10 sm:h-12 bg-muted rounded animate-pulse mb-2" />
+                  <div className="h-5 sm:h-6 bg-muted rounded animate-pulse" />
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="space-y-2">
                     <div className="h-4 bg-muted rounded animate-pulse" />
                     <div className="h-4 bg-muted rounded animate-pulse" />
@@ -139,43 +236,43 @@ const getStatusBadge = (status: string) => {
             ))}
           </div>
         ) : activeOrders && activeOrders.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {activeOrders.map((order) => (
               <Card
                 key={order.id}
                 className="overflow-hidden border-2"
                 data-testid={`card-order-${order.id}`}
               >
-                <CardHeader className="p-6 bg-card space-y-3">
-                  <div className="flex items-start justify-between gap-4">
+                <CardHeader className="p-4 sm:p-6 bg-card space-y-2 sm:space-y-3">
+                  <div className="flex items-start justify-between gap-3 sm:gap-4">
                     <div>
-                      <div className="text-4xl font-bold mb-1" data-testid={`text-order-number-${order.id}`}>
+                      <div className="text-3xl sm:text-4xl font-bold mb-1" data-testid={`text-order-number-${order.id}`}>
                         #{order.orderNumber}
                       </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
+                      <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 sm:gap-2">
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                         {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
                       </div>
                     </div>
                     {getStatusBadge(order.status)}
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">{order.orderType}</Badge>
-                    <span className="font-medium">{order.customerName}</span>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <Badge variant="outline" className="text-xs sm:text-sm">{order.orderType}</Badge>
+                    <span className="font-medium text-sm sm:text-base">{order.customerName}</span>
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     {order.orderItems.map((item) => (
-                      <div key={item.id} className="flex justify-between gap-3" data-testid={`order-item-${item.id}`}>
+                      <div key={item.id} className="flex justify-between gap-2 sm:gap-3" data-testid={`order-item-${item.id}`}>
                         <div className="flex-1">
-                          <div className="font-semibold text-lg">
+                          <div className="font-semibold text-base sm:text-lg">
                             {item.quantity}x {item.menuItem.name}
                           </div>
                           {item.specialInstructions && (
-                            <div className="text-sm text-muted-foreground italic mt-1">
+                            <div className="text-xs sm:text-sm text-muted-foreground italic mt-1">
                               Note: {item.specialInstructions}
                             </div>
                           )}
@@ -185,17 +282,28 @@ const getStatusBadge = (status: string) => {
                   </div>
 
                   {order.notes && (
-                    <div className="pt-3 border-t">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="pt-2 sm:pt-3 border-t">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         <span className="font-semibold">Notes:</span> {order.notes}
                       </p>
                     </div>
                   )}
 
-                  <div className="pt-3 border-t space-y-2">
+                  <div className="pt-2 sm:pt-3 border-t space-y-2">
+                    {/* Print button for kitchen ticket */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full flex items-center gap-2"
+                      onClick={() => handlePrintPreview(order)}
+                    >
+                      <Printer className="w-4 h-4" />
+                      Print Ticket
+                    </Button>
+
                     {order.status === "pending" && (
                       <Button
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                         size="lg"
                         onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "preparing" })}
                         disabled={updateStatusMutation.isPending}
@@ -206,10 +314,9 @@ const getStatusBadge = (status: string) => {
                     )}
                     {order.status === "preparing" && (
                       <Button
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                         size="lg"
-                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
-                        disabled={updateStatusMutation.isPending}
+ onClick={() => handlePrintPreview(order)}
                         data-testid={`button-ready-${order.id}`}
                       >
                         Mark as Ready
@@ -217,14 +324,14 @@ const getStatusBadge = (status: string) => {
                     )}
                     {order.status === "ready" && (
                       <Button
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                         size="lg"
                         variant="secondary"
                         onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "completed" })}
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-complete-${order.id}`}
                       >
-                        Complete Order
+                        Collected ✅
                       </Button>
                     )}
                   </div>
@@ -233,14 +340,59 @@ const getStatusBadge = (status: string) => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-24">
-            <ChefHat className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
-            <h2 className="text-2xl font-semibold mb-2">No Active Orders</h2>
-            <p className="text-muted-foreground">
+          <div className="text-center py-16 sm:py-20 md:py-24">
+            <ChefHat className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 mx-auto text-muted-foreground mb-4 sm:mb-6" />
+            <h2 className="text-xl sm:text-2xl font-semibold mb-2">No Active Orders</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
               New orders will appear here automatically
             </p>
           </div>
         )}
+         {/* Thermal Printer Preview Dialog */}
+              <Dialog open={showThermalPreview} onOpenChange={setShowThermalPreview}>
+                <DialogContent className="max-w-md" data-testid="dialog-thermal-preview">
+                  <DialogHeader>
+                    <DialogTitle>Thermal Printer Preview</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex justify-center items-start bg-gray-100 p-4 rounded-lg overflow-auto max-h-[80vh]">
+                    {thermalPreviewData && (
+                      <div className="bg-white shadow-lg">
+                        <ThermalPrinterPreview {...thermalPreviewData} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (thermalPreviewData) {
+                          const printData = {
+                            orderNumber: thermalPreviewData.receiptNo || '',
+                            createdAt: thermalPreviewData.info?.createdAt || new Date().toISOString(),
+                            customerName: thermalPreviewData.name || '',
+                            orderType: '',
+                            items: (thermalPreviewData.data || []).map((item: any) => ({
+                              name: item.item_name || item.name || '',
+                              quantity: item.qty || item.quantity || 1,
+                              price: (item.amount || 0) / (item.qty || item.quantity || 1),
+                            })),
+                            total: thermalPreviewData.total || 0,
+                            paymentMethod: thermalPreviewData.modeOfPayment || 'Cash',
+                            paymentStatus: thermalPreviewData.paymentStatus || 'Full Payment',
+                            tendered: thermalPreviewData.amountPaid || 0,
+                          };
+                          printInvoice(printData);
+                        }
+                      }}
+                    >
+                      Print
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowThermalPreview(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
       </div>
     </div>
   );

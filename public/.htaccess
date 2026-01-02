@@ -1,0 +1,20 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Proxy API requests to backend
+  RewriteCond %{REQUEST_URI} ^/api/(.*)$
+  RewriteRule ^api/(.*)$ https://server.brainstorm.ng/nibbleskitchen/$1 [P,L]
+  
+  # Don't rewrite files or directories
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  
+  # Rewrite everything else to index.html for SPA routing
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Enable CORS
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+</IfModule>
