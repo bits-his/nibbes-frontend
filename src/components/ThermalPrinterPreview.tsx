@@ -70,7 +70,8 @@ export function ThermalPrinterPreview({
         width: "200px",
         padding: "5px 10px",
         fontSize: "8px",
-        fontFamily: "'Courier New', monospace",
+        fontFamily: "'Roboto', sans-serif",
+        fontWeight: "bold",
         backgroundColor: "#fff",
         color: "#000",
         margin: "0 auto",
@@ -93,17 +94,17 @@ export function ThermalPrinterPreview({
           />
         )}
         {facilityInfo.printTitle && (
-          <div style={{ fontSize: "10px", fontFamily: "'Courier New', monospace" }}>
+          <div style={{ fontSize: "10px", fontFamily: "'Roboto', sans-serif", fontWeight: "bold" }}>
             {facilityInfo.printTitle}
           </div>
         )}
         {facilityInfo.printSubtitle1 && (
-          <div style={{ fontSize: "8px", fontFamily: "'Courier New', monospace" }}>
+          <div style={{ fontSize: "8px", fontFamily: "'Roboto', sans-serif", fontWeight: "bold" }}>
             {facilityInfo.printSubtitle1}
           </div>
         )}
         {facilityInfo.printSubtitle2 && (
-          <div style={{ fontSize: "8px", fontFamily: "'Courier New', monospace" }}>
+          <div style={{ fontSize: "8px", fontFamily: "'Roboto', sans-serif", fontWeight: "bold" }}>
             {facilityInfo.printSubtitle2}
           </div>
         )}
@@ -133,7 +134,7 @@ export function ThermalPrinterPreview({
       )}
 
       {/* Account Name */}
-      <div style={{ display: "flex", flexDirection: "row", margin: "3px 0" }}>
+      <div style={{ display: "flex", flexDirection: "row", margin: "3px 0", fontWeight: "bold" }}>
         <span style={{ marginRight: "5px" }}>Account name:</span>
         <div>
           <div>{name === "" ? "Walk-In" : `${name}${patient_id ? `(${patient_id})` : ""}`}</div>
@@ -171,18 +172,18 @@ export function ThermalPrinterPreview({
           return (
             <div key={index} style={{ display: "flex", flexDirection: "row" }}>
               <div style={{ width: `${COL1_WIDTH}%` }}>
-                <div style={{ margin: "1px 0" }}>{itemName}</div>
+                <div style={{ margin: "1px 0", fontWeight: "bold" }}>{itemName}</div>
               </div>
               <div style={{ width: `${COLN_WIDTH}%` }}>
-                <div style={{ margin: "1px 0" }}>
+                <div style={{ margin: "1px 0", fontWeight: "bold" }}>
                   {formatNumber(unitPrice)}
                 </div>
               </div>
               <div style={{ width: `${COLN_WIDTH}%` }}>
-                <div style={{ margin: "1px 0" }}>{formatNumber(qty)}</div>
+                <div style={{ margin: "1px 0", fontWeight: "bold" }}>{formatNumber(qty)}</div>
               </div>
               <div style={{ width: `${COL_AMT_WIDTH}%` }}>
-                <div style={{ margin: "1px 0", textAlign: "right" }}>
+                <div style={{ margin: "1px 0", textAlign: "right", fontWeight: "bold" }}>
                   {formatNumber(amount)}
                 </div>
               </div>
@@ -193,7 +194,7 @@ export function ThermalPrinterPreview({
         {/* Total Row */}
         <div style={{ display: "flex", flexDirection: "row" }}>
           <div style={{ width: `${COL1_WIDTH}%` }}>
-            <div style={{ margin: "1px 0" }}>Total</div>
+            <div style={{ margin: "1px 0", fontWeight: "bold" }}>Total</div>
           </div>
           <div style={{ width: `${COLN_WIDTH}%` }}>
             <div style={{ margin: "1px 0" }}></div>
@@ -204,7 +205,7 @@ export function ThermalPrinterPreview({
               fontWeight: "bold",
             }}
           >
-            <div style={{ margin: "1px 0", textAlign: "right" }}>
+            <div style={{ margin: "1px 0", textAlign: "right", fontWeight: "bold" }}>
               ₦ {formatNumber(total)}
             </div>
           </div>
@@ -220,7 +221,7 @@ export function ThermalPrinterPreview({
             }}
           >
             <div style={{ width: `${COL1_WIDTH}%` }}>
-              <div style={{ margin: "1px 0" }}>Discount</div>
+              <div style={{ margin: "1px 0", fontWeight: "bold" }}>Discount</div>
             </div>
             <div style={{ width: `${COLN_WIDTH}%` }}>
               <div style={{ margin: "1px 0" }}></div>
@@ -231,7 +232,7 @@ export function ThermalPrinterPreview({
                 fontWeight: "bold",
               }}
             >
-              <div style={{ margin: "1px 0", textAlign: "right" }}>
+              <div style={{ margin: "1px 0", textAlign: "right", fontWeight: "bold" }}>
                 ₦ {formatNumber(discount)}
               </div>
             </div>
@@ -247,7 +248,7 @@ export function ThermalPrinterPreview({
           }}
         >
           <div style={{ width: `${COL1_WIDTH}%` }}>
-            <div style={{ margin: "1px 0" }}>Amount Paid</div>
+            <div style={{ margin: "1px 0", fontWeight: "bold" }}>Amount Paid</div>
           </div>
           <div style={{ width: `${COLN_WIDTH}%` }}>
             <div style={{ margin: "1px 0" }}></div>
@@ -260,7 +261,7 @@ export function ThermalPrinterPreview({
               paddingTop: "3px",
             }}
           >
-            <div style={{ margin: "1px 0", textAlign: "right" }}>
+            <div style={{ margin: "1px 0", textAlign: "right", fontWeight: "bold" }}>
               ₦ {formatNumber(amountPaid)}
             </div>
           </div>
@@ -270,7 +271,7 @@ export function ThermalPrinterPreview({
         {paymentStatus !== "Full Payment" && (
           <div style={{ display: "flex", flexDirection: "row" }}>
             <div style={{ width: `${COL1_WIDTH}%` }}>
-              <div style={{ margin: "1px 0" }}>Grand Total</div>
+              <div style={{ margin: "1px 0", fontWeight: "bold" }}>Grand Total</div>
             </div>
             <div style={{ width: `${COLN_WIDTH}%` }}>
               <div style={{ margin: "1px 0" }}></div>
@@ -281,7 +282,7 @@ export function ThermalPrinterPreview({
                 fontWeight: "bold",
               }}
             >
-              <div style={{ margin: "1px 0", textAlign: "right" }}>
+              <div style={{ margin: "1px 0", textAlign: "right", fontWeight: "bold" }}>
                 ₦ {formatNumber(grandTotal || 0)}
               </div>
             </div>
@@ -298,7 +299,7 @@ export function ThermalPrinterPreview({
             }}
           >
             <div style={{ width: `${COL1_WIDTH}%` }}>
-              <div style={{ margin: "1px 0" }}>Balance</div>
+              <div style={{ margin: "1px 0", fontWeight: "bold" }}>Balance</div>
             </div>
             <div style={{ width: `${COLN_WIDTH}%` }}>
               <div style={{ margin: "1px 0" }}></div>
@@ -311,7 +312,7 @@ export function ThermalPrinterPreview({
                 paddingTop: "3px",
               }}
             >
-              <div style={{ margin: "1px 0", textAlign: "right" }}>
+              <div style={{ margin: "1px 0", textAlign: "right", fontWeight: "bold" }}>
                 ₦ {formatNumber(balance || 0)}
               </div>
             </div>
@@ -325,6 +326,7 @@ export function ThermalPrinterPreview({
           display: "flex",
           flexDirection: "row",
           justifyContent: "space-between",
+          fontWeight: "bold",
         }}
       >
         <div style={{ display: "flex", flexDirection: "row", margin: "3px 0" }}>
@@ -344,6 +346,7 @@ export function ThermalPrinterPreview({
             fontSize: "8px",
             textTransform: "capitalize",
             textAlign: "center",
+            fontWeight: "bold",
           }}
         >
           Thanks for coming, get well soon!
@@ -356,8 +359,9 @@ export function ThermalPrinterPreview({
           fontSize: "8px",
           marginTop: "6px",
           textAlign: "center",
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "'Roboto', sans-serif",
           fontStyle: "italic",
+          fontWeight: "bold",
           marginBottom: "30px",
         }}
       >

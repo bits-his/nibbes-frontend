@@ -181,27 +181,30 @@ const getStatusCardColor = (status: string) => {
             <Badge variant="outline" className="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base whitespace-nowrap">
               Orders: {activeOrders?.length || 0}
             </Badge>
-            <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">Live updates</span>
-              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
-            </div>
+            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
           </div>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
               <Card key={i} className="overflow-hidden">
                 <CardHeader className="p-6">
-                  <div className="h-8 bg-muted rounded animate-pulse mb-2" />
+                  <div className="h-12 bg-muted rounded animate-pulse mb-2" />
                   <div className="h-6 bg-muted rounded animate-pulse" />
                 </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 bg-muted rounded animate-pulse" />
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>
-        ) : activeOrders && activeOrders.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeOrders.map((order) => (
+        ) : orders && orders.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {orders.map((order) => (
               <Card 
                 key={order.id} 
                 className={`overflow-hidden border-2 hover:shadow-lg transition-shadow ${getStatusCardColor(order.status)}`}

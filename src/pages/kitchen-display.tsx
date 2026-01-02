@@ -9,25 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { autoPrintKitchenTicket } from "@/utils/kitchenPrint";
 import { usePrint } from "@/hooks/usePrint";
-import { ThermalPrinterPreview } from "@/components/ThermalPrinterPreview";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
-    const { printInvoice, convertToThermalPreview } = usePrint();
-
-  // const { printInvoice } = usePrint();
+  const { printInvoice } = usePrint();
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
-    const [showThermalPreview, setShowThermalPreview] = useState(false);
-  const [thermalPreviewData, setThermalPreviewData] = useState<any>(null);
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active"],
@@ -147,10 +135,8 @@ const convertOrderForPrint = (order: OrderWithItems) => {
   // Function to print kitchen ticket for a specific order
   const handlePrintPreview = (order: OrderWithItems) => {
     const printData = convertOrderForPrint(order);
-    // Show thermal preview in dialog
-    const thermalData = convertToThermalPreview(printData);
-    setThermalPreviewData(thermalData);
-    setShowThermalPreview(true);
+    // Print exactly like order management (with receipt type and card list)
+    printInvoice(printData, 'receipt');
   };
 
 const getStatusBadge = (status: string) => {
@@ -289,52 +275,55 @@ const getStatusBadge = (status: string) => {
                     </div>
                   )}
 
-                  <div className="pt-2 sm:pt-3 border-t space-y-2">
-                    {/* Print button for kitchen ticket */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full flex items-center gap-2"
-                      onClick={() => handlePrintPreview(order)}
-                    >
-                      <Printer className="w-4 h-4" />
-                      Print Ticket
-                    </Button>
+                  <div className="pt-2 sm:pt-3 border-t">
+                    <div className="flex gap-2">
+                      {/* Print button for kitchen ticket */}
+                      
 
-                    {order.status === "pending" && (
+                      {order.status === "pending" && (
+                        <Button
+                          className="flex-1 text-sm sm:text-base"
+                          size="lg"
+                          onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "preparing" })}
+                          disabled={updateStatusMutation.isPending}
+                          data-testid={`button-start-${order.id}`}
+                        >
+                          Start Preparing
+                        </Button>
+                      )}
+                      {order.status === "preparing" && (
+                        <Button
+                          className="flex-1 text-sm sm:text-base"
+                          size="lg"
+                          onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
+                          disabled={updateStatusMutation.isPending}
+                          data-testid={`button-ready-${order.id}`}
+                        >
+                          Mark as Ready
+                        </Button>
+                      )}
+                      {order.status === "ready" && (
+                        <Button
+                          className="flex-1 text-sm sm:text-base"
+                          size="lg"
+                          variant="secondary"
+                          onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "completed" })}
+                          disabled={updateStatusMutation.isPending}
+                          data-testid={`button-complete-${order.id}`}
+                        >
+                          Collected ✅
+                        </Button>
+                      )}
                       <Button
-                        className="w-full text-sm sm:text-base"
-                        size="lg"
-                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "preparing" })}
-                        disabled={updateStatusMutation.isPending}
-                        data-testid={`button-start-${order.id}`}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 flex items-center justify-center gap-2"
+                        onClick={() => handlePrintPreview(order)}
                       >
-                        Start Preparing
+                        <Printer className="w-4 h-4" />
+                        Print Ticket
                       </Button>
-                    )}
-                    {order.status === "preparing" && (
-                      <Button
-                        className="w-full text-sm sm:text-base"
-                        size="lg"
-                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
-                        disabled={updateStatusMutation.isPending}
-                        data-testid={`button-ready-${order.id}`}
-                      >
-                        Mark as Ready
-                      </Button>
-                    )}
-                    {order.status === "ready" && (
-                      <Button
-                        className="w-full text-sm sm:text-base"
-                        size="lg"
-                        variant="secondary"
-                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "completed" })}
-                        disabled={updateStatusMutation.isPending}
-                        data-testid={`button-complete-${order.id}`}
-                      >
-                        Collected ✅
-                      </Button>
-                    )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -349,51 +338,6 @@ const getStatusBadge = (status: string) => {
             </p>
           </div>
         )}
-         {/* Thermal Printer Preview Dialog */}
-              <Dialog open={showThermalPreview} onOpenChange={setShowThermalPreview}>
-                <DialogContent className="max-w-md" data-testid="dialog-thermal-preview">
-                  <DialogHeader>
-                    <DialogTitle>Thermal Printer Preview</DialogTitle>
-                  </DialogHeader>
-                  <div className="flex justify-center items-start bg-gray-100 p-4 rounded-lg overflow-auto max-h-[80vh]">
-                    {thermalPreviewData && (
-                      <div className="bg-white shadow-lg">
-                        <ThermalPrinterPreview {...thermalPreviewData} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-end gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (thermalPreviewData) {
-                          const printData = {
-                            orderNumber: thermalPreviewData.receiptNo || '',
-                            createdAt: thermalPreviewData.info?.createdAt || new Date().toISOString(),
-                            customerName: thermalPreviewData.name || '',
-                            orderType: '',
-                            items: (thermalPreviewData.data || []).map((item: any) => ({
-                              name: item.item_name || item.name || '',
-                              quantity: item.qty || item.quantity || 1,
-                              price: (item.amount || 0) / (item.qty || item.quantity || 1),
-                            })),
-                            total: thermalPreviewData.total || 0,
-                            paymentMethod: thermalPreviewData.modeOfPayment || 'Cash',
-                            paymentStatus: thermalPreviewData.paymentStatus || 'Full Payment',
-                            tendered: thermalPreviewData.amountPaid || 0,
-                          };
-                          printInvoice(printData);
-                        }
-                      }}
-                    >
-                      Print
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowThermalPreview(false)}>
-                      Close
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
       </div>
     </div>
   );

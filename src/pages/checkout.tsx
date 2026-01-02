@@ -20,8 +20,7 @@ import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
-import { PDFViewer } from "@react-pdf/renderer"
-import WalkInReceipt from "@/components/WalkInReceipt"
+import { usePrint } from "@/hooks/usePrint"
 
 // Extend Window interface for Interswitch
 declare global {
@@ -78,10 +77,7 @@ export default function Checkout() {
   const { toast} = useToast()
   const { user, loading } = useAuth()
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
-  
-  // PDF Receipt State - Show inline instead of new tab
-  const [showPdfReceipt, setShowPdfReceipt] = useState(false)
-  const [pdfReceiptData, setPdfReceiptData] = useState<any>(null)
+  const { printInvoice } = usePrint()
   
   const [cart, setCart] = useState<CartItem[]>([])
   const [walkInOrder, setWalkInOrder] = useState<any>(null)
@@ -318,8 +314,10 @@ export default function Checkout() {
     calculateDeliveryFee()
   }, [form.watch("orderType"), locationData])
 
+  // For walk-in orders, calculate subtotal from items (total already includes VAT)
+  // For regular orders, calculate from cart
   const subtotal = walkInOrder 
-    ? (walkInOrder.total || (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0))
+    ? (walkInOrder.items?.reduce((sum: number, item: any) => sum + (Number.parseFloat(item.price) * item.quantity), 0) || 0)
     : cart.reduce((sum, item) => sum + Number.parseFloat(item.menuItem.price) * item.quantity, 0)
 
   // Helper function to try getting location with specific options
@@ -828,33 +826,20 @@ export default function Checkout() {
         tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
       }
       
-      // 🖨️ Show PDF receipt inline for walk-in orders
-      console.log('🖨️ Showing PDF receipt for walk-in order #' + data.orderNumber)
+      // 🖨️ Show print preview immediately for walk-in orders
+      console.log('🖨️ Showing print preview for walk-in order #' + data.orderNumber)
       
-      // Prepare receipt data
-      const receiptData = {
-        orderNumber: orderDataForPrint.orderNumber,
-        createdAt: orderDataForPrint.createdAt,
-        customerName: orderDataForPrint.customerName,
-        items: orderDataForPrint.items,
-        total: orderDataForPrint.total,
-        paymentMethod: orderDataForPrint.paymentMethod,
-        tendered: orderDataForPrint.tendered
-      }
+      // Show print preview immediately with walk-in receipt type (no card list)
+      printInvoice(orderDataForPrint, 'walk-in')
       
-      console.log('📄 Setting PDF receipt data:', receiptData)
+      // Clear walk-in order and redirect after a short delay to allow print window to open
+      setTimeout(() => {
+        setWalkInOrder(null)
+        localStorage.removeItem("pendingWalkInOrder")
+        // Redirect to staff page to avoid blank page
+        setLocation("/staff")
+      }, 500)
       
-      // Show PDF inline on the same page
-      setPdfReceiptData(receiptData)
-      setShowPdfReceipt(true)
-      
-      // Clear walk-in order so the payment form doesn't show
-      setWalkInOrder(null)
-      
-      console.log('📄 PDF receipt should now be visible')
-      console.log('📄 walkInOrder cleared, showPdfReceipt:', true)
-      
-      localStorage.removeItem("pendingWalkInOrder")
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
     },
     onError: () => {
@@ -1261,21 +1246,40 @@ export default function Checkout() {
               <div className="border-t pt-6">
                 {!multiPaymentEnabled && (
                   <div className="space-y-3 mb-6">
-                    {/* Subtotal */}
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Subtotal</span>
-                      <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {/* VAT */}
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>VAT (7.5%)</span>
-                      <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {/* Total */}
-                    <div className="flex justify-between text-2xl font-bold border-t pt-3">
-                      <span>Total</span>
-                      <span className="text-[#4EB5A4]">₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
+                    {/* VAT - show for both walk-in and regular orders */}
+                    {walkInOrder && walkInOrder.total ? (
+                      // Walk-in order: show breakdown with VAT (total already includes VAT)
+                      <>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Subtotal (excl. VAT)</span>
+                          <span>₦{(walkInOrder.total / 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT (7.5%)</span>
+                          <span>₦{(walkInOrder.total - (walkInOrder.total / 1.075)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-2xl font-bold border-t pt-3">
+                          <span>Total</span>
+                          <span className="text-[#4EB5A4]">₦{walkInOrder.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </>
+                    ) : (
+                      // Regular checkout - calculate and show VAT
+                      <>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Subtotal</span>
+                          <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT (7.5%)</span>
+                          <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-2xl font-bold border-t pt-3">
+                          <span>Total</span>
+                          <span className="text-[#4EB5A4]">₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -1294,49 +1298,6 @@ export default function Checkout() {
     )
   }
 
-  // Show PDF Receipt inline (after order is created)
-  if (showPdfReceipt && pdfReceiptData) {
-    console.log('📄 Rendering PDF Receipt section')
-    console.log('📄 pdfReceiptData:', pdfReceiptData)
-    
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="mb-6 flex items-center justify-between">
-            <Button
-              variant="ghost"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                console.log('🔙 Back button clicked')
-                setShowPdfReceipt(false)
-                setPdfReceiptData(null)
-                setLocation("/staff")
-              }}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Walk-in Orders
-            </Button>
-            
-            <div className="text-lg font-semibold text-foreground">
-              Receipt for Order #{pdfReceiptData?.orderNumber || 'N/A'}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-4" style={{ height: 'calc(100vh - 200px)' }}>
-            {pdfReceiptData ? (
-              <PDFViewer width="100%" height="100%" showToolbar={true}>
-                <WalkInReceipt orderData={pdfReceiptData} />
-              </PDFViewer>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading receipt...</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   if (cart.length === 0) {
     return null
@@ -1641,8 +1602,8 @@ export default function Checkout() {
                   </Card>
                 )}
 
-                {/* Payment Method Card */}
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                {/* Payment Method Card - Removed: Payment automatically processed via Interswitch when order is completed */}
+                {/* <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <CardTitle className="text-lg">3. Payment Method</CardTitle>
                   </CardHeader>
@@ -1676,7 +1637,6 @@ export default function Checkout() {
                       })}
                     </RadioGroup>
 
-                    {/* Payment method specific information */}
                     {selectedPaymentMethod === 'card' && (
                       <Alert className="border-purple-200 bg-purple-50">
                         <Lock className="h-4 w-4" />
@@ -1709,7 +1669,7 @@ export default function Checkout() {
                       </Alert>
                     )}
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
 
               {/* Right column - Order Summary */}

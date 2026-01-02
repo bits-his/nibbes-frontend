@@ -102,13 +102,23 @@ export default function CustomerMenu() {
 
   const filteredItems = menuItems?.filter(
     (item) =>
-      item.available && // Only show available items to customers
+      // Show all items (including unavailable) - they will show as "sold out"
       (selectedCategory === "All" || item.category === selectedCategory) &&
       (searchQuery === "" ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const addToCart = (menuItem: MenuItem) => {
+    // Prevent adding unavailable items to cart
+    if (!menuItem.available) {
+      toast({
+        title: "Item Unavailable",
+        description: `${menuItem.name} is currently sold out.`,
+        variant: "destructive",
+        duration: 2000,
+      });
+      return;
+    }
     addToCartContext({ menuItem: menuItem as any });
     toast({
       title: "Added to Cart",
@@ -417,9 +427,16 @@ export default function CustomerMenu() {
                     <img
                       src={item.imageUrl}
                       alt={item.name}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${!item.available ? 'opacity-60' : ''}`}
                     />
-                    {isInCart && (
+                    {!item.available && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <Badge variant="secondary" className="text-sm sm:text-base font-semibold bg-gray-600 text-white px-4 py-2">
+                          Sold Out
+                        </Badge>
+                      </div>
+                    )}
+                    {isInCart && item.available && (
                       <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold">
                         {cartItem?.quantity}
                       </div>
@@ -456,6 +473,7 @@ export default function CustomerMenu() {
                             size="sm"
                             variant="ghost"
                             onClick={() => item.id && updateQuantity(String(item.id), 1)}
+                            disabled={!item.available}
                             data-testid={`button-plus-${item.id}`}
                             className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
                           >
@@ -471,16 +489,16 @@ export default function CustomerMenu() {
                           className="text-xs px-2 py-1.5"
                         >
                           <Plus className="w-2.5 h-2.5 mr-1" />
-                          Add
+                          {item.available ? 'Add' : 'Sold Out'}
                         </Button>
                       )}
                     </div>
                     {!item.available && (
                       <Badge
                         variant="secondary"
-                        className="w-full justify-center text-xs"
+                        className="w-full justify-center text-sm sm:text-base font-semibold bg-gray-600 text-white py-2"
                       >
-                        Currently Unavailable
+                        Sold Out
                       </Badge>
                     )}
                   </CardContent>
