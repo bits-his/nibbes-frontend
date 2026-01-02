@@ -35,9 +35,12 @@ import type { OrderWithItems } from "@shared/schema";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
+import { usePrint } from "@/hooks/usePrint";
+import { ThermalPrinterPreview } from "@/components/ThermalPrinterPreview";
 
 export default function OrderManagement() {
   const { toast } = useToast();
+  const { printInvoice, convertToThermalPreview } = usePrint();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
@@ -181,6 +184,34 @@ export default function OrderManagement() {
       });
     },
   });
+
+  // Helper function to convert OrderWithItems to print format
+  const convertOrderForPrint = (order: OrderWithItems) => {
+    return {
+      orderNumber: order.orderNumber.toString(),
+      createdAt: order.createdAt,
+      customerName: order.customerName,
+      orderType: order.orderType,
+      items: order.orderItems.map(item => ({
+        name: item.menuItem?.name || 'Unknown Item',
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+        specialInstructions: item.specialInstructions || null
+      })),
+      total: parseFloat(order.totalAmount),
+      paymentMethod: order.paymentMethod || 'N/A',
+      paymentStatus: order.paymentStatus || 'paid',
+      tendered: parseFloat(order.totalAmount)
+    };
+  };
+
+  const handlePrintPreview = (order: OrderWithItems) => {
+    const printData = convertOrderForPrint(order);
+    // Show thermal preview in dialog
+    const thermalData = convertToThermalPreview(printData);
+    setThermalPreviewData(thermalData);
+    setShowThermalPreview(true);
+  };
 
   const filteredOrders = orders?.filter((order) => {
     const matchesSearch =
@@ -442,14 +473,10 @@ const getStatusBadge = (status: string) => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    // Open receipt in new tab
-                                    const receiptUrl = `/print-receipt?order_id=${order.id}&order_number=${order.orderNumber}&type=order_management`;
-                                    window.open(receiptUrl, '_blank');
-                                  }}
+                                  onClick={() => handlePrintPreview(order)}
                                 >
                                   <Printer className="w-4 h-4 mr-2" />
-                                  Print Receipt
+                                  Print Preview
                                 </DropdownMenuItem>
                                 {/* Direct printing disabled - printer has hardware/driver issues causing blank infinite printing */}
                               </DropdownMenuContent>
@@ -506,16 +533,10 @@ const getStatusBadge = (status: string) => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={() => {
-                        if (selectedOrder) {
-                          // Open receipt in new tab
-                          const receiptUrl = `/print-receipt?order_id=${selectedOrder.id}&order_number=${selectedOrder.orderNumber}&type=order_management`;
-                          window.open(receiptUrl, '_blank');
-                        }
-                      }}
+                      onClick={() => handlePrintPreview(selectedOrder)}
                     >
                       <Printer className="w-4 h-4 mr-2" />
-                      Print Receipt
+                      Print Preview
                     </DropdownMenuItem>
                     {/* Direct printing disabled - printer has hardware/driver issues causing blank infinite printing */}
                   </DropdownMenuContent>
@@ -583,6 +604,52 @@ const getStatusBadge = (status: string) => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Thermal Printer Preview Dialog */}
+      <Dialog open={showThermalPreview} onOpenChange={setShowThermalPreview}>
+        <DialogContent className="max-w-md" data-testid="dialog-thermal-preview">
+          <DialogHeader>
+            <DialogTitle>Thermal Printer Preview</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center items-start bg-gray-100 p-4 rounded-lg overflow-auto max-h-[80vh]">
+            {thermalPreviewData && (
+              <div className="bg-white shadow-lg">
+                <ThermalPrinterPreview {...thermalPreviewData} />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (thermalPreviewData) {
+                  const printData = {
+                    orderNumber: thermalPreviewData.receiptNo || '',
+                    createdAt: thermalPreviewData.info?.createdAt || new Date().toISOString(),
+                    customerName: thermalPreviewData.name || '',
+                    orderType: '',
+                    items: (thermalPreviewData.data || []).map((item: any) => ({
+                      name: item.item_name || item.name || '',
+                      quantity: item.qty || item.quantity || 1,
+                      price: (item.amount || 0) / (item.qty || item.quantity || 1),
+                    })),
+                    total: thermalPreviewData.total || 0,
+                    paymentMethod: thermalPreviewData.modeOfPayment || 'Cash',
+                    paymentStatus: thermalPreviewData.paymentStatus || 'Full Payment',
+                    tendered: thermalPreviewData.amountPaid || 0,
+                  };
+                  printInvoice(printData);
+                }
+              }}
+            >
+              Print
+            </Button>
+            <Button variant="outline" onClick={() => setShowThermalPreview(false)}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

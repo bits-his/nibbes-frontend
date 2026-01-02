@@ -9,13 +9,25 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { autoPrintKitchenTicket } from "@/utils/kitchenPrint";
+import { usePrint } from "@/hooks/usePrint";
+import { ThermalPrinterPreview } from "@/components/ThermalPrinterPreview";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
+    const { printInvoice, convertToThermalPreview } = usePrint();
+
   // const { printInvoice } = usePrint();
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+    const [showThermalPreview, setShowThermalPreview] = useState(false);
+  const [thermalPreviewData, setThermalPreviewData] = useState<any>(null);
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active"],
@@ -61,7 +73,7 @@ export default function KitchenDisplay() {
                 createdAt: order.createdAt,
                 customerName: order.customerName,
                 items: order.orderItems.map((item: any) => ({
-                  name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
+                  name: item.menuItem?.name || 'Unknown Item',
                   quantity: item.quantity,
                   price: item.price,
                   specialInstructions: item.specialInstructions || null,
@@ -114,37 +126,31 @@ export default function KitchenDisplay() {
       });
     },
   });
-
+const convertOrderForPrint = (order: OrderWithItems) => {
+    return {
+      orderNumber: order.orderNumber.toString(),
+      createdAt: order.createdAt,
+      customerName: order.customerName,
+      orderType: order.orderType,
+      items: order.orderItems.map(item => ({
+        name: item.menuItem?.name || 'Unknown Item',
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+        specialInstructions: item.specialInstructions || null
+      })),
+      total: parseFloat(order.totalAmount),
+      paymentMethod: order.paymentMethod || 'N/A',
+      paymentStatus: order.paymentStatus || 'paid',
+      tendered: parseFloat(order.totalAmount)
+    };
+  };
   // Function to print kitchen ticket for a specific order
-  const printKitchenTicket = (order: OrderWithItems) => {
-    try {
-      // Transform OrderWithItems to kitchen ticket format
-      const kitchenTicketData = {
-        orderNumber: order.orderNumber.toString(),
-        createdAt: order.createdAt,
-        customerName: order.customerName,
-        items: order.orderItems.map((item: any) => ({
-          name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
-          quantity: item.quantity,
-          price: item.price,
-          specialInstructions: item.specialInstructions || null,
-        })),
-      };
-
-      // Print kitchen ticket
-      autoPrintKitchenTicket(kitchenTicketData);
-      toast({
-        title: "Print Sent",
-        description: `Kitchen ticket for order #${order.orderNumber} sent to printer.`,
-      });
-    } catch (error) {
-      console.error('❌ Failed to print kitchen ticket:', error);
-      toast({
-        title: "Print Error",
-        description: "Failed to print kitchen ticket.",
-        variant: "destructive",
-      });
-    }
+  const handlePrintPreview = (order: OrderWithItems) => {
+    const printData = convertOrderForPrint(order);
+    // Show thermal preview in dialog
+    const thermalData = convertToThermalPreview(printData);
+    setThermalPreviewData(thermalData);
+    setShowThermalPreview(true);
   };
 
 const getStatusBadge = (status: string) => {
@@ -289,7 +295,7 @@ const getStatusBadge = (status: string) => {
                       variant="outline"
                       size="sm"
                       className="w-full flex items-center gap-2"
-                      onClick={() => printKitchenTicket(order)}
+                      onClick={() => handlePrintPreview(order)}
                     >
                       <Printer className="w-4 h-4" />
                       Print Ticket
@@ -310,8 +316,7 @@ const getStatusBadge = (status: string) => {
                       <Button
                         className="w-full text-sm sm:text-base"
                         size="lg"
-                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
-                        disabled={updateStatusMutation.isPending}
+ onClick={() => handlePrintPreview(order)}
                         data-testid={`button-ready-${order.id}`}
                       >
                         Mark as Ready
@@ -343,6 +348,51 @@ const getStatusBadge = (status: string) => {
             </p>
           </div>
         )}
+         {/* Thermal Printer Preview Dialog */}
+              <Dialog open={showThermalPreview} onOpenChange={setShowThermalPreview}>
+                <DialogContent className="max-w-md" data-testid="dialog-thermal-preview">
+                  <DialogHeader>
+                    <DialogTitle>Thermal Printer Preview</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex justify-center items-start bg-gray-100 p-4 rounded-lg overflow-auto max-h-[80vh]">
+                    {thermalPreviewData && (
+                      <div className="bg-white shadow-lg">
+                        <ThermalPrinterPreview {...thermalPreviewData} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (thermalPreviewData) {
+                          const printData = {
+                            orderNumber: thermalPreviewData.receiptNo || '',
+                            createdAt: thermalPreviewData.info?.createdAt || new Date().toISOString(),
+                            customerName: thermalPreviewData.name || '',
+                            orderType: '',
+                            items: (thermalPreviewData.data || []).map((item: any) => ({
+                              name: item.item_name || item.name || '',
+                              quantity: item.qty || item.quantity || 1,
+                              price: (item.amount || 0) / (item.qty || item.quantity || 1),
+                            })),
+                            total: thermalPreviewData.total || 0,
+                            paymentMethod: thermalPreviewData.modeOfPayment || 'Cash',
+                            paymentStatus: thermalPreviewData.paymentStatus || 'Full Payment',
+                            tendered: thermalPreviewData.amountPaid || 0,
+                          };
+                          printInvoice(printData);
+                        }
+                      }}
+                    >
+                      Print
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowThermalPreview(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
       </div>
     </div>
   );
