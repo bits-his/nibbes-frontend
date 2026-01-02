@@ -316,7 +316,8 @@ const getStatusBadge = (status: string) => {
                       <Button
                         className="w-full text-sm sm:text-base"
                         size="lg"
- onClick={() => handlePrintPreview(order)}
+                        onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
+                        disabled={updateStatusMutation.isPending}
                         data-testid={`button-ready-${order.id}`}
                       >
                         Mark as Ready

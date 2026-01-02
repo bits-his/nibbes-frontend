@@ -553,7 +553,7 @@ function Router() {
       <Route
         path="/transactions"
         component={() => (
-          <ProtectedRoute requiredPermissions={["manage_store", "sales_inventory"]}>
+          <ProtectedRoute requiredPermissions={["store_management", "sales_inventory"]}>
             <Transactions />
           </ProtectedRoute>
         )}
