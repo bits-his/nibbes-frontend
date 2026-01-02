@@ -1464,7 +1464,7 @@ export default function Checkout() {
                       <Alert className="border-orange-300 bg-orange-50">
                         <MapPin className="h-4 w-4 text-orange-600" />
                         <AlertDescription className="text-orange-900">
-                          Please enter your delivery address to calculate delivery fee
+                          Please enter your delivery location
                         </AlertDescription>
                       </Alert>
 

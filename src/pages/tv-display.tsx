@@ -292,86 +292,87 @@ export default function TVDisplay() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 overflow-hidden">
+    <div className="h-screen w-screen bg-white text-gray-900 overflow-hidden flex flex-col">
       {/* Connection Status Indicator */}
       <div className="absolute top-2 right-2 md:top-4 md:right-4 z-50">
         {isConnected ? (
           <div className="flex items-center gap-1 md:gap-2 bg-green-100 border border-green-500 rounded-full px-2 md:px-4 py-1 md:py-2">
             <Wifi className="w-4 md:w-6 h-4 md:h-6 text-green-600" />
-            <span className="text-green-600 font-semibold text-xs md:text-lg hidden md:inline">LIVE</span>
-            <span className="text-green-600 font-semibold text-sm md:hidden">LIVE</span>
+            <span className="text-green-600 font-semibold text-xs md:text-lg">LIVE</span>
           </div>
         ) : (
           <div className="flex items-center gap-1 md:gap-2 bg-red-100 border border-red-500 rounded-full px-2 md:px-4 py-1 md:py-2 animate-pulse">
             <WifiOff className="w-4 md:w-6 h-4 md:h-6 text-red-600" />
-            <span className="text-red-600 font-semibold text-xs md:text-lg hidden md:inline">RECONNECTING...</span>
-            <span className="text-red-600 font-semibold text-sm md:hidden">RECON...</span>
+            <span className="text-red-600 font-semibold text-xs md:text-lg">RECONNECTING...</span>
           </div>
         )}
       </div>
 
-      {/* Header - Reduced size */}
-      <div className="bg-gradient-to-r from-[#50BAA8] to-teal-600 py-2 px-4 md:py-3 md:px-6 border-b-4 border-[#50BAA8]">
-        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center text-white tracking-wide">
+      {/* Header - Compact for TV */}
+      <div className="bg-gradient-to-r from-[#50BAA8] to-teal-600 py-3 md:py-4 px-4 md:px-6 border-b-4 border-[#50BAA8] flex-shrink-0">
+        <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-center text-white tracking-wide">
           🍽️ READY ORDERS
         </h1>
-        <p className="text-center text-sm md:text-base lg:text-lg text-white/90 mt-0.5 md:mt-1">
+        <p className="text-center text-base md:text-lg lg:text-xl xl:text-2xl text-white/90 mt-1">
           Orders ready for pickup
         </p>
       </div>
 
-      {/* Orders Display */}
-      <div className="p-4 md:p-6">
+      {/* Orders Display - Fills remaining space */}
+      <div className="flex-1 p-3 md:p-4 lg:p-6 overflow-hidden flex flex-col">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-[70vh]">
-            <div className="animate-spin rounded-full h-24 w-24 border-b-4 border-[#50BAA8]"></div>
-            <p className="text-2xl md:text-4xl text-gray-400 mt-6">Loading orders...</p>
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-20 w-20 md:h-24 md:w-24 border-b-4 border-[#50BAA8]"></div>
+            <p className="text-xl md:text-3xl text-gray-400 mt-6">Loading orders...</p>
           </div>
         ) : readyOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[70vh]">
-            <div className="text-7xl md:text-9xl mb-6">✅</div>
-            <p className="text-3xl md:text-5xl text-gray-400 font-semibold">No orders ready</p>
-            <p className="text-2xl md:text-3xl text-gray-500 mt-3">Orders will appear here when ready</p>
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-6xl md:text-8xl lg:text-9xl mb-6">✅</div>
+            <p className="text-2xl md:text-4xl lg:text-5xl text-gray-400 font-semibold">No orders ready</p>
+            <p className="text-xl md:text-2xl lg:text-3xl text-gray-500 mt-3">Orders will appear here when ready</p>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-6 md:gap-8">
-            {displayedOrders.map((order) => (
-              <div
-                key={order.id}
-                className="bg-white border-4 border-[#50BAA8] rounded-2xl p-8 md:p-10 shadow-2xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center min-h-[280px] md:min-h-[320px]"
-              >
-                <div className="text-center">
-                  <div className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-gray-900 mb-4">
-                    #{order.orderNumber}
-                  </div>
-                  <div className="inline-block bg-[#50BAA8] text-white px-6 py-3 md:px-8 md:py-4 rounded-xl text-2xl md:text-3xl lg:text-4xl font-bold">
-                    READY ✓
+          <div className="flex-1 flex flex-col">
+            {/* Grid container - 2 rows x 4 columns, fills available space */}
+            <div className="grid grid-cols-4 grid-rows-2 gap-3 md:gap-4 lg:gap-6 h-full">
+              {displayedOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="bg-white border-4 border-[#50BAA8] rounded-xl md:rounded-2xl shadow-2xl transform transition-all duration-300 hover:scale-105 animate-fadeIn flex flex-col items-center justify-center"
+                >
+                  <div className="text-center">
+                    <div className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl 2xl:text-8xl font-black text-gray-900 mb-2 md:mb-4">
+                      #{order.orderNumber}
+                    </div>
+                    <div className="inline-block bg-[#50BAA8] text-white px-4 py-2 md:px-6 md:py-3 lg:px-8 lg:py-4 rounded-lg md:rounded-xl text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold">
+                      READY ✓
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+            
+            {/* Pagination Indicator */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-3 md:mt-4 flex-shrink-0">
+                {Array.from({ length: totalPages }).map((_, index) => (
+                  <div
+                    key={index}
+                    className={`h-2 md:h-3 w-2 md:w-3 rounded-full transition-all ${
+                      index === currentPage ? 'bg-[#50BAA8] w-6 md:w-8' : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Pagination Indicator */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-6">
-            {Array.from({ length: totalPages }).map((_, index) => (
-              <div
-                key={index}
-                className={`h-3 w-3 rounded-full transition-all ${
-                  index === currentPage ? 'bg-[#50BAA8] w-8' : 'bg-gray-300'
-                }`}
-              />
-            ))}
+            )}
           </div>
         )}
       </div>
 
       {/* Footer - Order Count */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-[#50BAA8] py-2 px-4 shadow-lg">
+      <div className="bg-white border-t-2 border-[#50BAA8] py-2 md:py-3 px-4 md:px-6 shadow-lg flex-shrink-0">
         <div className="flex justify-between items-center">
-          <p className="text-sm md:text-xl text-gray-600">
+          <p className="text-sm md:text-lg lg:text-xl xl:text-2xl text-gray-600">
             Total Ready Orders: <span className="text-[#50BAA8] font-bold">{readyOrders.length}</span>
           </p>
           <TimeDisplay />
@@ -395,23 +396,9 @@ export default function TVDisplay() {
           animation: fadeIn 0.5s ease-out;
         }
 
-        /* Custom scrollbar */
-        .overflow-y-auto::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar-track {
-          background: #e2e8f0;
-          border-radius: 4px;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar-thumb {
-          background: #50BAA8;
-          border-radius: 4px;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-          background: #3fa391;
+        /* Ensure full screen on TV */
+        body {
+          overflow: hidden;
         }
       `}</style>
     </div>
