@@ -30,6 +30,7 @@ import { useAutoLogout } from "./hooks/useAutoLogout";
 import { CartProvider } from "@/context/CartContext";
 import { getGuestSession } from "@/lib/guestSession";
 import { InstallPWA } from "@/components/InstallPWA";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
@@ -664,6 +665,7 @@ function App() {
             </SidebarProvider>
             <Toaster />
             <InstallPWA />
+            <UpdatePrompt />
           </TooltipProvider>
         </CartProvider>
       </AuthProvider>
