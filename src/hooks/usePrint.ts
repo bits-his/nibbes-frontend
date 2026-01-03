@@ -79,13 +79,18 @@ export const usePrint = () => {
     console.log('🔍 Service charges at print time:', serviceCharges);
     console.log('🔍 Subtotal:', subtotal);
     
-    // Calculate each service charge
+    // Calculate each service charge - handle both percentage and fixed types
     const chargeBreakdown = serviceCharges.map(charge => {
-      const percentage = parseFloat(charge.amount); // Convert string to number
+      const chargeAmount = parseFloat(charge.amount) || 0; // Convert string to number
+      const isPercentage = charge.type === 'percentage';
+      
       return {
         name: charge.description,
-        percentage: percentage,
-        amount: Math.abs(subtotal * (percentage / 100))
+        type: charge.type,
+        percentage: isPercentage ? chargeAmount : null, // Only set percentage if type is percentage
+        amount: isPercentage 
+          ? Math.abs(subtotal * (chargeAmount / 100))  // Calculate percentage of subtotal
+          : Math.abs(chargeAmount)  // Use fixed amount directly
       };
     });
     
@@ -380,7 +385,7 @@ export const usePrint = () => {
           </div>
           ${chargeBreakdown.map(charge => `
           <div class="summary-row">
-            <span class="summary-vat-label">${charge.name} (${charge.percentage.toFixed(2)}%)</span>
+            <span class="summary-vat-label">${charge.name}${charge.type === 'percentage' && charge.percentage !== null ? ` (${charge.percentage.toFixed(2)}%)` : ''}</span>
             <span class="summary-vat-value">${formatCurrency(charge.amount)}</span>
           </div>`).join('')}
           <div class="summary-row">
@@ -422,7 +427,7 @@ export const usePrint = () => {
         <!-- Footer -->
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
-          <div class="footer-name">nibblesfastfood.com/</div>
+          <div class="footer-name">nibblesfastfood.com</div>
         </div>
 
         <!-- Print Actions (hidden when printing) -->

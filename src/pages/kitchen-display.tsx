@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Clock, ChefHat, Search, Printer } from "lucide-react";
+import { Clock, ChefHat, Search, Printer, Power } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,22 @@ export default function KitchenDisplay() {
   const { printInvoice } = usePrint();
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
+
+  // Fetch kitchen status
+  const { data: kitchenStatusData, refetch: refetchKitchenStatus } = useQuery<{ isOpen: boolean; updatedAt?: string }>({
+    queryKey: ["/api/kitchen/status"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/kitchen/status');
+      return await response.json();
+    },
+  });
+
+  useEffect(() => {
+    if (kitchenStatusData) {
+      setKitchenStatus(kitchenStatusData);
+    }
+  }, [kitchenStatusData]);
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/active"],
@@ -114,6 +130,29 @@ export default function KitchenDisplay() {
       });
     },
   });
+
+  // Kitchen status toggle mutation
+  const updateKitchenStatusMutation = useMutation({
+    mutationFn: async (isOpen: boolean) => {
+      const response = await apiRequest("PATCH", "/api/kitchen/status", { isOpen });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      setKitchenStatus(data.status);
+      refetchKitchenStatus();
+      toast({
+        title: data.status.isOpen ? "Kitchen Opened" : "Kitchen Closed",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update kitchen status.",
+        variant: "destructive",
+      });
+    },
+  });
 const convertOrderForPrint = (order: OrderWithItems) => {
     return {
       orderNumber: order.orderNumber.toString(),
@@ -133,10 +172,29 @@ const convertOrderForPrint = (order: OrderWithItems) => {
     };
   };
   // Function to print kitchen ticket for a specific order
+  // Automatically updates order status to "preparing" when print is clicked
   const handlePrintPreview = (order: OrderWithItems) => {
     const printData = convertOrderForPrint(order);
-    // Print exactly like order management (with receipt type and card list)
-    printInvoice(printData, 'receipt');
+    
+    // If order is pending, automatically update status to "preparing"
+    if (order.status === 'pending') {
+      updateStatusMutation.mutate(
+        { orderId: String(order.id), status: 'preparing' },
+        {
+          onSuccess: () => {
+            // Print after status update succeeds
+            printInvoice(printData, 'receipt');
+          },
+          onError: () => {
+            // Still print even if status update fails
+            printInvoice(printData, 'receipt');
+          }
+        }
+      );
+    } else {
+      // If order is already preparing or beyond, just print
+      printInvoice(printData, 'receipt');
+    }
   };
 
 const getStatusBadge = (status: string) => {
@@ -185,6 +243,16 @@ const getStatusBadge = (status: string) => {
             <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold">Kitchen Display</h1>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            {/* Kitchen Status Toggle */}
+            <Button
+              onClick={() => updateKitchenStatusMutation.mutate(!kitchenStatus.isOpen)}
+              disabled={updateKitchenStatusMutation.isPending}
+              variant={kitchenStatus.isOpen ? "default" : "destructive"}
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <Power className="w-4 h-4" />
+              {kitchenStatus.isOpen ? "Kitchen Open" : "Kitchen Closed"}
+            </Button>
             {/* Search Input - Made responsive */}
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />

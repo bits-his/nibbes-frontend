@@ -112,6 +112,9 @@ export default function Checkout() {
   // Service charges state
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
   const [loadingCharges, setLoadingCharges] = useState(true)
+  
+  // Kitchen status state
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
 
   // Payment methods available for customer checkout (online orders)
   const paymentMethods: PaymentMethod[] = [
@@ -825,6 +828,16 @@ export default function Checkout() {
   })
 
   const onSubmit = (values: CheckoutFormValues) => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!values.orderType) {
       toast({
         title: "Delivery Method Required",
@@ -969,6 +982,16 @@ export default function Checkout() {
   }
 
   const handleWalkInPayment = async () => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // For card payments, use Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
       try {
@@ -1174,6 +1197,21 @@ export default function Checkout() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Walk-in Orders
           </Button>
+
+          {/* Kitchen Closed Alert */}
+          {!kitchenStatus.isOpen && (
+            <Card className="mb-6 border-red-500 bg-red-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <ChefHat className="w-6 h-6 text-red-600" />
+                  <div>
+                    <h3 className="font-semibold text-red-900">Kitchen is Closed</h3>
+                    <p className="text-sm text-red-700">The kitchen is currently closed and not accepting orders. Please try again later.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-foreground mb-2">Confirm Payment</h1>
@@ -1441,6 +1479,21 @@ export default function Checkout() {
         </div>
 
         <CartSummaryHeader itemCount={cart.length} subtotal={subtotal} />
+
+        {/* Kitchen Closed Alert */}
+        {!kitchenStatus.isOpen && (
+          <Card className="mb-6 border-red-500 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <ChefHat className="w-6 h-6 text-red-600" />
+                <div>
+                  <h3 className="font-semibold text-red-900">Kitchen is Closed</h3>
+                  <p className="text-sm text-red-700">The kitchen is currently closed and not accepting orders. Please try again later.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -2013,12 +2066,17 @@ export default function Checkout() {
               <Button
                 onClick={handlePaymentConfirmation}
                 className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
-                disabled={isProcessingPayment || createOrderMutation.isPending}
+                disabled={isProcessingPayment || createOrderMutation.isPending || !kitchenStatus.isOpen}
               >
                 {isProcessingPayment || createOrderMutation.isPending ? (
                   <>
                     <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                     Processing...
+                  </>
+                ) : !kitchenStatus.isOpen ? (
+                  <>
+                    <ChefHat className="mr-2 h-4 w-4" />
+                    Kitchen Closed
                   </>
                 ) : (
                   <>
