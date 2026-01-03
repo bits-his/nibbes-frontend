@@ -212,6 +212,11 @@ export default function OrderManagement() {
   };
 
   const filteredOrders = orders?.filter((order) => {
+    // Only show orders with paymentStatus === 'paid'
+    if (order.paymentStatus !== 'paid') {
+      return false;
+    }
+    
     const matchesSearch =
       order.orderNumber.toString().includes(searchQuery) ||
       order.customerName.toLowerCase().includes(searchQuery.toLowerCase());

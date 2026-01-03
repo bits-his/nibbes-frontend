@@ -39,11 +39,8 @@ export default function DocketPage() {
 
   // Filter orders to only show paid orders
   const activeOrders = orders?.filter(order => {
-    // Exclude orders with pending payment (waiting for payment confirmation)
-    if (order.paymentStatus === 'pending') {
-      return false;
-    }
-    return true;
+    // Only show orders with paymentStatus === 'paid'
+    return order.paymentStatus === 'paid';
   });
 
   // Request notification permission on mount
