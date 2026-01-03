@@ -1044,7 +1044,26 @@ export default function Checkout() {
             console.log("Response code:", response.responseCode)
             
             if (response.responseCode === '00') {
-              // Payment successful
+              // Payment successful - Update order status to paid immediately
+              console.log('✅ Walk-in payment successful! Updating order paymentStatus to "paid"...')
+              
+              // Update order payment status via API
+              apiRequest("POST", "/api/payment/callback", {
+                txnref: response.txnref || response.txn_ref || transactionRef,
+                resp: response.resp || response.responseCode,
+                amount: response.amount || amountInKobo,
+                paymentReference: response.paymentReference,
+                responseDescription: response.responseDescription || response.desc
+              }).then(async (callbackResponse) => {
+                if (callbackResponse.ok) {
+                  console.log('✅ Walk-in order payment status updated to "paid" successfully')
+                } else {
+                  console.warn('⚠️ Failed to update walk-in order status via callback, webhook will handle it')
+                }
+              }).catch((err) => {
+                console.warn('⚠️ Error calling payment callback for walk-in order, webhook will handle it:', err)
+              })
+              
               toast({
                 title: "Payment Successful!",
                 description: `Order #${createdOrder.orderNumber} has been paid.`,
