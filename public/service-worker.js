@@ -1,21 +1,25 @@
-// Nibbles Service Worker
-// Version 1.0.0
+// Nibbles Service Worker - Version 2.0.0
+// OPTIMIZED FOR RELIABLE UPDATES
 
-const CACHE_NAME = 'nibbles-kitchen-v1';
-const RUNTIME_CACHE = 'nibbles-runtime-v1';
+const VERSION = '2.0.0';
+const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
+const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 
-// Assets to cache on install
+// ============================================================================
+// Assets to precache on install
+// NOTE: Do NOT include index.html here - it must always be fresh from network
+// ============================================================================
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/nibbles.jpg',
   '/offline.html'
 ];
 
-// Install event - cache essential assets
+// ============================================================================
+// INSTALL: Cache essential assets and activate immediately
+// ============================================================================
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
+  console.log(`[Service Worker v${VERSION}] Installing...`);
 
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -23,16 +27,21 @@ self.addEventListener('install', (event) => {
         console.log('[Service Worker] Precaching assets');
         return cache.addAll(PRECACHE_URLS.map(url => new Request(url, { cache: 'reload' })));
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[Service Worker] Calling skipWaiting()');
+        return self.skipWaiting(); // Activate immediately
+      })
       .catch((error) => {
         console.error('[Service Worker] Precaching failed:', error);
       })
   );
 });
 
-// Activate event - clean up old caches
+// ============================================================================
+// ACTIVATE: Clean up old caches and take control immediately
+// ============================================================================
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...');
+  console.log(`[Service Worker v${VERSION}] Activating...`);
 
   event.waitUntil(
     caches.keys()
@@ -40,20 +49,28 @@ self.addEventListener('activate', (event) => {
         return Promise.all(
           cacheNames
             .filter((cacheName) => {
-              // Delete old caches
-              return cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE;
+              // Delete ALL old caches (different version)
+              const isOldCache = cacheName.startsWith('nibbles-') && 
+                                cacheName !== CACHE_NAME && 
+                                cacheName !== RUNTIME_CACHE;
+              if (isOldCache) {
+                console.log('[Service Worker] Deleting old cache:', cacheName);
+              }
+              return isOldCache;
             })
-            .map((cacheName) => {
-              console.log('[Service Worker] Deleting old cache:', cacheName);
-              return caches.delete(cacheName);
-            })
+            .map((cacheName) => caches.delete(cacheName))
         );
       })
-      .then(() => self.clients.claim())
+      .then(() => {
+        console.log('[Service Worker] Claiming clients');
+        return self.clients.claim(); // Take control immediately
+      })
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// ============================================================================
+// FETCH: Network-first for HTML, cache-first for assets
+// ============================================================================
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -63,49 +80,97 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API requests from being cached
-  if (url.pathname.startsWith('/api/')) {
+  // Skip API requests and WebSocket connections
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
     return;
   }
 
+  // -------------------------------------------------------------------------
+  // Strategy 1: NETWORK FIRST for HTML (always fresh)
+  // -------------------------------------------------------------------------
+  if (request.mode === 'navigate' || 
+      request.headers.get('accept')?.includes('text/html') ||
+      url.pathname === '/' || 
+      url.pathname.endsWith('.html')) {
+    
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Got fresh HTML from network - don't cache it
+          return response;
+        })
+        .catch(() => {
+          // Network failed - try cache, then offline page
+          return caches.match(request)
+            .then((cachedResponse) => {
+              return cachedResponse || caches.match('/offline.html');
+            });
+        })
+    );
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Strategy 2: CACHE FIRST for static assets (images, fonts, etc.)
+  // But use stale-while-revalidate pattern
+  // -------------------------------------------------------------------------
   event.respondWith(
     caches.match(request)
       .then((cachedResponse) => {
-        if (cachedResponse) {
-          // Return cached version
-          return cachedResponse;
-        }
-
-        // Not in cache, fetch from network
-        return fetch(request)
-          .then((response) => {
-            // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response
-            const responseToCache = response.clone();
-
-            // Cache for runtime
-            caches.open(RUNTIME_CACHE)
-              .then((cache) => {
+        // Fetch from network in background to update cache
+        const fetchPromise = fetch(request)
+          .then((networkResponse) => {
+            // Cache successful responses
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              const responseToCache = networkResponse.clone();
+              caches.open(RUNTIME_CACHE).then((cache) => {
                 cache.put(request, responseToCache);
               });
-
-            return response;
+            }
+            return networkResponse;
           })
           .catch(() => {
-            // Network failed, try to serve offline page for navigation requests
-            if (request.mode === 'navigate') {
-              return caches.match('/offline.html');
-            }
+            // Network failed, that's ok if we have cache
+            return null;
           });
+
+        // Return cached version immediately if available, otherwise wait for network
+        return cachedResponse || fetchPromise;
       })
   );
 });
 
-// Background sync for offline orders (future enhancement)
+// ============================================================================
+// MESSAGE: Handle commands from the client
+// ============================================================================
+self.addEventListener('message', (event) => {
+  console.log('[Service Worker] Message received:', event.data);
+
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[Service Worker] SKIP_WAITING requested - activating new version');
+    self.skipWaiting();
+  }
+
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    console.log('[Service Worker] CLEAR_CACHE requested');
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((cacheName) => cacheName.startsWith('nibbles-'))
+            .map((cacheName) => {
+              console.log('[Service Worker] Clearing cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+        );
+      })
+    );
+  }
+});
+
+// ============================================================================
+// BACKGROUND SYNC: For offline orders (future enhancement)
+// ============================================================================
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-orders') {
     console.log('[Service Worker] Syncing offline orders...');
@@ -113,16 +178,31 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-// Push notifications (future enhancement)
+// ============================================================================
+// PUSH NOTIFICATIONS
+// ============================================================================
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push received:', event);
 
+  let notificationData = {
+    title: 'Nibbles Kitchen',
+    body: 'New notification from Nibbles',
+  };
+
+  if (event.data) {
+    try {
+      notificationData = event.data.json();
+    } catch (e) {
+      notificationData.body = event.data.text();
+    }
+  }
+
   const options = {
-    body: event.data ? event.data.text() : 'New notification from Nibbles',
+    body: notificationData.body,
     icon: '/pwa-icons/icon-192x192.png',
     badge: '/pwa-icons/icon-72x72.png',
     vibrate: [200, 100, 200],
-    tag: 'nibbles-notification',
+    tag: notificationData.tag || 'nibbles-notification',
     requireInteraction: true,
     actions: [
       { action: 'view', title: 'View Order' },
@@ -131,11 +211,13 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('Nibbles', options)
+    self.registration.showNotification(notificationData.title || 'Nibbles Kitchen', options)
   );
 });
 
-// Notification click handler
+// ============================================================================
+// NOTIFICATION CLICK: Handle notification interactions
+// ============================================================================
 self.addEventListener('notificationclick', (event) => {
   console.log('[Service Worker] Notification clicked:', event.action);
 
@@ -148,9 +230,5 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Message handler for cache updates
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
+// Log version on load
+console.log(`[Service Worker v${VERSION}] Script loaded`);

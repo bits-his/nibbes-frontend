@@ -1,3 +1,8 @@
+# ============================================================================
+# NibblesKitchen: Vite SPA + PWA on Apache/cPanel
+# PERMANENT FIX for stale cache issues
+# ============================================================================
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -14,7 +19,81 @@
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# Enable CORS
+# ============================================================================
+# CRITICAL: Cache Headers for PWA Updates
+# ============================================================================
+
 <IfModule mod_headers.c>
+  # -------------------------------------------------------------------------
+  # 1. SPA Shell (index.html) - MUST ALWAYS BE FRESH
+  # This ensures users get the latest HTML pointing to new hashed assets
+  # -------------------------------------------------------------------------
+  <FilesMatch "^(index\.html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  # -------------------------------------------------------------------------
+  # 2. Service Worker - MUST NEVER BE CACHED
+  # Critical: Old SW = old app forever. This forces browser to check for updates
+  # -------------------------------------------------------------------------
+  <FilesMatch "^(service-worker\.js|sw\.js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  # -------------------------------------------------------------------------
+  # 3. Manifest - Short cache / revalidate often
+  # Allows minor caching but ensures updates within 1 hour
+  # -------------------------------------------------------------------------
+  <FilesMatch "^(manifest\.webmanifest|manifest\.json)$">
+    Header set Cache-Control "public, max-age=3600, must-revalidate"
+    Header set Content-Type "application/manifest+json"
+  </FilesMatch>
+
+  # -------------------------------------------------------------------------
+  # 4. Hashed Static Assets - Cache forever (immutable)
+  # Vite generates hashed filenames (e.g. main-abc123.js) so these are safe
+  # to cache forever since the filename changes when content changes
+  # -------------------------------------------------------------------------
+  <FilesMatch "\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|otf)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # -------------------------------------------------------------------------
+  # 5. Security Headers (all pages)
+  # -------------------------------------------------------------------------
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "DENY"
+  Header set X-XSS-Protection "1; mode=block"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "geolocation=(self), microphone=(), camera=()"
+  
+  # CORS for API requests (if needed)
   Header set Access-Control-Allow-Origin "*"
+</IfModule>
+
+# ============================================================================
+# Optional: Compression for faster delivery
+# ============================================================================
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json application/xml image/svg+xml
+</IfModule>
+
+# ============================================================================
+# Optional: Set proper MIME types
+# ============================================================================
+
+<IfModule mod_mime.c>
+  AddType application/javascript js
+  AddType text/css css
+  AddType image/svg+xml svg
+  AddType application/manifest+json webmanifest
+  AddType font/woff woff
+  AddType font/woff2 woff2
+  AddType font/ttf ttf
+  AddType font/otf otf
 </IfModule>
