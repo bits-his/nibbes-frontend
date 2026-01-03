@@ -630,8 +630,8 @@ export default function UserManagement() {
             variant="outline"
             className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
           >
-            <DollarSign className="w-5 h-5" />
-            Charges
+            
+            ₦ Charges
           </Button>
 
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
