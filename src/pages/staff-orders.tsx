@@ -138,6 +138,37 @@ export default function StaffOrders() {
     setLocation('/staff/checkout');
   };
 
+  // F1 keyboard shortcut to proceed to checkout
+  // Supports: F1, Cmd+F1 (Mac), Ctrl+F1 (Windows)
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      const isF1 = event.key === 'F1' || event.key === 'f1';
+      const isMac = event.metaKey; // Cmd key on Mac
+      const isWindows = event.ctrlKey; // Ctrl key on Windows
+      
+      // Check if F1 is pressed (with or without modifier) and cart has items
+      if (isF1 && cart.length > 0 && (isMac || isWindows || !event.metaKey && !event.ctrlKey)) {
+        event.preventDefault();
+        // Validate form before proceeding
+        const values = form.getValues();
+        if (values.customerName && values.customerName.length >= 2) {
+          handleProceedToCheckout();
+        } else {
+          toast({
+            title: "Customer Name Required",
+            description: "Please enter customer name before proceeding to checkout.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [cart, form]);
+
   const onSubmit = (values: OrderFormValues) => {
     if (cart.length === 0) {
       toast({
