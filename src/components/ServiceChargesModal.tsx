@@ -255,7 +255,7 @@ export default function ServiceChargesModal({ open, onOpenChange }: ServiceCharg
                             ) : (
                               <>
                                 <DollarSign className="w-4 h-4" />
-                                <span>₦{charge.amount.toFixed(2)}</span>
+                                <span>₦{Number(charge.amount).toFixed(2)}</span>
                               </>
                             )}
                             <span className="text-sm text-slate-400 ml-2">
