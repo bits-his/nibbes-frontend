@@ -260,6 +260,9 @@ export default function Checkout() {
     }
   }, [user, loading, setLocation, form, cartFromContext])
 
+  // F2 keyboard shortcut to confirm payment for walk-in orders
+  // This will be set up after handleWalkInPayment is defined
+
   // Calculate delivery fee when order type is delivery and location is available
   useEffect(() => {
     const calculateDeliveryFee = async () => {
@@ -1051,6 +1054,33 @@ export default function Checkout() {
       createWalkInOrderMutation.mutate(orderData)
     }
   }
+
+  // F2 keyboard shortcut to confirm payment for walk-in orders
+  // Supports: F2, Cmd+F2 (Mac), Ctrl+F2 (Windows)
+  useEffect(() => {
+    if (!walkInOrder) return; // Only set up listener for walk-in orders
+    
+    const handleKeyPress = (event: KeyboardEvent) => {
+      const isF2 = event.key === 'F2' || event.key === 'f2';
+      const isMac = event.metaKey; // Cmd key on Mac
+      const isWindows = event.ctrlKey; // Ctrl key on Windows
+      
+      // Check if F2 is pressed (with or without modifier) and it's a walk-in order
+      if (isF2 && !createWalkInOrderMutation.isPending && !isProcessingPayment && (isMac || isWindows || !event.metaKey && !event.ctrlKey)) {
+        event.preventDefault();
+        // Only trigger if not in a text input/textarea
+        const target = event.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          handleWalkInPayment();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [walkInOrder, createWalkInOrderMutation.isPending, isProcessingPayment]);
 
   // Handle walk-in order payment
   if (walkInOrder) {
