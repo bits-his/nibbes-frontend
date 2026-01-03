@@ -381,6 +381,14 @@ export const usePrint = () => {
           <button onclick="window.print()">Print Again</button>
           <button onclick="window.close()">Close Window</button>
         </div>
+        <script>
+          // Escape key to close window
+          document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.key === 'Esc') {
+              window.close();
+            }
+          });
+        </script>
       </body>
       </html>
     `

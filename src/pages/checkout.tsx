@@ -565,7 +565,7 @@ export default function Checkout() {
         txn_ref: txnRef,
         amount: amount,
         currency: 566, // NGN currency code
-        site_redirect_url: window.location.origin + "/order-status?id=" + createdOrder.id,
+        site_redirect_url: window.location.origin + "/docket",
         cust_id: createdOrder.id.toString(),
         cust_name: orderData.customerName,
         cust_email: orderData.customerEmail || "customer@nibbleskitchen.com",
@@ -605,10 +605,10 @@ export default function Checkout() {
             // Clear cart using context method
             clearCart()
             
-            // Redirect to order status with success flag
+            // Redirect to docket (works for both authenticated users and guests)
             startTransition(() => {
               setTimeout(() => {
-                setLocation("/order-status?id=" + createdOrder.id + "&payment=success")
+                setLocation("/docket")
               }, 1500)
             })
           } else if (response.resp === "10" || response.responseCode === "10") {
@@ -620,7 +620,7 @@ export default function Checkout() {
             
             startTransition(() => {
               setTimeout(() => {
-                setLocation("/order-status?id=" + createdOrder.id + "&payment=pending")
+                setLocation("/docket")
               }, 1500)
             })
           } else {
@@ -957,7 +957,7 @@ export default function Checkout() {
           txn_ref: transactionRef,
           amount: amountInKobo,
           currency: 566, // NGN
-          site_redirect_url: `${window.location.origin}/order-status?id=${createdOrder.id}`,
+          site_redirect_url: `${window.location.origin}/docket`,
           
           // Merchant information
           merchant_name: "Nibbles Kitchen",
@@ -977,7 +977,7 @@ export default function Checkout() {
               // Clear walk-in order and redirect
               localStorage.removeItem("pendingWalkInOrder")
               startTransition(() => {
-                setLocation(`/order-status?id=${createdOrder.id}`)
+                setLocation("/docket")
               })
             } else {
               // Payment failed
