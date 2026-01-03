@@ -264,22 +264,6 @@ const getStatusCardColor = (status: string) => {
             <p className="text-muted-foreground mb-6">
               Your orders will appear here when you place them
             </p>
-            {guestSession && !user && (
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6 max-w-md mx-auto">
-                <h3 className="font-semibold text-lg mb-2">Create an Account?</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  You ordered as a guest. Create an account to track all your orders and get exclusive offers!
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Button asChild variant="default">
-                    <a href="#/signup">Create Account</a>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <a href="#/login">Sign In</a>
-                  </Button>
-                </div>
-              </div>
-            )}
             <Button onClick={() => setLocation('/')}>
               Back to Menu
             </Button>
