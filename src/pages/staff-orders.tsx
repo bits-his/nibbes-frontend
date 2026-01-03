@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Minus, X } from "lucide-react";
+import { Plus, Minus, X, ChefHat, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -41,6 +41,9 @@ export default function StaffOrders() {
   // Service charges state
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
   const [loadingCharges, setLoadingCharges] = useState(true)
+  
+  // Kitchen status state
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -79,6 +82,17 @@ export default function StaffOrders() {
   );
 
   const addToCart = (menuItem: MenuItem) => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    
     setCart((prev) => {
       const existing = prev.find((item) => item.menuItem.id === menuItem.id);
       if (existing) {
@@ -173,8 +187,40 @@ export default function StaffOrders() {
     fetchServiceCharges()
   }, [])
 
+  // Fetch kitchen status
+  useEffect(() => {
+    const fetchKitchenStatus = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/kitchen/status")
+        if (response.ok) {
+          const status = await response.json()
+          setKitchenStatus(status)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching kitchen status:', error)
+        // Default to open if check fails
+        setKitchenStatus({ isOpen: true })
+      }
+    }
+    
+    fetchKitchenStatus()
+    // Poll kitchen status every 30 seconds
+    const interval = setInterval(fetchKitchenStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   // No longer creating order here - just preparing data for checkout
   const handleProceedToCheckout = () => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      })
+      return
+    }
+
     toast({
       title: "Proceeding to Payment",
       description: "Please confirm payment method...",
@@ -212,6 +258,15 @@ export default function StaffOrders() {
       // Check if F1 is pressed (with or without modifier) and cart has items
       if (isF1 && cart.length > 0 && (isMac || isWindows || !event.metaKey && !event.ctrlKey)) {
         event.preventDefault();
+        // Check if kitchen is closed
+        if (!kitchenStatus.isOpen) {
+          toast({
+            title: "Kitchen is Closed",
+            description: "The kitchen is currently closed. Please try again later.",
+            variant: "destructive",
+          });
+          return;
+        }
         // Validate form before proceeding
         const values = form.getValues();
         if (values.customerName && values.customerName.length >= 2) {
@@ -292,6 +347,20 @@ export default function StaffOrders() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Kitchen Closed Banner - Very Prominent */}
+      {!kitchenStatus.isOpen && (
+        <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
+            <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+            <div className="text-center">
+              <h2 className="text-lg md:text-2xl font-bold mb-1">⚠️ KITCHEN IS CLOSED</h2>
+              <p className="text-sm md:text-base">We are currently not accepting orders. Please check back later.</p>
+            </div>
+            <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+          </div>
+        </div>
+      )}
+      
       <div className="flex flex-col md:flex-row h-auto md:h-screen overflow-hidden">
         {/* Menu Section - Full width on mobile, flex-1 on desktop */}
         <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">
@@ -346,7 +415,7 @@ export default function StaffOrders() {
                     <Card
                       key={item.id}
                       className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''}`}
-                      onClick={() => item.available && addToCart(item)}
+                      onClick={() => item.available && kitchenStatus.isOpen && addToCart(item)}
                       data-testid={`card-menu-item-${item.id}`}
                     >
                       <div className="aspect-video overflow-hidden relative">

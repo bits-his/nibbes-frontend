@@ -9,6 +9,8 @@ import {
   QrCode,
   Search,
   ChevronDown,
+  ChefHat,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_3376
 import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -38,11 +41,36 @@ export default function CustomerMenu() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  
+  // Kitchen status state
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
 
   // Initialize and refresh menu data on component mount
   useEffect(() => {
     // Force refresh the menu data when component mounts to ensure fresh data
     queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+  }, []);
+
+  // Fetch kitchen status
+  useEffect(() => {
+    const fetchKitchenStatus = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/kitchen/status")
+        if (response.ok) {
+          const status = await response.json()
+          setKitchenStatus(status)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching kitchen status:', error)
+        // Default to open if check fails
+        setKitchenStatus({ isOpen: true })
+      }
+    }
+    
+    fetchKitchenStatus()
+    // Poll kitchen status every 30 seconds
+    const interval = setInterval(fetchKitchenStatus, 30000)
+    return () => clearInterval(interval)
   }, []);
 
   // WebSocket connection for real-time menu updates
@@ -109,6 +137,17 @@ export default function CustomerMenu() {
   );
 
   const addToCart = (menuItem: MenuItem) => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    
     // Prevent adding unavailable items to cart
     if (!menuItem.available) {
       toast({
@@ -244,6 +283,20 @@ export default function CustomerMenu() {
         canonicalUrl="https://nibbleskitchen.netlify.app/"
       />
       <div className="min-h-screen bg-background">
+        {/* Kitchen Closed Banner - Very Prominent */}
+        {!kitchenStatus.isOpen && (
+          <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80">
+            <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
+              <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+              <div className="text-center">
+                <h2 className="text-lg md:text-2xl font-bold mb-1">⚠️ KITCHEN IS CLOSED</h2>
+                <p className="text-sm md:text-base">We are currently not accepting orders. Please check back later.</p>
+              </div>
+              <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+            </div>
+          </div>
+        )}
+        
         {/* Hero Section */}
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
