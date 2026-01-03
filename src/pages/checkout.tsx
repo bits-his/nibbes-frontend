@@ -234,7 +234,7 @@ export default function Checkout() {
     defaultValues: {
       customerName: user?.username || "",
       customerPhone: "",
-      orderType: "delivery",
+      orderType: "pickup", // Default to pickup - delivery button commented out temporarily
     },
   })
 
@@ -503,28 +503,50 @@ export default function Checkout() {
   }
 
   const calculateTotal = () => {
+    // Don't calculate if there are no items
+    const hasItems = walkInOrder 
+      ? (walkInOrder.items?.length > 0)
+      : (cart.length > 0)
+    
+    if (!hasItems) {
+      return 0
+    }
+    
     const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
     
-    // Apply service charges
+    // Apply service charges only if there are items
     let totalWithCharges = baseAmount
-    serviceCharges.forEach(charge => {
-      if (charge.type === 'percentage') {
-        totalWithCharges += (baseAmount * (charge.amount / 100))
-      } else {
-        totalWithCharges += charge.amount
-      }
-    })
+    if (hasItems) {
+      serviceCharges.forEach(charge => {
+        const chargeAmount = Number(charge.amount) || 0
+        if (charge.type === 'percentage') {
+          totalWithCharges += (baseAmount * (chargeAmount / 100))
+        } else {
+          totalWithCharges += chargeAmount
+        }
+      })
+    }
     
     return totalWithCharges
   }
   
   // Helper function to calculate individual service charge amounts
   const calculateServiceChargeAmount = (charge: ServiceCharge) => {
-    const baseAmount = subtotal + deliveryFee
-    if (charge.type === 'percentage') {
-      return (baseAmount * (charge.amount / 100))
+    // Don't calculate if there are no items
+    const hasItems = walkInOrder 
+      ? (walkInOrder.items?.length > 0)
+      : (cart.length > 0)
+    
+    if (!hasItems) {
+      return 0
     }
-    return charge.amount
+    
+    const baseAmount = subtotal + deliveryFee
+    const chargeAmount = Number(charge.amount) || 0
+    if (charge.type === 'percentage') {
+      return (baseAmount * (chargeAmount / 100))
+    }
+    return chargeAmount
   }
 
   // Handle Interswitch card payment - Inline Checkout
@@ -619,7 +641,7 @@ export default function Checkout() {
         txn_ref: txnRef,
         amount: amount,
         currency: 566, // NGN currency code
-        site_redirect_url: window.location.origin + "/order-status?id=" + createdOrder.id,
+        site_redirect_url: window.location.origin + "/docket",
         cust_id: createdOrder.id.toString(),
         cust_name: orderData.customerName,
         cust_email: orderData.customerEmail || "customer@nibbleskitchen.com",
@@ -659,10 +681,10 @@ export default function Checkout() {
             // Clear cart using context method
             clearCart()
             
-            // Redirect to order status with success flag
+            // Redirect to docket (works for both authenticated users and guests)
             startTransition(() => {
               setTimeout(() => {
-                setLocation("/order-status?id=" + createdOrder.id + "&payment=success")
+                setLocation("/docket")
               }, 1500)
             })
           } else if (response.resp === "10" || response.responseCode === "10") {
@@ -674,7 +696,7 @@ export default function Checkout() {
             
             startTransition(() => {
               setTimeout(() => {
-                setLocation("/order-status?id=" + createdOrder.id + "&payment=pending")
+                setLocation("/docket")
               }, 1500)
             })
           } else {
@@ -1011,7 +1033,7 @@ export default function Checkout() {
           txn_ref: transactionRef,
           amount: amountInKobo,
           currency: 566, // NGN
-          site_redirect_url: `${window.location.origin}/order-status?id=${createdOrder.id}`,
+          site_redirect_url: `${window.location.origin}/docket`,
           
           // Merchant information
           merchant_name: "Nibbles Kitchen",
@@ -1031,7 +1053,7 @@ export default function Checkout() {
               // Clear walk-in order and redirect
               localStorage.removeItem("pendingWalkInOrder")
               startTransition(() => {
-                setLocation(`/order-status?id=${createdOrder.id}`)
+                setLocation("/docket")
               })
             } else {
               // Payment failed
@@ -1332,8 +1354,8 @@ export default function Checkout() {
                 {!multiPaymentEnabled && (
                   <div className="space-y-3 mb-6">
                     {/* Service Charges - Dynamic from API */}
-                    {walkInOrder && walkInOrder.total ? (
-                      // Walk-in order: show breakdown with service charges (total already includes charges)
+                    {walkInOrder && walkInOrder.items?.length > 0 ? (
+                      // Walk-in order: show breakdown with service charges
                       <>
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>Subtotal</span>
@@ -1350,7 +1372,7 @@ export default function Checkout() {
                         ))}
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
                           <span>Total</span>
-                          <span className="text-[#4EB5A4]">₦{walkInOrder.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                       </>
                     ) : (
@@ -1478,14 +1500,39 @@ export default function Checkout() {
                     <CardTitle className="text-lg">2. Delivery Method</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {["pickup", "delivery"].map((type) => {
+                    <div className="flex justify-center">
+                      {/* Delivery button temporarily commented out - will be re-enabled when delivery people are available */}
+                      {/* {["pickup", "delivery"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
                             key={type}
                             type="button"
                             className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+                              ${
+                                isActive
+                                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
+                                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
+                              }`}
+                            onClick={() => {
+                              form.setValue("orderType", type as "delivery" | "pickup")
+                            }}
+                          >
+                            <div className="font-semibold text-base capitalize">{type}</div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {type === "pickup" ? "At our location" : "To your location"}
+                            </div>
+                          </button>
+                        )
+                      })} */}
+                      {/* Only show pickup option for now - centered */}
+                      {["pickup"].map((type) => {
+                        const isActive = form.watch("orderType") === type
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            className={`w-full max-w-xs p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
                               ${
                                 isActive
                                   ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"

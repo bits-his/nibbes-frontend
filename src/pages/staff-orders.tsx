@@ -20,7 +20,7 @@ interface ServiceCharge {
   id: string
   description: string
   type: 'fixed' | 'percentage'
-  amount: number
+  amount: string | number  // API returns string
   status: 'active' | 'inactive'
 }
 
@@ -125,12 +125,18 @@ export default function StaffOrders() {
   
   // Calculate total with service charges
   const calculateTotal = () => {
+    // If no items in cart, return 0
+    if (subtotal === 0) {
+      return 0
+    }
+    
     let total = subtotal
     serviceCharges.forEach(charge => {
+      const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount
       if (charge.type === 'percentage') {
-        total += (subtotal * (charge.amount / 100))
+        total += (subtotal * (amount / 100))
       } else {
-        total += charge.amount
+        total += amount
       }
     })
     return total
@@ -138,10 +144,11 @@ export default function StaffOrders() {
   
   // Helper function to calculate individual service charge amounts
   const calculateServiceChargeAmount = (charge: ServiceCharge) => {
+    const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount
     if (charge.type === 'percentage') {
-      return (subtotal * (charge.amount / 100))
+      return (subtotal * (amount / 100))
     }
-    return charge.amount
+    return amount
   }
   
   // Fetch active service charges
@@ -492,8 +499,8 @@ export default function StaffOrders() {
                   <span>Subtotal</span>
                   <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                {/* Service Charges - Dynamic from API */}
-                {serviceCharges.map((charge) => (
+                {/* Service Charges - Dynamic from API (only show if subtotal > 0) */}
+                {subtotal > 0 && serviceCharges.map((charge) => (
                   <div key={charge.id} className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>
                       {charge.description}
@@ -540,7 +547,7 @@ export default function StaffOrders() {
             <div>
               <div className="text-xs text-muted-foreground">
                 Subtotal: ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                {serviceCharges.length > 0 && (
+                {subtotal > 0 && serviceCharges.length > 0 && (
                   <span> + Charges: ₦{serviceCharges.reduce((sum, charge) => sum + calculateServiceChargeAmount(charge), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 )}
               </div>
