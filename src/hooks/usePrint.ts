@@ -1,4 +1,5 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useEffect } from 'react'
+import { BACKEND_URL } from '@/lib/queryClient'
 
 interface OrderData {
   orderNumber: string
@@ -20,7 +21,34 @@ interface OrderData {
   tendered?: number
 }
 
+interface ServiceCharge {
+  id: string
+  description: string  // API uses 'description' not 'name'
+  type: string
+  amount: string       // API uses 'amount' for percentage value
+  status: string       // API uses 'status' not 'is_active'
+}
+
 export const usePrint = () => {
+  const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([]);
+
+  // Fetch service charges on mount
+  useEffect(() => {
+    const fetchServiceCharges = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/service-charges/active`);
+        if (!response.ok) throw new Error('Failed to fetch service charges');
+        const data = await response.json();
+        // The /active endpoint already returns only active charges
+        setServiceCharges(data);
+        console.log('✅ Service charges loaded for receipt:', data);
+      } catch (error) {
+        console.error('❌ Error fetching service charges for receipt:', error);
+        setServiceCharges([]);
+      }
+    };
+    fetchServiceCharges();
+  }, []);
   const printInvoice = useCallback((orderData: OrderData, receiptType: 'receipt' | 'walk-in' = 'receipt') => {
     const printWindow = window.open('', '_blank', 'width=300,height=600')
     
@@ -37,18 +65,38 @@ export const usePrint = () => {
     const dateStr = orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const timeStr = orderDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-    // Calculate totals with VAT
-    // Calculate subtotal from items (item prices without VAT)
+    // Calculate totals with dynamic service charges
+    // Calculate subtotal from items (item prices without charges)
     const calculatedSubtotal = orderData.items?.reduce((sum: number, item: any) => {
       const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price || 0
       return sum + (price * (item.quantity || 1))
     }, 0) || 0
     
-    // Always calculate VAT from subtotal and add to get total
-    // Ensure all values are positive
+    // Calculate all service charges dynamically from API
     const subtotal = Math.abs(calculatedSubtotal)
-    const vat = Math.abs(subtotal * 0.075) // 7.5% VAT
-    const totalAmount = subtotal + vat
+    
+    // Debug: Log service charges
+    console.log('🔍 Service charges at print time:', serviceCharges);
+    console.log('🔍 Subtotal:', subtotal);
+    
+    // Calculate each service charge
+    const chargeBreakdown = serviceCharges.map(charge => {
+      const percentage = parseFloat(charge.amount); // Convert string to number
+      return {
+        name: charge.description,
+        percentage: percentage,
+        amount: Math.abs(subtotal * (percentage / 100))
+      };
+    });
+    
+    console.log('🔍 Charge breakdown:', chargeBreakdown);
+    
+    // Sum all charges
+    const totalCharges = chargeBreakdown.reduce((sum, charge) => sum + charge.amount, 0);
+    const totalAmount = subtotal + totalCharges;
+    
+    console.log('🔍 Total charges:', totalCharges);
+    console.log('🔍 Total amount:', totalAmount);
 
     // Format currency
     const formatCurrency = (amount: number) => {
@@ -330,10 +378,11 @@ export const usePrint = () => {
             <span class="summary-label">Subtotal</span>
             <span class="summary-value">${formatCurrency(subtotal)}</span>
           </div>
+          ${chargeBreakdown.map(charge => `
           <div class="summary-row">
-            <span class="summary-vat-label">VAT (7.5%)</span>
-            <span class="summary-vat-value">${formatCurrency(vat)}</span>
-          </div>
+            <span class="summary-vat-label">${charge.name} (${charge.percentage.toFixed(2)}%)</span>
+            <span class="summary-vat-value">${formatCurrency(charge.amount)}</span>
+          </div>`).join('')}
           <div class="summary-row">
             <span class="summary-label">Total Amount</span>
             <span class="summary-value">${formatCurrency(totalAmount)}</span>
@@ -373,7 +422,7 @@ export const usePrint = () => {
         <!-- Footer -->
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
-          <div class="footer-name">nibbles kitchen</div>
+          <div class="footer-name">nibblesfastfood.com/</div>
         </div>
 
         <!-- Print Actions (hidden when printing) -->
@@ -418,7 +467,7 @@ export const usePrint = () => {
     } else {
       printWindow.addEventListener('load', printAfterLoad, { once: true })
     }
-  }, [])
+  }, [serviceCharges])
   
   return { printInvoice }
 }

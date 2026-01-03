@@ -27,7 +27,7 @@ import { useCart } from "@/context/CartContext";
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart } = useCart();
+  const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart, updateSpecialInstructions } = useCart();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartOpen, setCartOpen] = useState(false);
@@ -140,8 +140,7 @@ export default function CustomerMenu() {
   };
 
   const updateInstructions = (menuItemId: string, instructions: string) => {
-    // CartContext doesn't have updateSpecialInstructions yet, so we'll skip this for now
-    // or you can add it to the context
+    updateSpecialInstructions(menuItemId, instructions);
   };
 
   const subtotal = cart.reduce(
