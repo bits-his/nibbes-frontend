@@ -503,28 +503,50 @@ export default function Checkout() {
   }
 
   const calculateTotal = () => {
+    // Don't calculate if there are no items
+    const hasItems = walkInOrder 
+      ? (walkInOrder.items?.length > 0)
+      : (cart.length > 0)
+    
+    if (!hasItems) {
+      return 0
+    }
+    
     const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
     
-    // Apply service charges
+    // Apply service charges only if there are items
     let totalWithCharges = baseAmount
-    serviceCharges.forEach(charge => {
-      if (charge.type === 'percentage') {
-        totalWithCharges += (baseAmount * (charge.amount / 100))
-      } else {
-        totalWithCharges += charge.amount
-      }
-    })
+    if (hasItems) {
+      serviceCharges.forEach(charge => {
+        const chargeAmount = Number(charge.amount) || 0
+        if (charge.type === 'percentage') {
+          totalWithCharges += (baseAmount * (chargeAmount / 100))
+        } else {
+          totalWithCharges += chargeAmount
+        }
+      })
+    }
     
     return totalWithCharges
   }
   
   // Helper function to calculate individual service charge amounts
   const calculateServiceChargeAmount = (charge: ServiceCharge) => {
-    const baseAmount = subtotal + deliveryFee
-    if (charge.type === 'percentage') {
-      return (baseAmount * (charge.amount / 100))
+    // Don't calculate if there are no items
+    const hasItems = walkInOrder 
+      ? (walkInOrder.items?.length > 0)
+      : (cart.length > 0)
+    
+    if (!hasItems) {
+      return 0
     }
-    return charge.amount
+    
+    const baseAmount = subtotal + deliveryFee
+    const chargeAmount = Number(charge.amount) || 0
+    if (charge.type === 'percentage') {
+      return (baseAmount * (chargeAmount / 100))
+    }
+    return chargeAmount
   }
 
   // Handle Interswitch card payment - Inline Checkout
@@ -1332,8 +1354,8 @@ export default function Checkout() {
                 {!multiPaymentEnabled && (
                   <div className="space-y-3 mb-6">
                     {/* Service Charges - Dynamic from API */}
-                    {walkInOrder && walkInOrder.total ? (
-                      // Walk-in order: show breakdown with service charges (total already includes charges)
+                    {walkInOrder && walkInOrder.items?.length > 0 ? (
+                      // Walk-in order: show breakdown with service charges
                       <>
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>Subtotal</span>
@@ -1350,7 +1372,7 @@ export default function Checkout() {
                         ))}
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
                           <span>Total</span>
-                          <span className="text-[#4EB5A4]">₦{walkInOrder.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                       </>
                     ) : (
