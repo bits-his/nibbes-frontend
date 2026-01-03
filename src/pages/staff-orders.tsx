@@ -15,6 +15,15 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem, CartItem } from "@shared/schema";
 
+// Service Charge interface
+interface ServiceCharge {
+  id: string
+  description: string
+  type: 'fixed' | 'percentage'
+  amount: number
+  status: 'active' | 'inactive'
+}
+
 const orderFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
   customerPhone: z.string().optional(),
@@ -28,6 +37,10 @@ export default function StaffOrders() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  
+  // Service charges state
+  const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
+  const [loadingCharges, setLoadingCharges] = useState(true)
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -109,6 +122,49 @@ export default function StaffOrders() {
     (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,
     0
   );
+  
+  // Calculate total with service charges
+  const calculateTotal = () => {
+    let total = subtotal
+    serviceCharges.forEach(charge => {
+      if (charge.type === 'percentage') {
+        total += (subtotal * (charge.amount / 100))
+      } else {
+        total += charge.amount
+      }
+    })
+    return total
+  }
+  
+  // Helper function to calculate individual service charge amounts
+  const calculateServiceChargeAmount = (charge: ServiceCharge) => {
+    if (charge.type === 'percentage') {
+      return (subtotal * (charge.amount / 100))
+    }
+    return charge.amount
+  }
+  
+  // Fetch active service charges
+  useEffect(() => {
+    const fetchServiceCharges = async () => {
+      try {
+        setLoadingCharges(true)
+        const response = await apiRequest("GET", "/api/service-charges/active")
+        if (response.ok) {
+          const charges = await response.json()
+          setServiceCharges(charges)
+          console.log('✅ Service charges loaded:', charges)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching service charges:', error)
+        setServiceCharges([])
+      } finally {
+        setLoadingCharges(false)
+      }
+    }
+    
+    fetchServiceCharges()
+  }, [])
 
   // No longer creating order here - just preparing data for checkout
   const handleProceedToCheckout = () => {
@@ -121,7 +177,7 @@ export default function StaffOrders() {
     localStorage.setItem('pendingWalkInOrder', JSON.stringify({
       customerName: form.getValues('customerName'),
       customerPhone: form.getValues('customerPhone'),
-      total: subtotal * 1.075, // Include 7.5% VAT
+      total: calculateTotal(), // Include all service charges
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
         quantity: item.quantity,
@@ -436,16 +492,21 @@ export default function StaffOrders() {
                   <span>Subtotal</span>
                   <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                {/* VAT */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>VAT (7.5%)</span>
-                  <span>₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
+                {/* Service Charges - Dynamic from API */}
+                {serviceCharges.map((charge) => (
+                  <div key={charge.id} className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      {charge.description}
+                      {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
+                    </span>
+                    <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
                 {/* Total */}
                 <div className="flex items-center justify-between text-base md:text-xl border-t pt-3">
                   <span className="font-semibold">Total</span>
                   <span className="font-bold" data-testid="text-total">
-                    ₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:gap-3">
@@ -477,8 +538,13 @@ export default function StaffOrders() {
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 md:hidden z-10">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs text-muted-foreground">Subtotal: ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} + VAT (7.5%): ₦{(subtotal * 0.075).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-              <div className="font-semibold">Total: ₦{(subtotal * 1.075).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-xs text-muted-foreground">
+                Subtotal: ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {serviceCharges.length > 0 && (
+                  <span> + Charges: ₦{serviceCharges.reduce((sum, charge) => sum + calculateServiceChargeAmount(charge), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                )}
+              </div>
+              <div className="font-semibold">Total: ₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? 's' : ''}</div>
             </div>
             <Button

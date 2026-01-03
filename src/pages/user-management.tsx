@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge, UserRound, ChefHat, UserCheck2, Shield } from "lucide-react"
+import { Eye, EyeOff, Search, Plus, Trash2, Edit2, Users, ShieldCheck, Badge, UserRound, ChefHat, UserCheck2, Shield, DollarSign } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
+import ServiceChargesModal from "@/components/ServiceChargesModal"
 
 interface User {
   id: string
@@ -84,6 +85,9 @@ export default function UserManagement() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+  
+  // Service charges modal state
+  const [showServiceChargesModal, setShowServiceChargesModal] = useState(false)
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -620,6 +624,14 @@ export default function UserManagement() {
           >
             <Shield className="w-5 h-5" />
             Roles
+          </Button>
+          <Button
+            onClick={() => setShowServiceChargesModal(true)}
+            variant="outline"
+            className="border-slate-200 hover:bg-slate-100 h-11 gap-2"
+          >
+            <DollarSign className="w-5 h-5" />
+            Charges
           </Button>
 
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
@@ -1258,6 +1270,12 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Service Charges Modal */}
+      <ServiceChargesModal 
+        open={showServiceChargesModal} 
+        onOpenChange={setShowServiceChargesModal} 
+      />
     </div>
   )
 }
