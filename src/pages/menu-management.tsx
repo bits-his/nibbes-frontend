@@ -421,13 +421,13 @@ export default function MenuManagement() {
               <Plus className="w-4 h-4 mr-2" />
               Add Category
             </Button>
-            {/* <Button
+            <Button
               onClick={() => handleOpenDialog()}
               data-testid="button-add-item"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Menu Item
-            </Button> */}
+            </Button>
           </div>
         </div>
 
