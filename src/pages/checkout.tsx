@@ -112,6 +112,9 @@ export default function Checkout() {
   // Service charges state
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
   const [loadingCharges, setLoadingCharges] = useState(true)
+  
+  // Kitchen status state
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
 
   // Payment methods available for customer checkout (online orders)
   const paymentMethods: PaymentMethod[] = [
@@ -560,12 +563,18 @@ export default function Checkout() {
         description: "Please wait...",
       })
 
+      // Generate transaction reference BEFORE creating order
+      // This ensures the backend can store it in the payment record
+      const txnRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      
       console.log('Sending order to API with pending status...')
-      // Create order with pending payment status
+      console.log('Transaction reference:', txnRef)
+      // Create order with pending payment status and transaction reference
       const response = await apiRequest("POST", "/api/orders", {
         ...orderData,
         paymentStatus: "pending",
         paymentMethod: "card",
+        transactionRef: txnRef, // Send transaction reference to backend
       })
       
       console.log('Response status:', response.status)
@@ -594,8 +603,7 @@ export default function Checkout() {
       setIsProcessingPayment(false)
       setShowPaymentModal(false)
 
-      // Generate transaction reference
-      const txnRef = `NKO-${createdOrder.orderNumber}-${Date.now()}`
+      // Transaction reference was already generated above and sent to backend
       // Always use calculateTotal() which includes VAT (7.5%) to ensure correct payment amount
       const amount = Math.round(calculateTotal() * 100) // Amount in kobo (includes VAT)
 
@@ -662,7 +670,7 @@ export default function Checkout() {
         // payment_channels: ["card", "bank", "ussd", "qr"], 
         
         // Callback when payment is completed
-        onComplete: function(response: any) {
+        onComplete: async function(response: any) {
           console.log('Payment completed:', response)
           console.log('Response code:', response.resp || response.responseCode)
           
@@ -671,7 +679,33 @@ export default function Checkout() {
           
           // Check payment response
           // Interswitch success codes: "00" or "10" (pending)
-          if (response.resp === "00" || response.responseCode === "00") {
+          const respCode = response.resp || response.responseCode
+          const paymentStatus = respCode === "00" ? "success" : respCode === "10" ? "pending" : "failed"
+          
+          // Call backend payment callback to update paymentStatus
+          // This ensures the order paymentStatus is updated even if Interswitch webhook fails
+          try {
+            const callbackResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/payment/callback`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                txnref: txnRef,
+                resp: respCode,
+                amount: amount
+              })
+            })
+            
+            if (callbackResponse.ok) {
+              console.log('✅ Payment callback processed successfully')
+            } else {
+              console.error('⚠️ Payment callback failed:', await callbackResponse.text())
+            }
+          } catch (callbackError) {
+            console.error('⚠️ Error calling payment callback:', callbackError)
+            // Don't fail the payment flow if callback fails - webhook should handle it
+          }
+          
+          if (respCode === "00") {
             // Payment successful
             toast({
               title: "Payment Successful! 🎉",
@@ -687,7 +721,7 @@ export default function Checkout() {
                 setLocation("/docket")
               }, 1500)
             })
-          } else if (response.resp === "10" || response.responseCode === "10") {
+          } else if (respCode === "10") {
             // Payment pending (e.g., bank transfer initiated)
             toast({
               title: "Payment Pending",
@@ -825,6 +859,16 @@ export default function Checkout() {
   })
 
   const onSubmit = (values: CheckoutFormValues) => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!values.orderType) {
       toast({
         title: "Delivery Method Required",
@@ -969,22 +1013,37 @@ export default function Checkout() {
   }
 
   const handleWalkInPayment = async () => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // For card payments, use Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
       try {
         setIsProcessingPayment(true)
         
-        // Create order with pending payment status
+        // Generate transaction reference BEFORE creating order
+        const transactionRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        // Create order with pending payment status and transaction reference
         const orderData = {
           customerName: walkInOrder.customerName,
           customerPhone: walkInOrder.customerPhone || "N/A",
           orderType: "walk-in",
           paymentMethod: 'card',
           paymentStatus: "pending",
+          transactionRef: transactionRef, // Send transaction reference to backend
           items: walkInOrder.items,
         }
 
         console.log("Creating walk-in order for card payment:", orderData)
+        console.log("Transaction reference:", transactionRef)
 
         // Create order via API
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/orders`, {
@@ -1014,7 +1073,6 @@ export default function Checkout() {
 
         // Calculate amount in kobo (multiply by 100)
         const amountInKobo = Math.round((walkInOrder.total || 0) * 100)
-        const transactionRef = `NKO-${createdOrder.orderNumber}-${Date.now()}`
 
         console.log("Opening Interswitch modal for walk-in order...")
         console.log("Transaction Reference:", transactionRef)
@@ -1039,31 +1097,37 @@ export default function Checkout() {
           merchant_name: "Nibbles Kitchen",
           logo_url: window.location.origin + "/nibbles.jpg",
           
-          onComplete: function (response: any) {
+          onComplete: async function (response: any) {
             console.log("Walk-in payment completed:", response)
             console.log("Response code:", response.responseCode)
             
-            if (response.responseCode === '00') {
-              // Payment successful - Update order status to paid immediately
-              console.log('✅ Walk-in payment successful! Updating order paymentStatus to "paid"...')
-              
-              // Update order payment status via API
-              apiRequest("POST", "/api/payment/callback", {
-                txnref: response.txnref || response.txn_ref || transactionRef,
-                resp: response.resp || response.responseCode,
-                amount: response.amount || amountInKobo,
-                paymentReference: response.paymentReference,
-                responseDescription: response.responseDescription || response.desc
-              }).then(async (callbackResponse) => {
-                if (callbackResponse.ok) {
-                  console.log('✅ Walk-in order payment status updated to "paid" successfully')
-                } else {
-                  console.warn('⚠️ Failed to update walk-in order status via callback, webhook will handle it')
-                }
-              }).catch((err) => {
-                console.warn('⚠️ Error calling payment callback for walk-in order, webhook will handle it:', err)
+            const respCode = response.responseCode || response.resp
+            
+            // Call backend payment callback to update paymentStatus
+            // This ensures the order paymentStatus is updated even if Interswitch webhook fails
+            try {
+              const callbackResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/payment/callback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  txnref: transactionRef,
+                  resp: respCode,
+                  amount: amountInKobo
+                })
               })
               
+              if (callbackResponse.ok) {
+                console.log('✅ Payment callback processed successfully')
+              } else {
+                console.error('⚠️ Payment callback failed:', await callbackResponse.text())
+              }
+            } catch (callbackError) {
+              console.error('⚠️ Error calling payment callback:', callbackError)
+              // Don't fail the payment flow if callback fails - webhook should handle it
+            }
+            
+            if (respCode === '00') {
+              // Payment successful
               toast({
                 title: "Payment Successful!",
                 description: `Order #${createdOrder.orderNumber} has been paid.`,
@@ -1193,6 +1257,21 @@ export default function Checkout() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Walk-in Orders
           </Button>
+
+          {/* Kitchen Closed Alert */}
+          {!kitchenStatus.isOpen && (
+            <Card className="mb-6 border-red-500 bg-red-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <ChefHat className="w-6 h-6 text-red-600" />
+                  <div>
+                    <h3 className="font-semibold text-red-900">Kitchen is Closed</h3>
+                    <p className="text-sm text-red-700">The kitchen is currently closed and not accepting orders. Please try again later.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-foreground mb-2">Confirm Payment</h1>
@@ -1460,6 +1539,21 @@ export default function Checkout() {
         </div>
 
         <CartSummaryHeader itemCount={cart.length} subtotal={subtotal} />
+
+        {/* Kitchen Closed Alert */}
+        {!kitchenStatus.isOpen && (
+          <Card className="mb-6 border-red-500 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <ChefHat className="w-6 h-6 text-red-600" />
+                <div>
+                  <h3 className="font-semibold text-red-900">Kitchen is Closed</h3>
+                  <p className="text-sm text-red-700">The kitchen is currently closed and not accepting orders. Please try again later.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -2032,12 +2126,17 @@ export default function Checkout() {
               <Button
                 onClick={handlePaymentConfirmation}
                 className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
-                disabled={isProcessingPayment || createOrderMutation.isPending}
+                disabled={isProcessingPayment || createOrderMutation.isPending || !kitchenStatus.isOpen}
               >
                 {isProcessingPayment || createOrderMutation.isPending ? (
                   <>
                     <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                     Processing...
+                  </>
+                ) : !kitchenStatus.isOpen ? (
+                  <>
+                    <ChefHat className="mr-2 h-4 w-4" />
+                    Kitchen Closed
                   </>
                 ) : (
                   <>

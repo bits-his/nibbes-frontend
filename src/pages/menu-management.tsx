@@ -421,13 +421,13 @@ export default function MenuManagement() {
               <Plus className="w-4 h-4 mr-2" />
               Add Category
             </Button>
-            {/* <Button
+            <Button
               onClick={() => handleOpenDialog()}
               data-testid="button-add-item"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Menu Item
-            </Button> */}
+            </Button>
           </div>
         </div>
 
@@ -457,7 +457,16 @@ export default function MenuManagement() {
                     alt={item.name}
                     className="w-full h-full object-cover"
                   />
-                  {!item.available && (
+                  {/* Show Out of Stock badge if stockBalance is 0 */}
+                  {item.stockBalance !== null && item.stockBalance <= 0 && (
+                    <div className="absolute inset-0 bg-red-600/90 flex items-center justify-center">
+                      <Badge variant="destructive" className="text-base font-bold">
+                        Out of Stock
+                      </Badge>
+                    </div>
+                  )}
+                  {/* Show Unavailable badge if item is manually set unavailable */}
+                  {!item.available && item.stockBalance !== 0 && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                       <Badge variant="secondary" className="text-base">
                         Unavailable
@@ -477,6 +486,44 @@ export default function MenuManagement() {
                       {item.description}
                     </p>
                   </div>
+                  
+                  {/* Stock Balance Display */}
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Stock Balance</span>
+                      <span className={`text-sm font-semibold ${
+                        (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 0)
+                          ? 'text-red-700 font-bold' // Negative = Critical error
+                          : (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance === 0) 
+                          ? 'text-red-600' 
+                          : (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 5) 
+                          ? 'text-orange-600' 
+                          : (item.stockBalance !== null && item.stockBalance !== undefined)
+                          ? 'text-green-600'
+                          : 'text-gray-500'
+                      }`}>
+                        {item.stockBalance !== null && item.stockBalance !== undefined
+                          ? item.stockBalance < 0
+                            ? `${item.stockBalance} portions (⚠️ Oversold)`
+                            : item.stockBalance === 0
+                            ? 'Out of Stock'
+                            : `${item.stockBalance} portions`
+                          : 'Not tracked'}
+                      </span>
+                      {item.itemCode && (
+                        <span className="text-xs text-muted-foreground mt-1">
+                          Code: {item.itemCode}
+                        </span>
+                      )}
+                      {/* Warning for negative stock */}
+                      {(item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 0) && (
+                        <span className="text-xs text-red-700 mt-1 font-medium">
+                          ⚠️ Stock discrepancy - needs restock
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
                   <div className="flex items-center justify-between">
                     <span className="text-xl font-bold">
                       ₦{parseFloat(item.price).toLocaleString()}
@@ -586,7 +633,14 @@ export default function MenuManagement() {
                   name="quantity"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantity</FormLabel>
+                      <FormLabel>
+                        Initial Quantity
+                        {editingItem && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            (Read-only)
+                          </span>
+                        )}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -594,9 +648,16 @@ export default function MenuManagement() {
                           placeholder="20"
                           value={field.value ?? ""}
                           onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                          disabled={!!editingItem}
+                          className={editingItem ? "bg-gray-100 cursor-not-allowed" : ""}
                           data-testid="input-quantity"
                         />
                       </FormControl>
+                      {editingItem && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Stock is tracked via store entries. To adjust stock, use Store Management.
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}

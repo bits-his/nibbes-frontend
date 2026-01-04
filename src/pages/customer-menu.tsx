@@ -9,6 +9,8 @@ import {
   QrCode,
   Search,
   ChevronDown,
+  ChefHat,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_3376
 import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -38,11 +41,36 @@ export default function CustomerMenu() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  
+  // Kitchen status state
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
 
   // Initialize and refresh menu data on component mount
   useEffect(() => {
     // Force refresh the menu data when component mounts to ensure fresh data
     queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+  }, []);
+
+  // Fetch kitchen status
+  useEffect(() => {
+    const fetchKitchenStatus = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/kitchen/status")
+        if (response.ok) {
+          const status = await response.json()
+          setKitchenStatus(status)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching kitchen status:', error)
+        // Default to open if check fails
+        setKitchenStatus({ isOpen: true })
+      }
+    }
+    
+    fetchKitchenStatus()
+    // Poll kitchen status every 30 seconds
+    const interval = setInterval(fetchKitchenStatus, 30000)
+    return () => clearInterval(interval)
   }, []);
 
   // WebSocket connection for real-time menu updates
@@ -109,6 +137,17 @@ export default function CustomerMenu() {
   );
 
   const addToCart = (menuItem: MenuItem) => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    
     // Prevent adding unavailable items to cart
     if (!menuItem.available) {
       toast({
@@ -119,6 +158,32 @@ export default function CustomerMenu() {
       });
       return;
     }
+    
+    // Check stock balance
+    if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
+      toast({
+        title: "Out of Stock",
+        description: `${menuItem.name} is currently out of stock.`,
+        variant: "destructive",
+        duration: 2000,
+      });
+      return;
+    }
+    
+    // Check if adding would exceed available stock
+    const currentInCart = cart.find(item => String(item.menuItem.id) === String(menuItem.id))?.quantity || 0;
+    if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
+      if (currentInCart >= menuItem.stockBalance) {
+        toast({
+          title: "Maximum Quantity Reached",
+          description: `Only ${menuItem.stockBalance} portion${menuItem.stockBalance !== 1 ? 's' : ''} available. You already have ${currentInCart} in your cart.`,
+          variant: "destructive",
+          duration: 3000,
+        });
+        return;
+      }
+    }
+    
     addToCartContext({ menuItem: menuItem as any });
     toast({
       title: "Added to Cart",
@@ -131,11 +196,32 @@ export default function CustomerMenu() {
     const item = cart.find(item => item.menuItem.id === menuItemId);
     if (item) {
       const newQuantity = item.quantity + delta;
-      if (newQuantity <= 0) {
-        removeFromCart(menuItemId);
-      } else {
-        updateQuantityContext(menuItemId, newQuantity);
+      
+      // If decreasing, allow it
+      if (delta < 0) {
+        if (newQuantity <= 0) {
+          removeFromCart(menuItemId);
+        } else {
+          updateQuantityContext(menuItemId, newQuantity);
+        }
+        return;
       }
+      
+      // If increasing, check stock availability
+      const menuItem = menuItems?.find(m => String(m.id) === String(menuItemId));
+      if (menuItem && menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
+        if (newQuantity > menuItem.stockBalance) {
+          toast({
+            title: "Maximum Quantity Reached",
+            description: `Only ${menuItem.stockBalance} portion${menuItem.stockBalance !== 1 ? 's' : ''} available for ${menuItem.name}.`,
+            variant: "destructive",
+            duration: 3000,
+          });
+          return;
+        }
+      }
+      
+      updateQuantityContext(menuItemId, newQuantity);
     }
   };
 
@@ -244,6 +330,20 @@ export default function CustomerMenu() {
         canonicalUrl="https://nibbleskitchen.netlify.app/"
       />
       <div className="min-h-screen bg-background">
+        {/* Kitchen Closed Banner - Very Prominent */}
+        {!kitchenStatus.isOpen && (
+          <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80">
+            <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
+              <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+              <div className="text-center">
+                <h2 className="text-lg md:text-2xl font-bold mb-1">⚠️ KITCHEN IS CLOSED</h2>
+                <p className="text-sm md:text-base">We are currently not accepting orders. Please check back later.</p>
+              </div>
+              <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+            </div>
+          </div>
+        )}
+        
         {/* Hero Section */}
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
@@ -414,6 +514,8 @@ export default function CustomerMenu() {
                 (cartItem) => String(cartItem.menuItem.id) === String(item.id)
               );
               const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
+              const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
+                                 (cartItem ? cartItem.quantity < item.stockBalance : true);
               return (
                 <Card
                   key={item.id}
@@ -428,14 +530,21 @@ export default function CustomerMenu() {
                       alt={item.name}
                       className={`w-full h-full object-cover ${!item.available ? 'opacity-60' : ''}`}
                     />
-                    {!item.available && (
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                        <Badge variant="secondary" className="text-sm sm:text-base font-semibold bg-gray-600 text-white px-4 py-2">
-                          Sold Out
+                    {/* Out of Stock Overlay - Using stockBalance */}
+                    {(!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0)) && (
+                      <div className="absolute inset-0 bg-red-600/80 flex items-center justify-center">
+                        <Badge variant="destructive" className="text-sm sm:text-base font-bold bg-red-700 text-white px-4 py-2 shadow-lg">
+                          Out of Stock
                         </Badge>
                       </div>
                     )}
-                    {isInCart && item.available && (
+                    {/* Low Stock Badge */}
+                    {item.available && item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3 && (
+                      <div className="absolute top-2 left-2 bg-orange-500 text-white rounded-md px-2 py-1 text-xs font-semibold shadow-md">
+                        Only {item.stockBalance} left!
+                      </div>
+                    )}
+                    {isInCart && item.available && (item.stockBalance === null || item.stockBalance === undefined || item.stockBalance > 0) && (
                       <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold">
                         {cartItem?.quantity}
                       </div>
@@ -450,6 +559,18 @@ export default function CustomerMenu() {
                         {item.description}
                       </p>
                     </div>
+                    
+                    {/* Stock Balance Info for Customer */}
+                    {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 5 && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className={`font-medium ${
+                          item.stockBalance <= 2 ? 'text-red-600' : 'text-orange-600'
+                        }`}>
+                          ⚡ Only {item.stockBalance} portion{item.stockBalance !== 1 ? 's' : ''} left
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold">
                         ₦{parseFloat(item.price).toLocaleString()}
@@ -472,9 +593,10 @@ export default function CustomerMenu() {
                             size="sm"
                             variant="ghost"
                             onClick={() => item.id && updateQuantity(String(item.id), 1)}
-                            disabled={!item.available}
+                            disabled={!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0) || !canAddMore}
                             data-testid={`button-plus-${item.id}`}
                             className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
+                            title={!canAddMore ? `Maximum ${item.stockBalance} portions available` : ''}
                           >
                             <Plus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
                           </Button>
@@ -483,23 +605,15 @@ export default function CustomerMenu() {
                         <Button
                           size="sm"
                           onClick={() => addToCart(item)}
-                          disabled={!item.available}
+                          disabled={!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0)}
                           data-testid={`button-add-${item.id}`}
                           className="text-xs px-2 py-1.5"
                         >
                           <Plus className="w-2.5 h-2.5 mr-1" />
-                          {item.available ? 'Add' : 'Sold Out'}
+                          {(item.available && (item.stockBalance === null || item.stockBalance === undefined || item.stockBalance > 0)) ? 'Add' : 'Out of Stock'}
                         </Button>
                       )}
                     </div>
-                    {!item.available && (
-                      <Badge
-                        variant="secondary"
-                        className="w-full justify-center text-sm sm:text-base font-semibold bg-gray-600 text-white py-2"
-                      >
-                        Sold Out
-                      </Badge>
-                    )}
                   </CardContent>
                 </Card>
               );
