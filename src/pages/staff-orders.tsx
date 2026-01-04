@@ -77,7 +77,8 @@ export default function StaffOrders() {
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      return item.available && matchesCategory && matchesSearch;
+      // Show all items, including out of stock ones
+      return matchesCategory && matchesSearch;
     }
   );
 
@@ -91,6 +92,31 @@ export default function StaffOrders() {
         duration: 3000,
       });
       return;
+    }
+    
+    // Check if item is out of stock
+    if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
+      toast({
+        title: "Out of Stock",
+        description: `${menuItem.name} is currently out of stock.`,
+        variant: "destructive",
+        duration: 2000,
+      });
+      return;
+    }
+    
+    // Check if we can add more of this item
+    if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
+      const currentCartQuantity = cart.find(item => item.menuItem.id === menuItem.id)?.quantity || 0;
+      if (currentCartQuantity >= menuItem.stockBalance) {
+        toast({
+          title: "Insufficient Stock",
+          description: `Only ${menuItem.stockBalance} portion(s) of ${menuItem.name} available.`,
+          variant: "destructive",
+          duration: 2000,
+        });
+        return;
+      }
     }
     
     setCart((prev) => {
@@ -107,15 +133,42 @@ export default function StaffOrders() {
   };
 
   const updateQuantity = (menuItemId: number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.menuItem.id === menuItemId
-            ? { ...item, quantity: item.quantity + delta }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
+    setCart((prev) => {
+      const item = prev.find((cartItem) => cartItem.menuItem.id === menuItemId);
+      if (!item) return prev;
+      
+      const newQuantity = item.quantity + delta;
+      
+      // If decreasing, allow it
+      if (delta < 0) {
+        return prev
+          .map((cartItem) =>
+            cartItem.menuItem.id === menuItemId
+              ? { ...cartItem, quantity: newQuantity }
+              : cartItem
+          )
+          .filter((cartItem) => cartItem.quantity > 0);
+      }
+      
+      // If increasing, check stock limits
+      if (delta > 0 && item.menuItem.stockBalance !== null && item.menuItem.stockBalance !== undefined) {
+        if (newQuantity > item.menuItem.stockBalance) {
+          toast({
+            title: "Insufficient Stock",
+            description: `Only ${item.menuItem.stockBalance} portion(s) of ${item.menuItem.name} available.`,
+            variant: "destructive",
+            duration: 2000,
+          });
+          return prev;
+        }
+      }
+      
+      return prev.map((cartItem) =>
+        cartItem.menuItem.id === menuItemId
+          ? { ...cartItem, quantity: newQuantity }
+          : cartItem
+      );
+    });
   };
 
   const removeFromCart = (menuItemId: number) => {
@@ -411,11 +464,16 @@ export default function StaffOrders() {
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                 {filteredItems?.map((item) => {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
+                  const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
+                  const isOutOfStock = !item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0);
+                  const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
+                  const canAddMore = !isOutOfStock && (item.stockBalance === null || item.stockBalance === undefined || !cartItem || cartItem.quantity < item.stockBalance);
+                  
                   return (
                     <Card
                       key={item.id}
-                      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''}`}
-                      onClick={() => item.available && kitchenStatus.isOpen && addToCart(item)}
+                      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''} ${isOutOfStock ? 'opacity-75' : ''}`}
+                      onClick={() => canAddMore && kitchenStatus.isOpen && addToCart(item)}
                       data-testid={`card-menu-item-${item.id}`}
                     >
                       <div className="aspect-video overflow-hidden relative">
@@ -429,12 +487,40 @@ export default function StaffOrders() {
                             <Plus className="w-3 h-3 md:w-4 md:h-4" />
                           </div>
                         )}
+                        {/* Out of Stock Overlay */}
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 bg-red-600/90 flex items-center justify-center">
+                            <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-red-700/50 shadow-lg border-2 border-white">
+                              OUT OF STOCK
+                            </span>
+                          </div>
+                        )}
+                        {/* Low Stock Badge */}
+                        {!isOutOfStock && isLowStock && (
+                          <div className="absolute top-2 left-2">
+                            <Badge variant="destructive" className="text-xs font-semibold shadow-md">
+                              Only {item.stockBalance} left!
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                       <CardContent className="p-3 md:p-4">
                         <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{item.name}</h3>
                         <p className="text-base md:text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
-                        {!item.available && (
-                          <Badge variant="secondary" className="mt-2 text-xs">Unavailable</Badge>
+                        {/* Stock Balance Indicator */}
+                        {item.stockBalance !== null && item.stockBalance !== undefined ? (
+                          <div className="flex items-center gap-1 mt-2">
+                            <span className="text-xs text-muted-foreground">Stock:</span>
+                            <span className={`text-xs font-semibold ${
+                              item.stockBalance <= 0 ? 'text-red-600' :
+                              item.stockBalance <= 3 ? 'text-orange-500' :
+                              'text-green-600'
+                            }`}>
+                              {item.stockBalance} portions
+                            </span>
+                          </div>
+                        ) : (
+                          <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
                         )}
                       </CardContent>
                     </Card>
@@ -499,7 +585,12 @@ export default function StaffOrders() {
                     <p className="text-sm mt-2">Click on menu items to add them</p>
                   </div>
                 ) : (
-                  cart.map((item) => (
+                  cart.map((item) => {
+                    const atMaxStock = item.menuItem.stockBalance !== null && 
+                                      item.menuItem.stockBalance !== undefined && 
+                                      item.quantity >= item.menuItem.stockBalance;
+                    
+                    return (
                     <Card key={item.menuItem.id} data-testid={`cart-item-${item.menuItem.id}`}>
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-center justify-between">
@@ -537,6 +628,8 @@ export default function StaffOrders() {
                               variant="outline"
                               className="h-8 w-8"
                               onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
+                              disabled={atMaxStock}
+                              title={atMaxStock ? `Maximum ${item.menuItem.stockBalance} portions available` : undefined}
                               data-testid={`button-increase-${item.menuItem.id}`}
                             >
                               <Plus className="w-3 h-3" />
@@ -546,6 +639,13 @@ export default function StaffOrders() {
                             ₦{(parseFloat(item.menuItem.price) * item.quantity).toLocaleString()}
                           </span>
                         </div>
+                        
+                        {/* Stock warning */}
+                        {atMaxStock && (
+                          <div className="text-xs text-orange-600 font-medium">
+                            ⚠️ Maximum stock reached ({item.menuItem.stockBalance} available)
+                          </div>
+                        )}
 
                         <Textarea
                           placeholder="Special instructions"
@@ -557,7 +657,7 @@ export default function StaffOrders() {
                         />
                       </CardContent>
                     </Card>
-                  ))
+                  )})
                 )}
               </div>
 
