@@ -489,8 +489,8 @@ export default function StaffOrders() {
                         )}
                         {/* Out of Stock Overlay */}
                         {isOutOfStock && (
-                          <div className="absolute inset-0 bg-red-600/90 flex items-center justify-center">
-                            <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-red-700/50 shadow-lg border-2 border-white">
+                          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                            <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
                               OUT OF STOCK
                             </span>
                           </div>

@@ -458,9 +458,9 @@ export default function MenuManagement() {
                     className="w-full h-full object-cover"
                   />
                   {/* Show Out of Stock badge if stockBalance is 0 */}
-                  {item.stockBalance !== null && item.stockBalance <= 0 && (
-                    <div className="absolute inset-0 bg-red-600/90 flex items-center justify-center">
-                      <Badge variant="destructive" className="text-base font-bold">
+                  {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 && (
+                    <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                      <Badge variant="default" className="text-base font-bold bg-primary text-white">
                         Out of Stock
                       </Badge>
                     </div>

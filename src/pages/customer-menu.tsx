@@ -532,8 +532,8 @@ export default function CustomerMenu() {
                     />
                     {/* Out of Stock Overlay - Using stockBalance */}
                     {(!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0)) && (
-                      <div className="absolute inset-0 bg-red-600/80 flex items-center justify-center">
-                        <Badge variant="destructive" className="text-sm sm:text-base font-bold bg-red-700 text-white px-4 py-2 shadow-lg">
+                      <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                        <Badge variant="default" className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg">
                           Out of Stock
                         </Badge>
                       </div>
