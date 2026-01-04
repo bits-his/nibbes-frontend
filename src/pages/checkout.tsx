@@ -685,7 +685,7 @@ export default function Checkout() {
           // Call backend payment callback to update paymentStatus
           // This ensures the order paymentStatus is updated even if Interswitch webhook fails
           try {
-            const callbackResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/payment/callback`, {
+            const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1046,7 +1046,7 @@ export default function Checkout() {
         console.log("Transaction reference:", transactionRef)
 
         // Create order via API
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/orders`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData),
@@ -1106,7 +1106,7 @@ export default function Checkout() {
             // Call backend payment callback to update paymentStatus
             // This ensures the order paymentStatus is updated even if Interswitch webhook fails
             try {
-              const callbackResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/payment/callback`, {
+              const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
