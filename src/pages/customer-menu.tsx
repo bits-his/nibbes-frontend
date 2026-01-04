@@ -514,6 +514,12 @@ export default function CustomerMenu() {
                 (cartItem) => String(cartItem.menuItem.id) === String(item.id)
               );
               const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
+              
+              // Determine if item is out of stock: prioritize stock balance over manual available setting
+              const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
+                ? item.stockBalance <= 0  // Stock tracked: out of stock if balance <= 0
+                : !item.available;        // Stock not tracked: use manual available setting
+              
               const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
                                  (cartItem ? cartItem.quantity < item.stockBalance : true);
               return (
@@ -528,10 +534,10 @@ export default function CustomerMenu() {
                     <img
                       src={item.imageUrl}
                       alt={item.name}
-                      className={`w-full h-full object-cover ${!item.available ? 'opacity-60' : ''}`}
+                      className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
                     />
                     {/* Out of Stock Overlay - Using stockBalance */}
-                    {(!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0)) && (
+                    {isOutOfStock && (
                       <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
                         <Badge variant="default" className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg">
                           Out of Stock
@@ -539,12 +545,12 @@ export default function CustomerMenu() {
                       </div>
                     )}
                     {/* Low Stock Badge */}
-                    {item.available && item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3 && (
+                    {!isOutOfStock && item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3 && (
                       <div className="absolute top-2 left-2 bg-orange-500 text-white rounded-md px-2 py-1 text-xs font-semibold shadow-md">
                         Only {item.stockBalance} left!
                       </div>
                     )}
-                    {isInCart && item.available && (item.stockBalance === null || item.stockBalance === undefined || item.stockBalance > 0) && (
+                    {isInCart && !isOutOfStock && (
                       <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold">
                         {cartItem?.quantity}
                       </div>
@@ -593,7 +599,7 @@ export default function CustomerMenu() {
                             size="sm"
                             variant="ghost"
                             onClick={() => item.id && updateQuantity(String(item.id), 1)}
-                            disabled={!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0) || !canAddMore}
+                            disabled={isOutOfStock || !canAddMore}
                             data-testid={`button-plus-${item.id}`}
                             className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
                             title={!canAddMore ? `Maximum ${item.stockBalance} portions available` : ''}
@@ -605,12 +611,12 @@ export default function CustomerMenu() {
                         <Button
                           size="sm"
                           onClick={() => addToCart(item)}
-                          disabled={!item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0)}
+                          disabled={isOutOfStock}
                           data-testid={`button-add-${item.id}`}
                           className="text-xs px-2 py-1.5"
                         >
                           <Plus className="w-2.5 h-2.5 mr-1" />
-                          {(item.available && (item.stockBalance === null || item.stockBalance === undefined || item.stockBalance > 0)) ? 'Add' : 'Out of Stock'}
+                          {!isOutOfStock ? 'Add' : 'Out of Stock'}
                         </Button>
                       )}
                     </div>

@@ -465,7 +465,12 @@ export default function StaffOrders() {
                 {filteredItems?.map((item) => {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
                   const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
-                  const isOutOfStock = !item.available || (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0);
+                  
+                  // Determine if item is out of stock: prioritize stock balance over manual available setting
+                  const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
+                    ? item.stockBalance <= 0  // Stock tracked: out of stock if balance <= 0
+                    : !item.available;        // Stock not tracked: use manual available setting
+                  
                   const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
                   const canAddMore = !isOutOfStock && (item.stockBalance === null || item.stockBalance === undefined || !cartItem || cartItem.quantity < item.stockBalance);
                   

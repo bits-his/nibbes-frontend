@@ -221,7 +221,7 @@ export default function MenuManagement() {
         category: item.category,
         imageUrl: item.imageUrl || "", // For existing items, we have an image URL
         available: item.available,
-        quantity: item.quantity,
+        quantity: undefined, // Don't set quantity when editing - it's read-only and tracked via store entries
       });
       // Reset image states when editing an existing item
       setImageFile(null);
@@ -336,16 +336,23 @@ export default function MenuManagement() {
     }
 
     // Create or update menu item with the image URL from Cloudinary
-    const finalValues = {
+    let finalValues: any = {
       ...values,
       imageUrl: currentImageUrl, // Use the current value from the form
     };
     
-    console.log('Final values being sent:', JSON.stringify(finalValues));
-
+    // When editing, remove the quantity field as it's read-only and tracked via store entries
     if (editingItem && editingItem.id !== undefined) {
+      // Remove quantity from the update payload
+      delete finalValues.quantity;
+      console.log('Update values being sent (quantity excluded):', JSON.stringify(finalValues));
       updateMutation.mutate({ id: String(editingItem.id), data: finalValues });
     } else {
+      // When creating, ensure quantity is a valid number or undefined
+      if (finalValues.quantity === null || finalValues.quantity === '' || isNaN(finalValues.quantity)) {
+        finalValues.quantity = undefined;
+      }
+      console.log('Create values being sent:', JSON.stringify(finalValues));
       createMutation.mutate(finalValues);
     }
   };
@@ -643,11 +650,10 @@ export default function MenuManagement() {
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="1"
+                          type="text"
                           placeholder="20"
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                          value={editingItem ? (editingItem.stockBalance ?? "N/A") : (field.value ?? "")}
+                          onChange={(e) => !editingItem && field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
                           disabled={!!editingItem}
                           className={editingItem ? "bg-gray-100 cursor-not-allowed" : ""}
                           data-testid="input-quantity"
