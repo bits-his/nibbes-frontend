@@ -360,18 +360,18 @@ export default function CustomerMenu() {
           <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
             {/* Main Tagline */}
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
-              <span className="block mb-2">Fast. Premium. Affordable.</span>
+              <span className="block mb-2">Made right. Priced right.</span>
             </h1>
             
             {/* Secondary Tagline */}
-            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl text-white/95 font-semibold drop-shadow-lg">
+            {/* <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl text-white/95 font-semibold drop-shadow-lg">
               Quality food that moves fast.
-            </p>
+            </p> */}
             
             {/* Call to Action Tagline */}
-            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 font-medium drop-shadow-md">
+            {/* <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 font-medium drop-shadow-md">
               Eat more. Pay less. Move on.
-            </p>
+            </p> */}
           </div>
         </div>
       </section>
