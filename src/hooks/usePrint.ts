@@ -353,7 +353,7 @@ export const usePrint = () => {
         <table class="items-table">
           <thead>
             <tr>
-              <th class="item-sno">SN</th>
+              <!-- <th class="item-sno">SN</th> -->
               <th class="item-name">Item / Description</th>
               <th class="item-amount">Amt</th>
             </tr>
@@ -364,11 +364,11 @@ export const usePrint = () => {
               const quantity = item.quantity || 1
               const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price || 0
               const amount = price * quantity
-              const displayName = `${itemName} x ${quantity}`
+              const displayName = ` <span style="margin-right: 4px;">${quantity}</span> ${itemName}`
               
               return `
                 <tr>
-                  <td class="item-sno">${index + 1}</td>
+                <!--  <td class="item-sno">${index + 1}</td> -->
                   <td class="item-name">${displayName}</td>
                   <td class="item-amount">${formatCurrency(amount)}</td>
                 </tr>
@@ -405,7 +405,7 @@ export const usePrint = () => {
           ${items.map((item: any, index: number) => {
             const itemName = item.name || item.menuItemName || 'Unknown Item'
             const quantity = item.quantity || 1
-            const displayName = `${itemName} x ${quantity}`
+            const displayName = ` <span style="margin-right: 4px;">${quantity}</span> ${itemName}`
             const specialInstructions = item.specialInstructions || 'notes...'
             const orderNumber = `#${orderData.orderNumber}`
             

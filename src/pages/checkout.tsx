@@ -563,12 +563,18 @@ export default function Checkout() {
         description: "Please wait...",
       })
 
+      // Generate transaction reference BEFORE creating order
+      // This ensures the backend can store it in the payment record
+      const txnRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      
       console.log('Sending order to API with pending status...')
-      // Create order with pending payment status
+      console.log('Transaction reference:', txnRef)
+      // Create order with pending payment status and transaction reference
       const response = await apiRequest("POST", "/api/orders", {
         ...orderData,
         paymentStatus: "pending",
         paymentMethod: "card",
+        transactionRef: txnRef, // Send transaction reference to backend
       })
       
       console.log('Response status:', response.status)
@@ -597,8 +603,7 @@ export default function Checkout() {
       setIsProcessingPayment(false)
       setShowPaymentModal(false)
 
-      // Generate transaction reference
-      const txnRef = `NKO-${createdOrder.orderNumber}-${Date.now()}`
+      // Transaction reference was already generated above and sent to backend
       // Always use calculateTotal() which includes VAT (7.5%) to ensure correct payment amount
       const amount = Math.round(calculateTotal() * 100) // Amount in kobo (includes VAT)
 
@@ -665,7 +670,7 @@ export default function Checkout() {
         // payment_channels: ["card", "bank", "ussd", "qr"], 
         
         // Callback when payment is completed
-        onComplete: function(response: any) {
+        onComplete: async function(response: any) {
           console.log('Payment completed:', response)
           console.log('Response code:', response.resp || response.responseCode)
           
@@ -674,7 +679,33 @@ export default function Checkout() {
           
           // Check payment response
           // Interswitch success codes: "00" or "10" (pending)
-          if (response.resp === "00" || response.responseCode === "00") {
+          const respCode = response.resp || response.responseCode
+          const paymentStatus = respCode === "00" ? "success" : respCode === "10" ? "pending" : "failed"
+          
+          // Call backend payment callback to update paymentStatus
+          // This ensures the order paymentStatus is updated even if Interswitch webhook fails
+          try {
+            const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                txnref: txnRef,
+                resp: respCode,
+                amount: amount
+              })
+            })
+            
+            if (callbackResponse.ok) {
+              console.log('✅ Payment callback processed successfully')
+            } else {
+              console.error('⚠️ Payment callback failed:', await callbackResponse.text())
+            }
+          } catch (callbackError) {
+            console.error('⚠️ Error calling payment callback:', callbackError)
+            // Don't fail the payment flow if callback fails - webhook should handle it
+          }
+          
+          if (respCode === "00") {
             // Payment successful
             toast({
               title: "Payment Successful! 🎉",
@@ -690,7 +721,7 @@ export default function Checkout() {
                 setLocation("/docket")
               }, 1500)
             })
-          } else if (response.resp === "10" || response.responseCode === "10") {
+          } else if (respCode === "10") {
             // Payment pending (e.g., bank transfer initiated)
             toast({
               title: "Payment Pending",
@@ -997,20 +1028,25 @@ export default function Checkout() {
       try {
         setIsProcessingPayment(true)
         
-        // Create order with pending payment status
+        // Generate transaction reference BEFORE creating order
+        const transactionRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        // Create order with pending payment status and transaction reference
         const orderData = {
           customerName: walkInOrder.customerName,
           customerPhone: walkInOrder.customerPhone || "N/A",
           orderType: "walk-in",
           paymentMethod: 'card',
           paymentStatus: "pending",
+          transactionRef: transactionRef, // Send transaction reference to backend
           items: walkInOrder.items,
         }
 
         console.log("Creating walk-in order for card payment:", orderData)
+        console.log("Transaction reference:", transactionRef)
 
         // Create order via API
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/orders`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData),
@@ -1037,7 +1073,6 @@ export default function Checkout() {
 
         // Calculate amount in kobo (multiply by 100)
         const amountInKobo = Math.round((walkInOrder.total || 0) * 100)
-        const transactionRef = `NKO-${createdOrder.orderNumber}-${Date.now()}`
 
         console.log("Opening Interswitch modal for walk-in order...")
         console.log("Transaction Reference:", transactionRef)
@@ -1062,11 +1097,36 @@ export default function Checkout() {
           merchant_name: "Nibbles Kitchen",
           logo_url: window.location.origin + "/nibbles.jpg",
           
-          onComplete: function (response: any) {
+          onComplete: async function (response: any) {
             console.log("Walk-in payment completed:", response)
             console.log("Response code:", response.responseCode)
             
-            if (response.responseCode === '00') {
+            const respCode = response.responseCode || response.resp
+            
+            // Call backend payment callback to update paymentStatus
+            // This ensures the order paymentStatus is updated even if Interswitch webhook fails
+            try {
+              const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  txnref: transactionRef,
+                  resp: respCode,
+                  amount: amountInKobo
+                })
+              })
+              
+              if (callbackResponse.ok) {
+                console.log('✅ Payment callback processed successfully')
+              } else {
+                console.error('⚠️ Payment callback failed:', await callbackResponse.text())
+              }
+            } catch (callbackError) {
+              console.error('⚠️ Error calling payment callback:', callbackError)
+              // Don't fail the payment flow if callback fails - webhook should handle it
+            }
+            
+            if (respCode === '00') {
               // Payment successful
               toast({
                 title: "Payment Successful!",

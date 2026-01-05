@@ -10,6 +10,8 @@ export const menuItemSchema = z.object({
   imageUrl: z.string().optional(),
   available: z.boolean().default(true),
   quantity: z.number().optional(),
+  stockBalance: z.number().nullable().optional(), // Stock balance from store entries
+  itemCode: z.string().nullable().optional(), // Item code for tracking
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
