@@ -234,7 +234,7 @@ const getStatusCardColor = (status: string) => {
                       <div key={item.id} className="flex justify-between gap-3">
                         <div className="flex-1">
                           <div className="font-semibold text-lg">
-                            {item.quantity}x {item.menuItem.name}
+                            {item.quantity}x {item.menuItem?.name || 'Unknown Item'}
                           </div>
                           {item.specialInstructions && (
                             <div className="text-sm text-muted-foreground italic mt-1">
