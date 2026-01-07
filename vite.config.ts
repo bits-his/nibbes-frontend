@@ -44,7 +44,7 @@ export default defineConfig({
             return 'ui-vendor';
           }
           
-          // Chart libraries (heavy)
+          // Chart libraries - keep recharts and d3 together to avoid circular deps
           if (id.includes('recharts') || id.includes('d3-')) {
             return 'charts-vendor';
           }
@@ -74,8 +74,6 @@ export default defineConfig({
             return 'query-vendor';
           }
         },
-        // Optimize chunk size
-        chunkSizeWarningLimit: 1000, // Warn if chunk exceeds 1MB
       },
     },
     // Enable source maps for production debugging (optional)
