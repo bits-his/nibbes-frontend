@@ -71,13 +71,44 @@ window.addEventListener('error', (event) => {
   
   // Handle ReferenceError from vendor chunks (charts initialization issues)
   if (event.error && event.error instanceof ReferenceError) {
+    // Check for the specific "Cannot access 'r' before initialization" error
+    if (event.message && event.message.includes("Cannot access 'r' before initialization")) {
+      console.error('Recharts circular dependency error detected. This is a known issue.');
+      console.error('Error details:', event.message);
+      console.error('File:', event.filename);
+      
+      // Prevent the error from breaking the app
+      event.preventDefault();
+      event.stopPropagation();
+      
+      // Show user-friendly message
+      if (typeof window !== 'undefined') {
+        const errorMsg = 'Chart library failed to load. Please refresh the page. If the issue persists, clear your browser cache.';
+        console.warn(errorMsg);
+        
+        // Optionally show a toast notification (if toast is available)
+        setTimeout(() => {
+          const event = new CustomEvent('chart-load-error', { 
+            detail: { message: errorMsg } 
+          });
+          window.dispatchEvent(event);
+        }, 100);
+      }
+      
+      return false;
+    }
+    
     if (event.filename && (
       event.filename.includes('charts-vendor') ||
+      event.filename.includes('d3-vendor') ||
       event.filename.includes('vendor')
     )) {
       console.warn('Vendor chunk initialization error detected:', event.message);
       console.warn('This may affect chart rendering. The app will continue to function.');
-      // Don't prevent default - let it log for debugging but don't break the app
+      console.warn('If charts fail to load, try refreshing the page.');
+      
+      // Prevent breaking the app
+      event.preventDefault();
       return false;
     }
   }
