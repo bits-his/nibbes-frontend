@@ -638,9 +638,9 @@ export default function Checkout() {
 
       // Interswitch Inline Checkout Configuration - LIVE MODE
       const paymentConfig = {
-        // LIVE MODE CREDENTIALS (ACTIVE)
-        merchant_code: "MX162337",
-        pay_item_id: "MX162337_MERCHANT_APP",
+        // NEW MERCHANT CREDENTIALS (ACTIVE)
+        merchant_code: "MX169500",
+        pay_item_id: "Default_Payable_MX169500",
         
         txn_ref: txnRef,
         amount: amount,
@@ -1076,9 +1076,9 @@ export default function Checkout() {
 
         // Interswitch Inline Checkout Configuration - LIVE MODE
         const paymentConfig = {
-          // LIVE MODE CREDENTIALS (ACTIVE)
-          merchant_code: "MX162337",
-          pay_item_id: "MX162337_MERCHANT_APP",
+          // NEW MERCHANT CREDENTIALS (ACTIVE)
+          merchant_code: "MX169500",
+          pay_item_id: "Default_Payable_MX169500",
           
           txn_ref: transactionRef,
           amount: amountInKobo,
