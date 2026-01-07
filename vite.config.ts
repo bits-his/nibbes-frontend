@@ -33,11 +33,59 @@ export default defineConfig({
     manifest: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Optimize bundle size by splitting vendor code
-          'react-vendor': ['react', 'react-dom', 'wouter'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select'],
+        manualChunks: (id) => {
+          // React core libraries
+          if (id.includes('react') || id.includes('react-dom') || id.includes('wouter')) {
+            return 'react-vendor';
+          }
+          
+          // Radix UI components (large library)
+          if (id.includes('@radix-ui')) {
+            return 'ui-vendor';
+          }
+          
+          // Chart libraries (heavy)
+          if (id.includes('recharts') || id.includes('d3-')) {
+            return 'charts-vendor';
+          }
+          
+          // PDF/Print libraries
+          if (id.includes('@react-pdf') || id.includes('jspdf')) {
+            return 'pdf-vendor';
+          }
+          
+          // Form libraries
+          if (id.includes('react-hook-form') || id.includes('@hookform')) {
+            return 'forms-vendor';
+          }
+          
+          // Date utilities
+          if (id.includes('date-fns')) {
+            return 'date-vendor';
+          }
+          
+          // Large utility libraries
+          if (id.includes('framer-motion') || id.includes('lucide-react')) {
+            return 'utils-vendor';
+          }
+          
+          // Query/state management
+          if (id.includes('@tanstack/react-query')) {
+            return 'query-vendor';
+          }
         },
+        // Optimize chunk size
+        chunkSizeWarningLimit: 1000, // Warn if chunk exceeds 1MB
+      },
+    },
+    // Enable source maps for production debugging (optional)
+    sourcemap: false,
+    // Minify with terser for better compression
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true,
       },
     },
   },

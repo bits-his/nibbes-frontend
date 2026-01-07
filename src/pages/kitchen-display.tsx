@@ -38,8 +38,26 @@ export default function KitchenDisplay() {
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/orders/active');
       const data = await response.json();
+      
+      // Normalize order items to ensure menuItemName is always present
+      const normalizedData = data.map((order: any) => {
+        if (order.orderItems && Array.isArray(order.orderItems)) {
+          order.orderItems = order.orderItems.map((item: any) => {
+            const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+              || (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim())
+              || 'Unknown Item';
+            return {
+              ...item,
+              menuItemName: menuItemName,
+              menuItem: menuItemName !== 'Unknown Item' ? { name: menuItemName } : (item.menuItem || null)
+            };
+          });
+        }
+        return order;
+      });
+      
       // Sort orders by createdAt in descending order (newest first)
-      return data.sort((a: OrderWithItems, b: OrderWithItems) =>
+      return normalizedData.sort((a: OrderWithItems, b: OrderWithItems) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     },
@@ -69,12 +87,40 @@ export default function KitchenDisplay() {
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         // Use WebSocket data directly - no HTTP query needed for instant updates!
         if (data.order) {
+          // Normalize order structure to ensure orderItems are properly formatted
+          const normalizeOrder = (order: any): OrderWithItems => {
+            const normalized = { ...order };
+            // Ensure orderItems is an array
+            if (!normalized.orderItems || !Array.isArray(normalized.orderItems)) {
+              normalized.orderItems = [];
+            }
+            // Ensure each orderItem has menuItem structure for display
+            normalized.orderItems = normalized.orderItems.map((item: any) => {
+              // Get menuItemName, handling empty strings
+              const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim()) 
+                ? item.menuItemName.trim() 
+                : (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim() 
+                  ? item.menuItem.name.trim() 
+                  : null);
+              
+              // Create menuItem structure if we have a valid name
+              const menuItem = menuItemName ? { name: menuItemName } : null;
+              
+              return {
+                ...item,
+                menuItemName: menuItemName || 'Unknown Item', // Always include menuItemName
+                menuItem: menuItem
+              };
+            });
+            return normalized as OrderWithItems;
+          };
+
           queryClient.setQueryData(
             ["/api/orders/active"],
             (old: OrderWithItems[] = []) => {
               if (data.type === "new_order") {
                 // Add new order to the list
-                const newOrder = data.order as OrderWithItems;
+                const newOrder = normalizeOrder(data.order);
                 // Check if order already exists (avoid duplicates)
                 const exists = old.some(o => o.id === newOrder.id);
                 if (!exists) {
@@ -87,7 +133,7 @@ export default function KitchenDisplay() {
                 return old;
               } else if (data.type === "order_status_change" || data.type === "order_update") {
                 // Update existing order or remove if completed/cancelled
-                const updatedOrder = data.order as OrderWithItems;
+                const updatedOrder = normalizeOrder(data.order);
                 if (updatedOrder.status === "completed" || updatedOrder.status === "cancelled") {
                   // Remove completed/cancelled orders from active list
                   return old.filter(o => o.id !== updatedOrder.id);
@@ -133,7 +179,7 @@ export default function KitchenDisplay() {
                 orderNumber: order.orderNumber.toString(),
                 createdAt: order.createdAt,
                 customerName: order.customerName,
-                items: order.orderItems.map((item: any) => ({
+                items: (order.orderItems || []).map((item: any) => ({
                   name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
                   quantity: item.quantity,
                   price: item.price,
@@ -246,12 +292,17 @@ const convertOrderForPrint = (order: OrderWithItems) => {
       createdAt: order.createdAt,
       customerName: order.customerName,
       orderType: order.orderType,
-      items: order.orderItems.map(item => ({
-        name: item.menuItem?.name || 'Unknown Item',
-        quantity: item.quantity,
-        price: parseFloat(item.price),
-        specialInstructions: item.specialInstructions || null
-      })),
+      items: (order.orderItems || []).map((item: any) => {
+        const itemName = (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim())
+          || (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+          || 'Unknown Item';
+        return {
+          name: itemName,
+          quantity: item.quantity,
+          price: parseFloat(item.price),
+          specialInstructions: item.specialInstructions || null
+        };
+      }),
       total: parseFloat(order.totalAmount),
       paymentMethod: order.paymentMethod || 'N/A',
       paymentStatus: order.paymentStatus || 'paid',
@@ -406,11 +457,17 @@ const getStatusBadge = (status: string) => {
 
                 <CardContent className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                   <div className="space-y-2">
-                    {order.orderItems.map((item) => (
+                    {(order.orderItems || []).map((item: any) => {
+                      // Get item name with proper fallback handling
+                      const itemName = (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim()) 
+                        || (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+                        || 'Unknown Item';
+                      
+                      return (
                       <div key={item.id} className="flex justify-between gap-2 sm:gap-3" data-testid={`order-item-${item.id}`}>
                         <div className="flex-1">
                           <div className="font-semibold text-base sm:text-lg">
-                            {item.quantity}x {item.menuItem?.name || 'Unknown Item'}
+                            {item.quantity}x {itemName}
                           </div>
                           {item.specialInstructions && (
                             <div className="text-xs sm:text-sm text-muted-foreground italic mt-1">
@@ -419,7 +476,8 @@ const getStatusBadge = (status: string) => {
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {order.notes && (

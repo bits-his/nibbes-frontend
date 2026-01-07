@@ -1,7 +1,7 @@
-// Nibbles Service Worker - Version 2.0.0
-// OPTIMIZED FOR RELIABLE UPDATES
+// Nibbles Service Worker - Version 3.0.0
+// OPTIMIZED FOR OFFLINE SUPPORT AND PERFORMANCE
 
-const VERSION = '2.0.0';
+const VERSION = '3.0.0';
 const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
 const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 
@@ -80,8 +80,47 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API requests and WebSocket connections
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
+  // Skip WebSocket connections
+  if (url.pathname.startsWith('/ws')) {
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Strategy 0: CACHE API RESPONSES (menu items, kitchen status)
+  // Network-first with cache fallback for offline support
+  // -------------------------------------------------------------------------
+  if (url.pathname.startsWith('/api/')) {
+    // Cache menu items and kitchen status for offline use
+    const cacheableEndpoints = ['/api/menu/all', '/api/kitchen/status'];
+    const isCacheable = cacheableEndpoints.some(endpoint => url.pathname.includes(endpoint));
+    
+    if (isCacheable) {
+      event.respondWith(
+        caches.open(RUNTIME_CACHE).then((cache) => {
+          return fetch(request)
+            .then((response) => {
+              // Cache successful responses
+              if (response && response.status === 200) {
+                const responseToCache = response.clone();
+                cache.put(request, responseToCache);
+              }
+              return response;
+            })
+            .catch(() => {
+              // Network failed - try cache
+              return cache.match(request).then((cachedResponse) => {
+                if (cachedResponse) {
+                  console.log('[SW] Serving cached API response:', url.pathname);
+                }
+                return cachedResponse;
+              });
+            });
+        })
+      );
+      return;
+    }
+    
+    // For other API endpoints, don't cache (always fetch from network)
     return;
   }
 
@@ -111,32 +150,32 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 2: CACHE FIRST for static assets (images, fonts, etc.)
-  // But use stale-while-revalidate pattern
+  // Strategy 2: CACHE FIRST for static assets (images, fonts, CSS, JS)
+  // Use stale-while-revalidate pattern for better performance
   // -------------------------------------------------------------------------
   event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
+    caches.open(RUNTIME_CACHE).then((cache) => {
+      return cache.match(request).then((cachedResponse) => {
         // Fetch from network in background to update cache
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
-            // Cache successful responses
-            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            // Cache successful responses (images, fonts, etc.)
+            if (networkResponse && networkResponse.status === 200) {
               const responseToCache = networkResponse.clone();
-              caches.open(RUNTIME_CACHE).then((cache) => {
-                cache.put(request, responseToCache);
-              });
+              cache.put(request, responseToCache);
             }
             return networkResponse;
           })
           .catch(() => {
-            // Network failed, that's ok if we have cache
+            // Network failed - that's ok if we have cache
             return null;
           });
 
-        // Return cached version immediately if available, otherwise wait for network
+        // Return cached version immediately if available (stale-while-revalidate)
+        // Otherwise wait for network
         return cachedResponse || fetchPromise;
-      })
+      });
+    })
   );
 });
 

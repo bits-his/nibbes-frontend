@@ -26,6 +26,7 @@ import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
 import { apiRequest } from "@/lib/queryClient";
+import { getOptimizedImageUrl, getResponsiveImageSrcSet, getResponsiveImageSizes } from "@/utils/imageCDN";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -101,8 +102,19 @@ export default function CustomerMenu() {
   }, []); // Empty deps - WebSocket doesn't block rendering
   const [showQRCode, setShowQRCode] = useState(false);
 
+  // OPTIMIZED: Menu items query with proper queryFn and caching
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/menu/all');
+      if (!response.ok) throw new Error('Failed to fetch menu items');
+      return await response.json();
+    },
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on mount if data exists
+    retry: 1, // Only retry once on failure
   });
 
   // Extract unique categories from menu items
@@ -520,11 +532,24 @@ export default function CustomerMenu() {
                 >
                   <div className="aspect-square overflow-hidden relative">
                     <img
-                      src={item.imageUrl}
+                      src={getOptimizedImageUrl(item.imageUrl, {
+                        width: 400,
+                        height: 400,
+                        format: 'auto',
+                        quality: 85,
+                        crop: 'fill',
+                        gravity: 'auto',
+                      })}
+                      srcSet={getResponsiveImageSrcSet(item.imageUrl)}
+                      sizes={getResponsiveImageSizes()}
                       alt={item.name}
                       loading="lazy"
                       decoding="async"
                       className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        (e.target as HTMLImageElement).src = getOptimizedImageUrl(null);
+                      }}
                     />
                     {/* SOLD OUT Overlay - Using stockBalance */}
                     {isOutOfStock && (
@@ -653,11 +678,20 @@ export default function CustomerMenu() {
                     <CardContent className="p-2.5 sm:p-3 space-y-2">
                       <div className="flex gap-2">
                         <img
-                          src={item.menuItem.imageUrl}
+                          src={getOptimizedImageUrl(item.menuItem.imageUrl, {
+                            width: 48,
+                            height: 48,
+                            format: 'auto',
+                            quality: 80,
+                            crop: 'fill',
+                          })}
                           loading="lazy"
                           decoding="async"
                           alt={item.menuItem.name}
                           className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = getOptimizedImageUrl(null, { width: 48, height: 48 });
+                          }}
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm truncate">
