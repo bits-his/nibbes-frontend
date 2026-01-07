@@ -27,7 +27,20 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname),
+  optimizeDeps: {
+    include: ['recharts'],
+    exclude: [],
+    esbuildOptions: {
+      // Fix circular dependency issues
+      keepNames: true,
+    },
+  },
   build: {
+    // CommonJS options to handle circular dependencies better
+    commonjsOptions: {
+      include: [/recharts/, /node_modules/],
+      transformMixedEsModules: true,
+    },
     outDir: path.resolve(import.meta.dirname, "dist"), // ✅ fixed here
     emptyOutDir: true,
     manifest: true,
@@ -44,9 +57,11 @@ export default defineConfig({
             return 'ui-vendor';
           }
           
-          // Chart libraries - keep recharts and d3 together to avoid circular deps
+          // IMPORTANT: Don't split recharts - keep it in main bundle to avoid circular deps
+          // Recharts has internal circular dependencies that break when code-split
+          // Returning undefined means it stays in the main bundle
           if (id.includes('recharts') || id.includes('d3-')) {
-            return 'charts-vendor';
+            return undefined; // Keep in main bundle to avoid circular dependency issues
           }
           
           // PDF/Print libraries
@@ -74,7 +89,11 @@ export default defineConfig({
             return 'query-vendor';
           }
         },
+        // Fix circular dependency issues
+        hoistTransitiveImports: true,
       },
+      // Externalize problematic dependencies if needed
+      external: [],
     },
     // Enable source maps for production debugging (optional)
     sourcemap: false,
