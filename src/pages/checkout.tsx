@@ -661,9 +661,9 @@ export default function Checkout() {
         // LIVE MODE (ACTIVE)
         mode: "LIVE",
         
-        // Payment channels - Enable all payment options
-        // Remove or comment out to show all available options
-        // payment_channels: ["card", "bank", "ussd", "qr"], 
+        // Payment channels - Only show Card and Bank Transfer
+        // Available options: "card", "bank", "ussd", "qr", "wallet", "opay", "quickteller", "googlepay"
+        payment_channels: ["card", "bank"], 
         
         // Callback when payment is completed
         onComplete: async function(response: any) {
@@ -1088,6 +1088,10 @@ export default function Checkout() {
           // Merchant information
           merchant_name: "Nibbles Kitchen",
           logo_url: window.location.origin + "/nibbles.jpg",
+          
+          // Payment channels - Only show Card and Bank Transfer
+          // Available options: "card", "bank", "ussd", "qr", "wallet", "opay", "quickteller", "googlepay"
+          payment_channels: ["card", "bank"],
           
           onComplete: async function (response: any) {
             console.log("Walk-in payment completed:", response)
