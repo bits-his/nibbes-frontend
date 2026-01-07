@@ -499,7 +499,7 @@ export default function AnalyticsDashboard() {
                               : 'bg-green-100 text-green-800'
                           }`}>
                             {item.quantity === 0 
-                              ? 'Out of Stock' 
+                              ? 'SOLD OUT' 
                               : item.quantity <= item.minThreshold
                               ? 'Low Stock'
                               : 'In Stock'}

@@ -42,39 +42,26 @@ export default function CustomerMenu() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   
-  // Kitchen status state
-  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
+  // OPTIMIZED: Use React Query for kitchen status (parallel with menu items, non-blocking)
+  const { data: kitchenStatusData } = useQuery<{ isOpen: boolean; updatedAt?: string }>({
+    queryKey: ["/api/kitchen/status"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/kitchen/status");
+      if (!response.ok) throw new Error("Failed to fetch kitchen status");
+      return await response.json();
+    },
+    refetchInterval: 30000, // Poll every 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+    // Default to open if fetch fails
+    placeholderData: { isOpen: true },
+  });
 
-  // Initialize and refresh menu data on component mount
-  useEffect(() => {
-    // Force refresh the menu data when component mounts to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
-  }, []);
+  const kitchenStatus = kitchenStatusData || { isOpen: true };
 
-  // Fetch kitchen status
+  // OPTIMIZED: WebSocket connection (non-blocking, doesn't delay page render)
   useEffect(() => {
-    const fetchKitchenStatus = async () => {
-      try {
-        const response = await apiRequest("GET", "/api/kitchen/status")
-        if (response.ok) {
-          const status = await response.json()
-          setKitchenStatus(status)
-        }
-      } catch (error) {
-        console.error('❌ Error fetching kitchen status:', error)
-        // Default to open if check fails
-        setKitchenStatus({ isOpen: true })
-      }
-    }
-    
-    fetchKitchenStatus()
-    // Poll kitchen status every 30 seconds
-    const interval = setInterval(fetchKitchenStatus, 30000)
-    return () => clearInterval(interval)
-  }, []);
-
-  // WebSocket connection for real-time menu updates
-  useEffect(() => {
+    // Don't block rendering - connect in background
     const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
     const socket = new WebSocket(wsUrl);
 
@@ -111,7 +98,7 @@ export default function CustomerMenu() {
     return () => {
       socket.close();
     };
-  }, []);
+  }, []); // Empty deps - WebSocket doesn't block rendering
   const [showQRCode, setShowQRCode] = useState(false);
 
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
@@ -122,8 +109,6 @@ export default function CustomerMenu() {
   const categories = menuItems
     ? ["All", ...Array.from(new Set(menuItems.map(item => item.category)))]
     : ["All"];
-
-  console.log("Available categories:", categories); // Debug log
 
   // Use loading state from menu only
   const isLoading = menuLoading;
@@ -162,8 +147,8 @@ export default function CustomerMenu() {
     // Check stock balance
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
       toast({
-        title: "Out of Stock",
-        description: `${menuItem.name} is currently out of stock.`,
+        title: "SOLD OUT",
+        description: `${menuItem.name} is currently SOLD OUT.`,
         variant: "destructive",
         duration: 2000,
       });
@@ -349,6 +334,8 @@ export default function CustomerMenu() {
         <div className="absolute inset-0">
           <img
             src={heroImage}
+            loading="eager"
+            fetchPriority="high"
             alt="Nibbles"
             className="w-full h-full object-cover object-center"
             loading="eager"
@@ -360,18 +347,18 @@ export default function CustomerMenu() {
           <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
             {/* Main Tagline */}
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
-              <span className="block mb-2">Fast. Premium. Affordable.</span>
+              <span className="block mb-2">Made right. Priced right.</span>
             </h1>
             
             {/* Secondary Tagline */}
-            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl text-white/95 font-semibold drop-shadow-lg">
+            {/* <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl text-white/95 font-semibold drop-shadow-lg">
               Quality food that moves fast.
-            </p>
+            </p> */}
             
             {/* Call to Action Tagline */}
-            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 font-medium drop-shadow-md">
+            {/* <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 font-medium drop-shadow-md">
               Eat more. Pay less. Move on.
-            </p>
+            </p> */}
           </div>
         </div>
       </section>
@@ -496,13 +483,14 @@ export default function CustomerMenu() {
         <h2 className="font-serif text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold mb-3 sm:mb-4">Our Menu</h2>
         {isLoading ? (
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="aspect-square bg-muted animate-pulse" />
-                <CardContent className="p-2.5 sm:p-3.5">
-                  <div className="h-3.5 sm:h-4 bg-muted rounded animate-pulse mb-1.5 sm:mb-2" />
-                  <div className="h-2.5 sm:h-3 bg-muted rounded animate-pulse mb-2.5 sm:mb-3" />
-                  <div className="h-5 sm:h-6 bg-muted rounded animate-pulse" />
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+              <Card key={i} className="overflow-hidden animate-pulse">
+                <div className="aspect-square bg-gradient-to-br from-muted to-muted/50" />
+                <CardContent className="p-2.5 sm:p-3.5 space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4" />
+                  <div className="h-3 bg-muted/70 rounded w-full" />
+                  <div className="h-3 bg-muted/70 rounded w-2/3" />
+                  <div className="h-6 bg-muted rounded w-1/2 mt-2" />
                 </CardContent>
               </Card>
             ))}
@@ -515,9 +503,9 @@ export default function CustomerMenu() {
               );
               const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
               
-              // Determine if item is out of stock: prioritize stock balance over manual available setting
+              // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
               const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
-                ? item.stockBalance <= 0  // Stock tracked: out of stock if balance <= 0
+                ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
                 : !item.available;        // Stock not tracked: use manual available setting
               
               const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
@@ -534,13 +522,15 @@ export default function CustomerMenu() {
                     <img
                       src={item.imageUrl}
                       alt={item.name}
+                      loading="lazy"
+                      decoding="async"
                       className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
                     />
-                    {/* Out of Stock Overlay - Using stockBalance */}
+                    {/* SOLD OUT Overlay - Using stockBalance */}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
                         <Badge variant="default" className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg">
-                          Out of Stock
+                          SOLD OUT
                         </Badge>
                       </div>
                     )}
@@ -616,7 +606,7 @@ export default function CustomerMenu() {
                           className="text-xs px-2 py-1.5"
                         >
                           <Plus className="w-2.5 h-2.5 mr-1" />
-                          {!isOutOfStock ? 'Add' : 'Out of Stock'}
+                          {!isOutOfStock ? 'Add' : 'SOLD OUT'}
                         </Button>
                       )}
                     </div>
@@ -664,6 +654,8 @@ export default function CustomerMenu() {
                       <div className="flex gap-2">
                         <img
                           src={item.menuItem.imageUrl}
+                          loading="lazy"
+                          decoding="async"
                           alt={item.menuItem.name}
                           className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg object-cover"
                         />

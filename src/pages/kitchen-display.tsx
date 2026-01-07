@@ -46,19 +46,76 @@ export default function KitchenDisplay() {
     // Remove refetchInterval since we're using WebSockets for real-time updates
   });
 
-  // WebSocket connection for real-time updates now
+  // WebSocket connection for real-time updates with auto-reconnect
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
-    const socket = new WebSocket(wsUrl);
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const baseReconnectDelay = 1000; // Start with 1 second
 
-    socket.onopen = () => {
-      console.log("WebSocket connected");
-    };
+    const connect = () => {
+      try {
+        socket = new WebSocket(wsUrl);
 
-    socket.onmessage = (event) => {
+        socket.onopen = () => {
+          console.log("WebSocket connected");
+          reconnectAttempts = 0; // Reset on successful connection
+        };
+
+        socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+        // Use WebSocket data directly - no HTTP query needed for instant updates!
+        if (data.order) {
+          queryClient.setQueryData(
+            ["/api/orders/active"],
+            (old: OrderWithItems[] = []) => {
+              if (data.type === "new_order") {
+                // Add new order to the list
+                const newOrder = data.order as OrderWithItems;
+                // Check if order already exists (avoid duplicates)
+                const exists = old.some(o => o.id === newOrder.id);
+                if (!exists) {
+                  const updated = [newOrder, ...old];
+                  // Sort by createdAt descending (newest first)
+                  return updated.sort((a, b) => 
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                  );
+                }
+                return old;
+              } else if (data.type === "order_status_change" || data.type === "order_update") {
+                // Update existing order or remove if completed/cancelled
+                const updatedOrder = data.order as OrderWithItems;
+                if (updatedOrder.status === "completed" || updatedOrder.status === "cancelled") {
+                  // Remove completed/cancelled orders from active list
+                  return old.filter(o => o.id !== updatedOrder.id);
+                } else {
+                  // Update existing order
+                  const index = old.findIndex(o => o.id === updatedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old];
+                    updated[index] = updatedOrder;
+                    return updated.sort((a, b) => 
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  } else {
+                    // Order not in list, add it (might have been filtered out before)
+                    const updated = [updatedOrder, ...old];
+                    return updated.sort((a, b) => 
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  }
+                }
+              }
+              return old;
+            }
+          );
+        } else {
+          // Fallback: if order data not in WebSocket message, invalidate query
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+        }
 
         if (data.type === "new_order") {
           toast({
@@ -77,7 +134,7 @@ export default function KitchenDisplay() {
                 createdAt: order.createdAt,
                 customerName: order.customerName,
                 items: order.orderItems.map((item: any) => ({
-                  name: item.menuItem?.name || 'Unknown Item',
+                  name: item.menuItem?.name || item.menuItemName || 'Unknown Item',
                   quantity: item.quantity,
                   price: item.price,
                   specialInstructions: item.specialInstructions || null,
@@ -100,18 +157,48 @@ export default function KitchenDisplay() {
       }
     };
 
-    socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
+        socket.onerror = (error) => {
+          console.error("WebSocket error:", error);
+        };
+
+        socket.onclose = () => {
+          console.log("WebSocket disconnected");
+          
+          // Auto-reconnect with exponential backoff
+          if (reconnectAttempts < maxReconnectAttempts) {
+            const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
+            console.log(`Reconnecting in ${delay}ms... (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+            
+            reconnectTimeout = setTimeout(() => {
+              reconnectAttempts++;
+              connect();
+            }, delay);
+          } else {
+            console.error("Max reconnection attempts reached. Please refresh the page.");
+            toast({
+              title: "Connection Lost",
+              description: "WebSocket connection failed. Please refresh the page to reconnect.",
+              variant: "destructive",
+            });
+          }
+        };
+
+        setWs(socket);
+      } catch (error) {
+        console.error("Failed to create WebSocket:", error);
+      }
     };
 
-    socket.onclose = () => {
-      console.log("WebSocket disconnected");
-    };
-
-    setWs(socket);
+    // Initial connection
+    connect();
 
     return () => {
-      socket.close();
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (socket) {
+        socket.close();
+      }
     };
   }, [toast]);
 
@@ -323,7 +410,7 @@ const getStatusBadge = (status: string) => {
                       <div key={item.id} className="flex justify-between gap-2 sm:gap-3" data-testid={`order-item-${item.id}`}>
                         <div className="flex-1">
                           <div className="font-semibold text-base sm:text-lg">
-                            {item.quantity}x {item.menuItem.name}
+                            {item.quantity}x {item.menuItem?.name || 'Unknown Item'}
                           </div>
                           {item.specialInstructions && (
                             <div className="text-xs sm:text-sm text-muted-foreground italic mt-1">

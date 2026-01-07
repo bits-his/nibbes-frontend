@@ -638,10 +638,6 @@ export default function Checkout() {
 
       // Interswitch Inline Checkout Configuration - LIVE MODE
       const paymentConfig = {
-        // TEST MODE CREDENTIALS (COMMENTED OUT)
-        // merchant_code: "MX250773",
-        // pay_item_id: "Default_Payable_MX250773",
-        
         // LIVE MODE CREDENTIALS (ACTIVE)
         merchant_code: "MX162337",
         pay_item_id: "MX162337_MERCHANT_APP",
@@ -1080,10 +1076,6 @@ export default function Checkout() {
 
         // Interswitch Inline Checkout Configuration - LIVE MODE
         const paymentConfig = {
-          // TEST MODE CREDENTIALS (COMMENTED OUT)
-          // merchant_code: "MX250773",
-          // pay_item_id: "Default_Payable_MX250773",
-          
           // LIVE MODE CREDENTIALS (ACTIVE)
           merchant_code: "MX162337",
           pay_item_id: "MX162337_MERCHANT_APP",
@@ -1615,7 +1607,7 @@ export default function Checkout() {
                   <CardContent className="pt-6">
                     <div className="flex justify-center">
                       {/* Delivery button temporarily commented out - will be re-enabled when delivery people are available */}
-                      {/* {["pickup", "delivery"].map((type) => {
+                      {["pickup", "delivery"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
@@ -1637,9 +1629,9 @@ export default function Checkout() {
                             </div>
                           </button>
                         )
-                      })} */}
+                      })}
                       {/* Only show pickup option for now - centered */}
-                      {["pickup"].map((type) => {
+                      {/* {["pickup"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
@@ -1661,7 +1653,7 @@ export default function Checkout() {
                             </div>
                           </button>
                         )
-                      })}
+                      })} */}
                     </div>
                     <FormMessage />
                   </CardContent>
