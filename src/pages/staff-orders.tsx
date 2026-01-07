@@ -77,7 +77,7 @@ export default function StaffOrders() {
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      // Show all items, including out of stock ones
+      // Show all items, including SOLD OUT ones
       return matchesCategory && matchesSearch;
     }
   );
@@ -94,11 +94,11 @@ export default function StaffOrders() {
       return;
     }
     
-    // Check if item is out of stock
+    // Check if item is SOLD OUT
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
       toast({
-        title: "Out of Stock",
-        description: `${menuItem.name} is currently out of stock.`,
+        title: "SOLD OUT",
+        description: `${menuItem.name} is currently SOLD OUT.`,
         variant: "destructive",
         duration: 2000,
       });
@@ -466,9 +466,9 @@ export default function StaffOrders() {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
                   const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
                   
-                  // Determine if item is out of stock: prioritize stock balance over manual available setting
+                  // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
                   const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
-                    ? item.stockBalance <= 0  // Stock tracked: out of stock if balance <= 0
+                    ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
                     : !item.available;        // Stock not tracked: use manual available setting
                   
                   const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
@@ -492,11 +492,11 @@ export default function StaffOrders() {
                             <Plus className="w-3 h-3 md:w-4 md:h-4" />
                           </div>
                         )}
-                        {/* Out of Stock Overlay */}
+                        {/* SOLD OUT Overlay */}
                         {isOutOfStock && (
                           <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
                             <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
-                              OUT OF STOCK
+                              SOLD OUT
                             </span>
                           </div>
                         )}

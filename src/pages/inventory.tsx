@@ -554,7 +554,7 @@ export default function InventoryManagement() {
   }
 
   const getStatusText = (quantity: number, minThreshold: number) => {
-    if (quantity === 0) return "Out of Stock"
+    if (quantity === 0) return "SOLD OUT"
     if (quantity <= minThreshold) return "Low Stock"
     return "In Stock"
   }
@@ -644,7 +644,7 @@ export default function InventoryManagement() {
 
             <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">Out of Stock</CardTitle>
+                <CardTitle className="text-sm font-medium text-slate-600">SOLD OUT</CardTitle>
                 <CheckCircle className="h-5 w-5 text-red-500" />
               </CardHeader>
               <CardContent>

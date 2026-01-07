@@ -162,8 +162,8 @@ export default function CustomerMenu() {
     // Check stock balance
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
       toast({
-        title: "Out of Stock",
-        description: `${menuItem.name} is currently out of stock.`,
+        title: "SOLD OUT",
+        description: `${menuItem.name} is currently SOLD OUT.`,
         variant: "destructive",
         duration: 2000,
       });
@@ -515,9 +515,9 @@ export default function CustomerMenu() {
               );
               const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
               
-              // Determine if item is out of stock: prioritize stock balance over manual available setting
+              // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
               const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
-                ? item.stockBalance <= 0  // Stock tracked: out of stock if balance <= 0
+                ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
                 : !item.available;        // Stock not tracked: use manual available setting
               
               const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
@@ -536,11 +536,11 @@ export default function CustomerMenu() {
                       alt={item.name}
                       className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
                     />
-                    {/* Out of Stock Overlay - Using stockBalance */}
+                    {/* SOLD OUT Overlay - Using stockBalance */}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
                         <Badge variant="default" className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg">
-                          Out of Stock
+                          SOLD OUT
                         </Badge>
                       </div>
                     )}
@@ -616,7 +616,7 @@ export default function CustomerMenu() {
                           className="text-xs px-2 py-1.5"
                         >
                           <Plus className="w-2.5 h-2.5 mr-1" />
-                          {!isOutOfStock ? 'Add' : 'Out of Stock'}
+                          {!isOutOfStock ? 'Add' : 'SOLD OUT'}
                         </Button>
                       )}
                     </div>

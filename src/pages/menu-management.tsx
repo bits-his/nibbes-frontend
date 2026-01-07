@@ -464,11 +464,11 @@ export default function MenuManagement() {
                     alt={item.name}
                     className="w-full h-full object-cover"
                   />
-                  {/* Show Out of Stock badge if stockBalance is 0 */}
+                  {/* Show SOLD OUT badge if stockBalance is 0 */}
                   {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 && (
                     <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
                       <Badge variant="default" className="text-base font-bold bg-primary text-white">
-                        Out of Stock
+                        SOLD OUT
                       </Badge>
                     </div>
                   )}
@@ -513,7 +513,7 @@ export default function MenuManagement() {
                           ? item.stockBalance < 0
                             ? `${item.stockBalance} portions (⚠️ Oversold)`
                             : item.stockBalance === 0
-                            ? 'Out of Stock'
+                            ? 'SOLD OUT'
                             : `${item.stockBalance} portions`
                           : 'Not tracked'}
                       </span>

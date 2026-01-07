@@ -323,7 +323,7 @@ const getStatusBadge = (status: string) => {
                       <div key={item.id} className="flex justify-between gap-2 sm:gap-3" data-testid={`order-item-${item.id}`}>
                         <div className="flex-1">
                           <div className="font-semibold text-base sm:text-lg">
-                            {item.quantity}x {item.menuItem.name}
+                            {item.quantity}x {item.menuItem?.name || 'Unknown Item'}
                           </div>
                           {item.specialInstructions && (
                             <div className="text-xs sm:text-sm text-muted-foreground italic mt-1">
