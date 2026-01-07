@@ -31,6 +31,7 @@ import { CartProvider } from "@/context/CartContext";
 import { getGuestSession } from "@/lib/guestSession";
 import { InstallPWA } from "@/components/InstallPWA";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
+import { SplashScreen } from "@/components/SplashScreen";
 
 // Fix missing import reference in the renderPage function
 import DocketPage from "@/pages/docket";
@@ -646,28 +647,65 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function App() {
+function AppContent() {
   const [location] = useLocation();
+  const { loading } = React.useContext(AuthContext);
+  const [showSplash, setShowSplash] = useState(true);
+  const [domReady, setDomReady] = useState(false);
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
+  // Check if DOM is ready
+  useEffect(() => {
+    if (document.readyState === "complete") {
+      setDomReady(true);
+    } else {
+      const handleLoad = () => setDomReady(true);
+      window.addEventListener("load", handleLoad);
+      return () => window.removeEventListener("load", handleLoad);
+    }
+  }, []);
+
+  // Hide splash screen when both auth and DOM are ready
+  useEffect(() => {
+    if (!loading && domReady) {
+      // Minimum display time to ensure users see the splash screen
+      const minDisplayTime = 1200; // 1.2 seconds minimum
+      
+      const timer = setTimeout(() => {
+        setShowSplash(false);
+      }, minDisplayTime);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, domReady]);
+
+  return (
+    <>
+      <CartProvider>
+        <TooltipProvider>
+          <SidebarProvider style={style as React.CSSProperties}>
+            <Layout>
+              <Router />
+            </Layout>
+          </SidebarProvider>
+          <Toaster />
+          <InstallPWA />
+          <UpdatePrompt />
+        </TooltipProvider>
+      </CartProvider>
+      <SplashScreen isVisible={showSplash} />
+    </>
+  );
+}
+
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <Layout>
-                <Router />
-              </Layout>
-            </SidebarProvider>
-            <Toaster />
-            <InstallPWA />
-            <UpdatePrompt />
-          </TooltipProvider>
-        </CartProvider>
+        <AppContent />
       </AuthProvider>
     </QueryClientProvider>
   );
