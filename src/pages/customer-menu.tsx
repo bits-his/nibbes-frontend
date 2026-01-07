@@ -111,27 +111,29 @@ export default function CustomerMenu() {
       return await response.json();
     },
     staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
-    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (renamed from cacheTime in React Query v5)
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Don't refetch on mount if data exists
     retry: 1, // Only retry once on failure
   });
 
   // Extract unique categories from menu items
-  const categories = menuItems
-    ? ["All", ...Array.from(new Set(menuItems.map(item => item.category)))]
+  const categories = menuItems && Array.isArray(menuItems)
+    ? ["All", ...Array.from(new Set(menuItems.map((item: MenuItem) => item.category)))]
     : ["All"];
 
   // Use loading state from menu only
   const isLoading = menuLoading;
 
-  const filteredItems = menuItems?.filter(
-    (item) =>
-      // Show all items (including unavailable) - they will show as "sold out"
-      (selectedCategory === "All" || item.category === selectedCategory) &&
-      (searchQuery === "" ||
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredItems = menuItems && Array.isArray(menuItems)
+    ? menuItems.filter(
+        (item: MenuItem) =>
+          // Show all items (including unavailable) - they will show as "sold out"
+          (selectedCategory === "All" || item.category === selectedCategory) &&
+          (searchQuery === "" ||
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : [];
 
   const addToCart = (menuItem: MenuItem) => {
     // Check if kitchen is closed
@@ -205,7 +207,9 @@ export default function CustomerMenu() {
       }
       
       // If increasing, check stock availability
-      const menuItem = menuItems?.find(m => String(m.id) === String(menuItemId));
+      const menuItem = menuItems && Array.isArray(menuItems)
+        ? menuItems.find((m: MenuItem) => String(m.id) === String(menuItemId))
+        : undefined;
       if (menuItem && menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
         if (newQuantity > menuItem.stockBalance) {
           toast({
@@ -350,7 +354,6 @@ export default function CustomerMenu() {
             fetchPriority="high"
             alt="Nibbles"
             className="w-full h-full object-cover object-center"
-            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
@@ -397,7 +400,7 @@ export default function CustomerMenu() {
 
             <div className="flex-1 overflow-x-auto min-w-0">
               <div className="flex gap-1 sm:gap-2">
-                {(categories || ["All"]).map((category: string) => (
+                {categories.map((category: string) => (
                   <Badge
                     key={category}
                     variant={
@@ -452,7 +455,7 @@ export default function CustomerMenu() {
               {/* Scrollable Category Buttons */}
               <div className="flex-1 overflow-x-auto -mx-3 px-3 mr-[1px]">
                 <div className="flex gap-1.5 sm:gap-2 w-max">
-                  {(categories || ["All"]).map((category: string) => (
+                  {categories.map((category: string) => (
                     <Badge
                       key={category}
                       variant={
@@ -509,7 +512,7 @@ export default function CustomerMenu() {
           </div>
         ) : (
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {filteredItems?.map((item) => {
+            {filteredItems.map((item: MenuItem) => {
               const isInCart = cart.some(
                 (cartItem) => String(cartItem.menuItem.id) === String(item.id)
               );
