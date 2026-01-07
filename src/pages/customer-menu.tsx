@@ -26,6 +26,7 @@ import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
 import { apiRequest } from "@/lib/queryClient";
+import { getOptimizedImageUrl, getResponsiveImageSrcSet, getResponsiveImageSizes } from "@/utils/imageCDN";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -42,39 +43,26 @@ export default function CustomerMenu() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   
-  // Kitchen status state
-  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
+  // OPTIMIZED: Use React Query for kitchen status (parallel with menu items, non-blocking)
+  const { data: kitchenStatusData } = useQuery<{ isOpen: boolean; updatedAt?: string }>({
+    queryKey: ["/api/kitchen/status"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/kitchen/status");
+      if (!response.ok) throw new Error("Failed to fetch kitchen status");
+      return await response.json();
+    },
+    refetchInterval: 30000, // Poll every 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+    // Default to open if fetch fails
+    placeholderData: { isOpen: true },
+  });
 
-  // Initialize and refresh menu data on component mount
-  useEffect(() => {
-    // Force refresh the menu data when component mounts to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
-  }, []);
+  const kitchenStatus = kitchenStatusData || { isOpen: true };
 
-  // Fetch kitchen status
+  // OPTIMIZED: WebSocket connection (non-blocking, doesn't delay page render)
   useEffect(() => {
-    const fetchKitchenStatus = async () => {
-      try {
-        const response = await apiRequest("GET", "/api/kitchen/status")
-        if (response.ok) {
-          const status = await response.json()
-          setKitchenStatus(status)
-        }
-      } catch (error) {
-        console.error('❌ Error fetching kitchen status:', error)
-        // Default to open if check fails
-        setKitchenStatus({ isOpen: true })
-      }
-    }
-    
-    fetchKitchenStatus()
-    // Poll kitchen status every 30 seconds
-    const interval = setInterval(fetchKitchenStatus, 30000)
-    return () => clearInterval(interval)
-  }, []);
-
-  // WebSocket connection for real-time menu updates
-  useEffect(() => {
+    // Don't block rendering - connect in background
     const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
     const socket = new WebSocket(wsUrl);
 
@@ -111,19 +99,28 @@ export default function CustomerMenu() {
     return () => {
       socket.close();
     };
-  }, []);
+  }, []); // Empty deps - WebSocket doesn't block rendering
   const [showQRCode, setShowQRCode] = useState(false);
 
+  // OPTIMIZED: Menu items query with proper queryFn and caching
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/menu/all');
+      if (!response.ok) throw new Error('Failed to fetch menu items');
+      return await response.json();
+    },
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on mount if data exists
+    retry: 1, // Only retry once on failure
   });
 
   // Extract unique categories from menu items
   const categories = menuItems
     ? ["All", ...Array.from(new Set(menuItems.map(item => item.category)))]
     : ["All"];
-
-  console.log("Available categories:", categories); // Debug log
 
   // Use loading state from menu only
   const isLoading = menuLoading;
@@ -349,6 +346,8 @@ export default function CustomerMenu() {
         <div className="absolute inset-0">
           <img
             src={heroImage}
+            loading="eager"
+            fetchPriority="high"
             alt="Nibbles"
             className="w-full h-full object-cover object-center"
             loading="eager"
@@ -496,13 +495,14 @@ export default function CustomerMenu() {
         <h2 className="font-serif text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold mb-3 sm:mb-4">Our Menu</h2>
         {isLoading ? (
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="aspect-square bg-muted animate-pulse" />
-                <CardContent className="p-2.5 sm:p-3.5">
-                  <div className="h-3.5 sm:h-4 bg-muted rounded animate-pulse mb-1.5 sm:mb-2" />
-                  <div className="h-2.5 sm:h-3 bg-muted rounded animate-pulse mb-2.5 sm:mb-3" />
-                  <div className="h-5 sm:h-6 bg-muted rounded animate-pulse" />
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+              <Card key={i} className="overflow-hidden animate-pulse">
+                <div className="aspect-square bg-gradient-to-br from-muted to-muted/50" />
+                <CardContent className="p-2.5 sm:p-3.5 space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4" />
+                  <div className="h-3 bg-muted/70 rounded w-full" />
+                  <div className="h-3 bg-muted/70 rounded w-2/3" />
+                  <div className="h-6 bg-muted rounded w-1/2 mt-2" />
                 </CardContent>
               </Card>
             ))}
@@ -532,9 +532,24 @@ export default function CustomerMenu() {
                 >
                   <div className="aspect-square overflow-hidden relative">
                     <img
-                      src={item.imageUrl}
+                      src={getOptimizedImageUrl(item.imageUrl, {
+                        width: 400,
+                        height: 400,
+                        format: 'auto',
+                        quality: 85,
+                        crop: 'fill',
+                        gravity: 'auto',
+                      })}
+                      srcSet={getResponsiveImageSrcSet(item.imageUrl)}
+                      sizes={getResponsiveImageSizes()}
                       alt={item.name}
+                      loading="lazy"
+                      decoding="async"
                       className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        (e.target as HTMLImageElement).src = getOptimizedImageUrl(null);
+                      }}
                     />
                     {/* SOLD OUT Overlay - Using stockBalance */}
                     {isOutOfStock && (
@@ -663,9 +678,20 @@ export default function CustomerMenu() {
                     <CardContent className="p-2.5 sm:p-3 space-y-2">
                       <div className="flex gap-2">
                         <img
-                          src={item.menuItem.imageUrl}
+                          src={getOptimizedImageUrl(item.menuItem.imageUrl, {
+                            width: 48,
+                            height: 48,
+                            format: 'auto',
+                            quality: 80,
+                            crop: 'fill',
+                          })}
+                          loading="lazy"
+                          decoding="async"
                           alt={item.menuItem.name}
                           className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = getOptimizedImageUrl(null, { width: 48, height: 48 });
+                          }}
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm truncate">
