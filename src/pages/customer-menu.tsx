@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ShoppingCart,
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChefHat,
   AlertCircle,
+  Wifi,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,11 @@ import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
 import { apiRequest } from "@/lib/queryClient";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet, getResponsiveImageSizes } from "@/utils/imageCDN";
+import { MenuItemCard } from "@/components/MenuItemCard";
+import { OptimizedImage } from "@/components/OptimizedImage";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { measurePerformance, logPerformanceMetrics } from "@/utils/performance";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -43,22 +49,21 @@ export default function CustomerMenu() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   
-  // OPTIMIZED: Use React Query for kitchen status (parallel with menu items, non-blocking)
-  const { data: kitchenStatusData } = useQuery<{ isOpen: boolean; updatedAt?: string }>({
-    queryKey: ["/api/kitchen/status"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/kitchen/status");
-      if (!response.ok) throw new Error("Failed to fetch kitchen status");
-      return await response.json();
-    },
-    refetchInterval: 30000, // Poll every 30 seconds
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
-    // Default to open if fetch fails
-    placeholderData: { isOpen: true },
-  });
-
-  const kitchenStatus = kitchenStatusData || { isOpen: true };
+  // Kitchen status state
+  const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
+  
+  // Network status for adaptive loading
+  const networkStatus = useNetworkStatus();
+  
+  // Performance monitoring
+  useEffect(() => {
+    // Measure performance after page load
+    const timer = setTimeout(() => {
+      const metrics = measurePerformance();
+      logPerformanceMetrics(metrics);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // OPTIMIZED: WebSocket connection (non-blocking, doesn't delay page render)
   useEffect(() => {
@@ -102,40 +107,55 @@ export default function CustomerMenu() {
   }, []); // Empty deps - WebSocket doesn't block rendering
   const [showQRCode, setShowQRCode] = useState(false);
 
-  // OPTIMIZED: Menu items query with proper queryFn and caching
+  // Fetch menu items with extended stale time for better caching
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/menu/all');
-      if (!response.ok) throw new Error('Failed to fetch menu items');
-      return await response.json();
-    },
-    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (renamed from cacheTime in React Query v5)
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: false, // Don't refetch on mount if data exists
-    retry: 1, // Only retry once on failure
+    staleTime: 10 * 60 * 1000, // 10 minutes (increased from default 5 minutes)
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
-  // Extract unique categories from menu items
-  const categories = menuItems && Array.isArray(menuItems)
-    ? ["All", ...Array.from(new Set(menuItems.map((item: MenuItem) => item.category)))]
-    : ["All"];
+  // Extract unique categories from menu items (memoized)
+  const categories = useMemo(() => {
+    if (!menuItems) return ["All"];
+    return ["All", ...Array.from(new Set(menuItems.map(item => item.category)))];
+  }, [menuItems]);
 
   // Use loading state from menu only
   const isLoading = menuLoading;
 
-  const filteredItems = menuItems && Array.isArray(menuItems)
-    ? menuItems.filter(
-        (item: MenuItem) =>
-          // Show all items (including unavailable) - they will show as "sold out"
-          (selectedCategory === "All" || item.category === selectedCategory) &&
-          (searchQuery === "" ||
-            item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : [];
+  // Filter items (memoized to prevent unnecessary recalculations)
+  const filteredItems = useMemo(() => {
+    if (!menuItems) return [];
+    return menuItems.filter(
+      (item) =>
+        // Show all items (including unavailable) - they will show as "sold out"
+        (selectedCategory === "All" || item.category === selectedCategory) &&
+        (searchQuery === "" ||
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [menuItems, selectedCategory, searchQuery]);
 
-  const addToCart = (menuItem: MenuItem) => {
+  // Infinite scroll for pagination (reduces initial payload)
+  const {
+    visibleItems,
+    hasMore,
+    isLoading: isLoadingMore,
+    loadMore,
+    reset: resetPagination,
+    sentinelRef,
+  } = useInfiniteScroll(filteredItems, {
+    itemsPerLoad: networkStatus.isSlow ? 6 : 12, // Load fewer items on slow networks
+    threshold: 300,
+    enabled: true,
+  });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [selectedCategory, searchQuery, resetPagination]);
+
+  // Memoize callbacks to prevent unnecessary re-renders
+  const addToCart = useCallback((menuItem: MenuItem) => {
     // Check if kitchen is closed
     if (!kitchenStatus.isOpen) {
       toast({
@@ -189,9 +209,9 @@ export default function CustomerMenu() {
       description: `${menuItem.name} has been added to your cart.`,
       duration: 1000,
     });
-  };
+  }, [kitchenStatus.isOpen, cart, menuItems, toast, addToCartContext]);
 
-  const updateQuantity = (menuItemId: string, delta: number) => {
+  const updateQuantity = useCallback((menuItemId: string, delta: number) => {
     const item = cart.find(item => item.menuItem.id === menuItemId);
     if (item) {
       const newQuantity = item.quantity + delta;
@@ -224,11 +244,11 @@ export default function CustomerMenu() {
       
       updateQuantityContext(menuItemId, newQuantity);
     }
-  };
+  }, [cart, menuItems, toast, updateQuantityContext, removeFromCart]);
 
-  const updateInstructions = (menuItemId: string, instructions: string) => {
+  const updateInstructions = useCallback((menuItemId: string, instructions: string) => {
     updateSpecialInstructions(menuItemId, instructions);
-  };
+  }, [updateSpecialInstructions]);
 
   const subtotal = cart.reduce(
     (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,
@@ -345,14 +365,24 @@ export default function CustomerMenu() {
           </div>
         )}
         
+        {/* Network Status Indicator (subtle) */}
+        {networkStatus.isSlow && (
+          <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 py-1 px-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-xs text-orange-700 dark:text-orange-300">
+              <Wifi className="w-3 h-3" />
+              <span>Slow network detected - Optimizing for faster loading</span>
+            </div>
+          </div>
+        )}
+        
         {/* Hero Section */}
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          <img
+          <OptimizedImage
             src={heroImage}
-            loading="eager"
-            fetchPriority="high"
-            alt="Nibbles"
+            alt="Nibbles Kitchen - Authentic Nigerian Cuisine"
+            aspectRatio="auto"
+            priority={true} // Load hero image immediately
             className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
@@ -511,138 +541,67 @@ export default function CustomerMenu() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {filteredItems.map((item: MenuItem) => {
-              const isInCart = cart.some(
-                (cartItem) => String(cartItem.menuItem.id) === String(item.id)
-              );
-              const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
-              
-              // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
-              const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
-                ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
-                : !item.available;        // Stock not tracked: use manual available setting
-              
-              const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
-                                 (cartItem ? cartItem.quantity < item.stockBalance : true);
-              return (
-                <Card
-                  key={item.id}
-                  className={`overflow-hidden hover-elevate transition-all ${
-                    isInCart ? "ring-2 ring-primary" : ""
-                  }`}
-                  data-testid={`card-menu-item-${item.id}`}
+          <>
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+              {visibleItems.map((item) => {
+                const isInCart = cart.some(
+                  (cartItem) => String(cartItem.menuItem.id) === String(item.id)
+                );
+                const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
+                
+                // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
+                const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
+                  ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
+                  : !item.available;        // Stock not tracked: use manual available setting
+                
+                const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
+                                   (cartItem ? cartItem.quantity < item.stockBalance : true);
+                
+                return (
+                  <MenuItemCard
+                    key={item.id}
+                    item={item}
+                    isInCart={isInCart}
+                    cartQuantity={cartItem?.quantity}
+                    isOutOfStock={isOutOfStock}
+                    canAddMore={canAddMore}
+                    onAddToCart={addToCart}
+                    onUpdateQuantity={updateQuantity}
+                  />
+                );
+              })}
+            </div>
+            
+            {/* Infinite Scroll Load More Button (fallback if intersection observer fails) */}
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="min-w-[120px]"
                 >
-                  <div className="aspect-square overflow-hidden relative">
-                    <img
-                      src={getOptimizedImageUrl(item.imageUrl, {
-                        width: 400,
-                        height: 400,
-                        format: 'auto',
-                        quality: 85,
-                        crop: 'fill',
-                        gravity: 'auto',
-                      })}
-                      srcSet={getResponsiveImageSrcSet(item.imageUrl)}
-                      sizes={getResponsiveImageSizes()}
-                      alt={item.name}
-                      loading="lazy"
-                      decoding="async"
-                      className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
-                      onError={(e) => {
-                        // Fallback to placeholder if image fails to load
-                        (e.target as HTMLImageElement).src = getOptimizedImageUrl(null);
-                      }}
-                    />
-                    {/* SOLD OUT Overlay - Using stockBalance */}
-                    {isOutOfStock && (
-                      <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
-                        <Badge variant="default" className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg">
-                          SOLD OUT
-                        </Badge>
-                      </div>
-                    )}
-                    {/* Low Stock Badge */}
-                    {!isOutOfStock && item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3 && (
-                      <div className="absolute top-2 left-2 bg-orange-500 text-white rounded-md px-2 py-1 text-xs font-semibold shadow-md">
-                        Only {item.stockBalance} left!
-                      </div>
-                    )}
-                    {isInCart && !isOutOfStock && (
-                      <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold">
-                        {cartItem?.quantity}
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
-                    <div>
-                      <h3 className="text-sm font-semibold mb-0.5 sm:mb-1">
-                        {item.name}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                        {item.description}
-                      </p>
-                    </div>
-                    
-                    {/* Stock Balance Info for Customer */}
-                    {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 5 && (
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className={`font-medium ${
-                          item.stockBalance <= 2 ? 'text-red-600' : 'text-orange-600'
-                        }`}>
-                          ⚡ Only {item.stockBalance} portion{item.stockBalance !== 1 ? 's' : ''} left
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold">
-                        ₦{parseFloat(item.price).toLocaleString()}
-                      </span>
-                      {isInCart ? (
-                        <div className="flex items-center gap-1 border rounded-lg">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => item.id && updateQuantity(String(item.id), -1)}
-                            data-testid={`button-minus-${item.id}`}
-                            className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
-                          >
-                            <Minus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
-                          </Button>
-                          <span className="font-semibold min-w-[14px] sm:min-w-[16px] text-center text-xs">
-                            {cartItem?.quantity}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => item.id && updateQuantity(String(item.id), 1)}
-                            disabled={isOutOfStock || !canAddMore}
-                            data-testid={`button-plus-${item.id}`}
-                            className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
-                            title={!canAddMore ? `Maximum ${item.stockBalance} portions available` : ''}
-                          >
-                            <Plus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => addToCart(item)}
-                          disabled={isOutOfStock}
-                          data-testid={`button-add-${item.id}`}
-                          className="text-xs px-2 py-1.5"
-                        >
-                          <Plus className="w-2.5 h-2.5 mr-1" />
-                          {!isOutOfStock ? 'Add' : 'SOLD OUT'}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                  {isLoadingMore ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Loading...
+                    </>
+                  ) : (
+                    `Load More (${filteredItems.length - visibleItems.length} remaining)`
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* Infinite Scroll Sentinel (for automatic loading) */}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="h-1 w-full"
+                aria-hidden="true"
+              />
+            )}
+          </>
         )}
       </section>
 
@@ -680,21 +639,14 @@ export default function CustomerMenu() {
                   >
                     <CardContent className="p-2.5 sm:p-3 space-y-2">
                       <div className="flex gap-2">
-                        <img
-                          src={getOptimizedImageUrl(item.menuItem.imageUrl, {
-                            width: 48,
-                            height: 48,
-                            format: 'auto',
-                            quality: 80,
-                            crop: 'fill',
-                          })}
-                          loading="lazy"
-                          decoding="async"
+                        <OptimizedImage
+                          src={item.menuItem.imageUrl}
                           alt={item.menuItem.name}
-                          className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = getOptimizedImageUrl(null, { width: 48, height: 48 });
-                          }}
+                          width={48}
+                          height={48}
+                          aspectRatio="square"
+                          priority={false}
+                          className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg"
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm truncate">

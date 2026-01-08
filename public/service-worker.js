@@ -69,14 +69,50 @@ self.addEventListener('activate', (event) => {
 });
 
 // ============================================================================
-// FETCH: Network-first for HTML, cache-first for assets
+// FETCH: Network-first for HTML, cache-first for assets, stale-while-revalidate for API
 // ============================================================================
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip cross-origin requests
-  if (url.origin !== location.origin) {
+  // Skip cross-origin requests (except for images from Cloudinary/CDN)
+  const isCloudinaryImage = url.hostname.includes('cloudinary.com') || 
+                            url.hostname.includes('res.cloudinary.com');
+  
+  if (url.origin !== location.origin && !isCloudinaryImage) {
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Strategy 3: STALE-WHILE-REVALIDATE for Menu API (performance optimization)
+  // -------------------------------------------------------------------------
+  if (url.pathname === '/api/menu/all' || url.pathname.includes('/api/menu/')) {
+    event.respondWith(
+      caches.open(RUNTIME_CACHE).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          // Fetch fresh data in background
+          const fetchPromise = fetch(request)
+            .then((networkResponse) => {
+              // Cache successful responses
+              if (networkResponse && networkResponse.status === 200) {
+                const responseToCache = networkResponse.clone();
+                cache.put(request, responseToCache);
+              }
+              return networkResponse;
+            })
+            .catch(() => {
+              // Network failed, return cached if available
+              return cachedResponse || new Response(
+                JSON.stringify({ error: 'Network unavailable' }),
+                { status: 503, headers: { 'Content-Type': 'application/json' } }
+              );
+            });
+
+          // Return cached version immediately if available, otherwise wait for network
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
     return;
   }
 
@@ -86,41 +122,47 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 0: CACHE API RESPONSES (menu items, kitchen status)
-  // Network-first with cache fallback for offline support
+  // Strategy 4: CACHE-FIRST for images (including Cloudinary)
   // -------------------------------------------------------------------------
-  if (url.pathname.startsWith('/api/')) {
-    // Cache menu items and kitchen status for offline use
-    const cacheableEndpoints = ['/api/menu/all', '/api/kitchen/status'];
-    const isCacheable = cacheableEndpoints.some(endpoint => url.pathname.includes(endpoint));
-    
-    if (isCacheable) {
-      event.respondWith(
-        caches.open(RUNTIME_CACHE).then((cache) => {
-          return fetch(request)
-            .then((response) => {
-              // Cache successful responses
-              if (response && response.status === 200) {
-                const responseToCache = response.clone();
+  if (isCloudinaryImage || 
+      request.destination === 'image' || 
+      url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i)) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          // Return cached image immediately
+          // Fetch fresh version in background for next time
+          fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone();
+              caches.open(RUNTIME_CACHE).then((cache) => {
                 cache.put(request, responseToCache);
-              }
-              return response;
-            })
-            .catch(() => {
-              // Network failed - try cache
-              return cache.match(request).then((cachedResponse) => {
-                if (cachedResponse) {
-                  console.log('[SW] Serving cached API response:', url.pathname);
-                }
-                return cachedResponse;
               });
+            }
+          }).catch(() => {
+            // Network failed, that's ok - we have cache
+          });
+          return cachedResponse;
+        }
+        
+        // Not in cache, fetch from network
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
             });
-        })
-      );
-      return;
-    }
-    
-    // For other API endpoints, don't cache (always fetch from network)
+          }
+          return networkResponse;
+        }).catch(() => {
+          // Network failed and no cache - return placeholder
+          return new Response(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e5e7eb"/></svg>',
+            { headers: { 'Content-Type': 'image/svg+xml' } }
+          );
+        });
+      })
+    );
     return;
   }
 
