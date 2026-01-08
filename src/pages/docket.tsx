@@ -52,28 +52,133 @@ export default function DocketPage() {
     }
   }, []);
 
-  // WebSocket connection for real-time updates
+  // WebSocket connection for real-time updates with auto-reconnect
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
-    const socket = new WebSocket(wsUrl);
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const baseReconnectDelay = 1000;
 
-    socket.onopen = () => {
-      console.log("Docket WebSocket connected");
-    };
+    const connect = () => {
+      try {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          console.log("Docket WebSocket connected");
+          reconnectAttempts = 0;
+        };
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (
-        data.type === "order_update" || 
-        data.type === "new_order" || 
-        data.type === "order_status_change"
-      ) {
-        // Invalidate both authenticated user orders and guest orders
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/guest/orders"] });
-      } else if (data.type === "menu_item_update") {
-        // Refresh menu data when items are updated
-        queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      
+      // Use WebSocket data directly - no HTTP refetch needed!
+      if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
+        if (data.order) {
+          // Normalize order structure
+          const normalizeOrder = (order: any): OrderWithItems => {
+            const normalized = { ...order };
+            if (!normalized.orderItems || !Array.isArray(normalized.orderItems)) {
+              normalized.orderItems = [];
+            }
+            normalized.orderItems = normalized.orderItems.map((item: any) => {
+              const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+                ? item.menuItemName.trim()
+                : (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim()
+                  ? item.menuItem.name.trim()
+                  : 'Unknown Item');
+              
+              return {
+                ...item,
+                menuItemName: menuItemName,
+                menuItem: menuItemName !== 'Unknown Item' ? { name: menuItemName } : (item.menuItem || null)
+              };
+            });
+            return normalized as OrderWithItems;
+          };
+
+          // Update query data directly based on user type
+          if (user) {
+            // Authenticated user orders
+            queryClient.setQueryData(
+              ["/api/orders/active/customer"],
+              (old: OrderWithItems[] = []) => {
+                const normalizedOrder = normalizeOrder(data.order);
+                
+                // Filter to only show paid orders
+                if (normalizedOrder.paymentStatus !== 'paid') {
+                  return old.filter(o => o.id !== normalizedOrder.id);
+                }
+                
+                if (data.type === "new_order") {
+                  const exists = old.some(o => o.id === normalizedOrder.id);
+                  if (!exists) {
+                    return [normalizedOrder, ...old].sort((a, b) =>
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  }
+                } else {
+                  const index = old.findIndex(o => o.id === normalizedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old];
+                    updated[index] = normalizedOrder;
+                    return updated.sort((a, b) =>
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  } else if (normalizedOrder.paymentStatus === 'paid') {
+                    return [normalizedOrder, ...old].sort((a, b) =>
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  }
+                }
+                return old;
+              }
+            );
+          } else if (guestSession) {
+            // Guest orders
+            queryClient.setQueryData(
+              ["/api/guest/orders", guestSession.guestId],
+              (old: { orders: OrderWithItems[] } = { orders: [] }) => {
+                const normalizedOrder = normalizeOrder(data.order);
+                
+                // Filter to only show paid orders
+                if (normalizedOrder.paymentStatus !== 'paid') {
+                  return { orders: old.orders.filter(o => o.id !== normalizedOrder.id) };
+                }
+                
+                if (data.type === "new_order") {
+                  const exists = old.orders.some(o => o.id === normalizedOrder.id);
+                  if (!exists) {
+                    return {
+                      orders: [normalizedOrder, ...old.orders].sort((a, b) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                    };
+                  }
+                } else {
+                  const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old.orders];
+                    updated[index] = normalizedOrder;
+                    return {
+                      orders: updated.sort((a, b) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                    };
+                  } else if (normalizedOrder.paymentStatus === 'paid') {
+                    return {
+                      orders: [normalizedOrder, ...old.orders].sort((a, b) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                    };
+                  }
+                }
+                return old;
+              }
+            );
+          }
+        }
       } else if (data.type === "order_ready_notification") {
         // Check if this notification is for the current user/guest
         const isForCurrentUser = 
@@ -92,30 +197,109 @@ export default function DocketPage() {
             });
           }
           
-          // Also show toast notification
-          console.log("🎉 Your order is ready!", data.message);
-          
-          // Refresh orders to show updated status
-          queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/guest/orders"] });
+          // Update order status directly via WebSocket data
+          if (data.order) {
+            const normalizeOrder = (order: any): OrderWithItems => {
+              const normalized = { ...order };
+              if (!normalized.orderItems || !Array.isArray(normalized.orderItems)) {
+                normalized.orderItems = [];
+              }
+              normalized.orderItems = normalized.orderItems.map((item: any) => {
+                const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+                  ? item.menuItemName.trim()
+                  : (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim()
+                    ? item.menuItem.name.trim()
+                    : 'Unknown Item');
+                
+                return {
+                  ...item,
+                  menuItemName: menuItemName,
+                  menuItem: menuItemName !== 'Unknown Item' ? { name: menuItemName } : (item.menuItem || null)
+                };
+              });
+              return normalized as OrderWithItems;
+            };
+
+            if (user) {
+              queryClient.setQueryData(
+                ["/api/orders/active/customer"],
+                (old: OrderWithItems[] = []) => {
+                  const normalizedOrder = normalizeOrder(data.order);
+                  const index = old.findIndex(o => o.id === normalizedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old];
+                    updated[index] = normalizedOrder;
+                    return updated;
+                  }
+                  return old;
+                }
+              );
+            } else if (guestSession) {
+              queryClient.setQueryData(
+                ["/api/guest/orders", guestSession.guestId],
+                (old: { orders: OrderWithItems[] } = { orders: [] }) => {
+                  const normalizedOrder = normalizeOrder(data.order);
+                  const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old.orders];
+                    updated[index] = normalizedOrder;
+                    return { orders: updated };
+                  }
+                  return old;
+                }
+              );
+            }
+          }
         }
       }
     };
 
-    socket.onerror = (error) => {
-      console.error("Docket WebSocket error:", error);
+        socket.onerror = (error) => {
+          console.error("Docket WebSocket error:", error);
+        };
+
+        socket.onclose = () => {
+          console.log("Docket WebSocket disconnected");
+          socket = null;
+          
+          // Auto-reconnect with exponential backoff
+          if (reconnectAttempts < maxReconnectAttempts) {
+            const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
+            reconnectAttempts++;
+            console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`);
+            reconnectTimeout = setTimeout(() => {
+              connect();
+            }, delay);
+          } else {
+            console.error("Max reconnection attempts reached for Docket WebSocket");
+          }
+        };
+
+        setWs(socket);
+      } catch (error) {
+        console.error("Error creating WebSocket connection:", error);
+        // Retry connection
+        if (reconnectAttempts < maxReconnectAttempts) {
+          const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
+          reconnectAttempts++;
+          reconnectTimeout = setTimeout(() => {
+            connect();
+          }, delay);
+        }
+      }
     };
 
-    socket.onclose = () => {
-      console.log("Docket WebSocket disconnected");
-    };
-
-    setWs(socket);
+    connect();
 
     return () => {
-      socket.close();
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (socket) {
+        socket.close();
+      }
     };
-  }, []);
+  }, [user, guestSession]);
 
 const getStatusIcon = (status: string) => {
   switch (status) {

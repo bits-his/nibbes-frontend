@@ -121,6 +121,15 @@ export default function KitchenDisplay() {
               if (data.type === "new_order") {
                 // Add new order to the list
                 const newOrder = normalizeOrder(data.order);
+                
+                // CRITICAL FIX: If orderItems are missing or empty, don't add the order
+                // Backend should always send complete data, but if it doesn't, we skip it
+                // to avoid showing blank orders. The order will appear when backend sends complete data.
+                if (!newOrder.orderItems || newOrder.orderItems.length === 0) {
+                  console.warn('⚠️ Order received without items via WebSocket, skipping until complete data arrives:', newOrder.id);
+                  return old; // Don't add incomplete order - wait for complete WebSocket message
+                }
+                
                 // Check if order already exists (avoid duplicates)
                 const exists = old.some(o => o.id === newOrder.id);
                 if (!exists) {
@@ -134,11 +143,37 @@ export default function KitchenDisplay() {
               } else if (data.type === "order_status_change" || data.type === "order_update") {
                 // Update existing order or remove if completed/cancelled
                 const updatedOrder = normalizeOrder(data.order);
+                
+                // CRITICAL FIX: If orderItems are missing, keep existing order data
+                // Don't replace order with incomplete data - preserve existing items
+                if (!updatedOrder.orderItems || updatedOrder.orderItems.length === 0) {
+                  console.warn('⚠️ Order update received without items via WebSocket, preserving existing data:', updatedOrder.id);
+                  // Find existing order and only update status, keep existing items
+                  const existingIndex = old.findIndex(o => o.id === updatedOrder.id);
+                  if (existingIndex >= 0) {
+                    const existingOrder = old[existingIndex];
+                    // Only update status, keep existing orderItems
+                    const updated = [...old];
+                    updated[existingIndex] = {
+                      ...existingOrder,
+                      status: updatedOrder.status,
+                      paymentStatus: updatedOrder.paymentStatus,
+                      // Keep existing orderItems
+                      orderItems: existingOrder.orderItems || []
+                    };
+                    return updated.sort((a, b) => 
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  }
+                  // If order doesn't exist and has no items, don't add it
+                  return old;
+                }
+                
                 if (updatedOrder.status === "completed" || updatedOrder.status === "cancelled") {
                   // Remove completed/cancelled orders from active list
                   return old.filter(o => o.id !== updatedOrder.id);
                 } else {
-                  // Update existing order
+                  // Update existing order with complete data
                   const index = old.findIndex(o => o.id === updatedOrder.id);
                   if (index >= 0) {
                     const updated = [...old];
@@ -159,8 +194,9 @@ export default function KitchenDisplay() {
             }
           );
         } else {
-          // Fallback: if order data not in WebSocket message, invalidate query
-          queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+          // Fallback: if order data not in WebSocket message, log warning
+          // Don't invalidate query - keep existing data (WebSocket-only approach)
+          console.warn('⚠️ WebSocket message received without order data:', data);
         }
 
         if (data.type === "new_order") {
