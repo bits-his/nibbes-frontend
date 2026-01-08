@@ -7,8 +7,8 @@ export default function AboutPage() {
         title="About Us - Authentic Nigerian Cuisine"
         description="Learn about Nibbles Kitchen, your destination for authentic Nigerian food. We serve traditional dishes made with fresh ingredients and traditional recipes passed down through generations."
         keywords="about Nibbles Kitchen, Nigerian restaurant story, authentic African cuisine, Nigerian food culture, restaurant about us"
-        ogUrl="https://nibbleskitchen.netlify.app/about"
-        canonicalUrl="https://nibbleskitchen.netlify.app/about"
+        ogUrl="https://nibblesfastfood.com/about"
+        canonicalUrl="https://nibblesfastfood.com/about"
       />
 
       <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">

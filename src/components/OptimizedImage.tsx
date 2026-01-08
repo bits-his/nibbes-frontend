@@ -49,8 +49,9 @@ export function OptimizedImage({
   const networkStatus = useNetworkStatus();
 
   // Calculate dimensions based on aspect ratio
-  const imageWidth = width || (aspectRatio === 'square' ? 400 : 600);
-  const imageHeight = height || (aspectRatio === 'square' ? 400 : 600);
+  // PERFORMANCE: Always provide explicit width/height to prevent layout shift
+  const imageWidth = width || (aspectRatio === 'square' ? 400 : 1920);
+  const imageHeight = height || (aspectRatio === 'square' ? 400 : 1080);
 
   // Get quality based on network status
   const quality = getQualityForNetwork(
@@ -152,9 +153,12 @@ export function OptimizedImage({
         ref={imgRef}
         src={imageSrc}
         alt={alt}
+        width={imageWidth}
+        height={imageHeight}
         srcSet={srcSet}
         sizes={sizes}
         loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           isLoaded ? 'opacity-100' : 'opacity-0'

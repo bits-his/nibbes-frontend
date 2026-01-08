@@ -1611,7 +1611,7 @@ export default function Checkout() {
                   <CardContent className="pt-6">
                     <div className="flex justify-center">
                       {/* Delivery button temporarily commented out - will be re-enabled when delivery people are available */}
-                      {["pickup", "delivery"].map((type) => {
+                      {/* {["pickup", "delivery"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
@@ -1633,9 +1633,9 @@ export default function Checkout() {
                             </div>
                           </button>
                         )
-                      })}
+                      })} */}
                       {/* Only show pickup option for now - centered */}
-                      {/* {["pickup"].map((type) => {
+                      {["pickup"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
@@ -1657,7 +1657,7 @@ export default function Checkout() {
                             </div>
                           </button>
                         )
-                      })} */}
+                      })}
                     </div>
                     <FormMessage />
                   </CardContent>

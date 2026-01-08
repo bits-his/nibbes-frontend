@@ -33,7 +33,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Users, DollarSign, ShoppingCart } from 'lucide-react';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen');
 
 interface DashboardData {
   todayOrders: number;

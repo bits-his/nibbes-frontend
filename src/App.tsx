@@ -1,30 +1,11 @@
 import { Switch, Route, useLocation } from "wouter";
-import React, { useEffect, useState, useRef, createElement, lazy } from "react";
+import React, { useEffect, useState, useRef, createElement, lazy, Suspense } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import CustomerMenu from "@/pages/customer-menu";
-import Checkout from "@/pages/checkout";
-import OrderStatus from "@/pages/order-status";
-import StaffOrders from "@/pages/staff-orders";
-import KitchenDisplay from "@/pages/kitchen-display";
-import OrderManagement from "@/pages/order-management";
-import MenuManagement from "@/pages/menu-management";
-import UserManagement from "@/pages/user-management";
-import DucketDisplay from "@/pages/docket";
-import NotFound from "@/pages/not-found";
-import Login from "@/pages/login";
-import Signup from "@/pages/signup";
-import ForgotPassword from "@/pages/forgot-password";
-import ResetPassword from "@/pages/reset-password";
-import GuestCheckout from "@/pages/guest-checkout";
-import QRCodePage from "@/pages/qr-code";
-import ProfilePage from "@/pages/profile";
-import CustomerAnalyticsPage from "@/pages/customer-analytics";
-import AnalyticsPage from "@/pages/analytics";
 import { useAuth } from "./hooks/useAuth";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { CartProvider } from "@/context/CartContext";
@@ -33,23 +14,53 @@ import { InstallPWA } from "@/components/InstallPWA";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { SplashScreen } from "@/components/SplashScreen";
 
-// Fix missing import reference in the renderPage function
-import DocketPage from "@/pages/docket";
-import InventoryPage from "@/pages/inventory";
-import CustomerAnalyticsDashboard from "@/pages/customer-analytics-enhanced";
-import StoreManagement from "@/pages/store-management";
-import EMcard from "@/pages/EMcard";
-import ManagerReportsList from "@/pages/ManagerReportsList";
-import ManagerReportDetail from "@/pages/ManagerReportDetail";
-import ManagerReportsDashboard from "@/pages/ManagerReportsDashboard";
-import ManagerReportsByStaff from "@/pages/ManagerReportsByStaff";
-import KitchenRequests from "@/pages/KitchenRequests";
-import AboutPage from "@/pages/about";
-import ContactPage from "@/pages/contact";
-import TVDisplay from "@/pages/tv-display";
-import CompletedOrders from "@/pages/completed-orders";
-import Transactions from "@/pages/transactions";
-import PrintReceipt from "@/pages/print-receipt";
+// PERFORMANCE: Lazy load all routes for code-splitting
+// Critical routes loaded immediately (home page)
+import CustomerMenu from "@/pages/customer-menu";
+
+// Lazy load all other routes
+const Checkout = lazy(() => import("@/pages/checkout"));
+const OrderStatus = lazy(() => import("@/pages/order-status"));
+const StaffOrders = lazy(() => import("@/pages/staff-orders"));
+const KitchenDisplay = lazy(() => import("@/pages/kitchen-display"));
+const OrderManagement = lazy(() => import("@/pages/order-management"));
+const MenuManagement = lazy(() => import("@/pages/menu-management"));
+const UserManagement = lazy(() => import("@/pages/user-management"));
+const DucketDisplay = lazy(() => import("@/pages/docket"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Login = lazy(() => import("@/pages/login"));
+const Signup = lazy(() => import("@/pages/signup"));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const GuestCheckout = lazy(() => import("@/pages/guest-checkout"));
+const QRCodePage = lazy(() => import("@/pages/qr-code"));
+const ProfilePage = lazy(() => import("@/pages/profile"));
+const CustomerAnalyticsPage = lazy(() => import("@/pages/customer-analytics"));
+const AnalyticsPage = lazy(() => import("@/pages/analytics"));
+const DocketPage = lazy(() => import("@/pages/docket"));
+const InventoryPage = lazy(() => import("@/pages/inventory"));
+const CustomerAnalyticsDashboard = lazy(() => import("@/pages/customer-analytics-enhanced"));
+const StoreManagement = lazy(() => import("@/pages/store-management"));
+const EMcard = lazy(() => import("@/pages/EMcard"));
+const ManagerReportsList = lazy(() => import("@/pages/ManagerReportsList"));
+const ManagerReportDetail = lazy(() => import("@/pages/ManagerReportDetail"));
+const ManagerReportsDashboard = lazy(() => import("@/pages/ManagerReportsDashboard"));
+const ManagerReportsByStaff = lazy(() => import("@/pages/ManagerReportsByStaff"));
+const KitchenRequests = lazy(() => import("@/pages/KitchenRequests"));
+const AboutPage = lazy(() => import("@/pages/about"));
+const ContactPage = lazy(() => import("@/pages/contact"));
+const TVDisplay = lazy(() => import("@/pages/tv-display"));
+const CompletedOrders = lazy(() => import("@/pages/completed-orders"));
+const Transactions = lazy(() => import("@/pages/transactions"));
+const PrintReceipt = lazy(() => import("@/pages/print-receipt"));
+
+// Loading fallback component
+const RouteLoader = () => (
+  <div className="flex items-center justify-center min-h-screen" role="status" aria-label="Loading">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <span className="sr-only">Loading...</span>
+  </div>
+);
 
 // Define user type
 interface User {
@@ -87,12 +98,12 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
-    const token = localStorage.getItem("token");
-    const userData = localStorage.getItem("user");
-    const sessionStartTime = localStorage.getItem("sessionStartTime");
-
+    // PERFORMANCE: Defer auth initialization to avoid blocking initial render
     const initializeUser = async () => {
+      // Check if user is already logged in (from localStorage)
+      const token = localStorage.getItem("token");
+      const userData = localStorage.getItem("user");
+      const sessionStartTime = localStorage.getItem("sessionStartTime");
       // Check if session has expired (past midnight)
       if (sessionStartTime) {
         const sessionStart = new Date(parseInt(sessionStartTime));
@@ -150,7 +161,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     };
 
-    initializeUser();
+    // PERFORMANCE: Defer auth initialization to avoid blocking render
+    // Use requestIdleCallback if available, otherwise setTimeout
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(initializeUser, { timeout: 1000 });
+    } else {
+      setTimeout(initializeUser, 100);
+    }
   }, []);
 
   const login = async (userData: User, token: string) => {
@@ -264,8 +281,9 @@ const ProtectedRoute: React.FC<{
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        Loading...
+      <div className="flex items-center justify-center h-screen" role="status" aria-label="Loading">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="sr-only">Loading...</span>
       </div>
     );
   }
@@ -305,8 +323,9 @@ const PublicRoute: React.FC<{
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        Loading...
+      <div className="flex items-center justify-center h-screen" role="status" aria-label="Loading">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="sr-only">Loading...</span>
       </div>
     );
   }
@@ -322,7 +341,8 @@ function Router() {
   const { user } = React.useContext(AuthContext);
 
   return (
-    <Switch>
+    <Suspense fallback={<RouteLoader />}>
+      <Switch>
       <Route
         path="/login"
         component={() => (
@@ -365,7 +385,12 @@ function Router() {
       />
       <Route
         path="/unauthorized"
-        component={() => <div className="p-6">Unauthorized Access</div>}
+        component={() => (
+          <div className="p-6" role="alert" aria-live="polite">
+            <h1>Unauthorized Access</h1>
+            <p>You do not have permission to access this page.</p>
+          </div>
+        )}
       />
 
       {/* Public routes */}
@@ -573,6 +598,7 @@ function Router() {
       {/* Fallback to not found for unauthorized access */}
       <Route path="*" component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -611,10 +637,10 @@ function Layout({ children }: { children: React.ReactNode }) {
         }`}
       >
         {showSidebar && (
-          <header className="flex items-center h-14 px-4 border-b shrink-0 justify-between">
-            <div className="flex items-center">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-            </div>
+          <header className="flex items-center h-14 px-4 border-b shrink-0 justify-between" role="banner">
+            <nav className="flex items-center" aria-label="Main navigation">
+              <SidebarTrigger data-testid="button-sidebar-toggle" aria-label="Toggle sidebar" />
+            </nav>
             <div className="flex items-center gap-2">
               <div className="text-[#50BAA8] font-medium">
                 {user ? (user.username || user.email) : guestSession ? `${guestSession.guestName} (Guest)` : "Guest"}
@@ -639,7 +665,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
         )}
-        <main className="flex-1 overflow-auto" ref={mainRef}>
+        <main className="flex-1 overflow-auto" ref={mainRef} role="main" id="main-content">
           {children}
         </main>
       </div>
@@ -668,11 +694,14 @@ function AppContent() {
     }
   }, []);
 
-  // Hide splash screen when both auth and DOM are ready
+  // PERFORMANCE: Hide splash screen immediately - don't block FCP
+  // Show content immediately, splash is just visual polish
   useEffect(() => {
-    if (!loading && domReady) {
-      // Minimum display time to ensure users see the splash screen
-      const minDisplayTime = 1200; // 1.2 seconds minimum
+    // Don't wait for auth loading - show content immediately
+    // Auth check happens in background
+    if (domReady) {
+      // Minimal delay just for visual smoothness
+      const minDisplayTime = 100; // 0.1 seconds - minimal delay
       
       const timer = setTimeout(() => {
         setShowSplash(false);
@@ -680,7 +709,7 @@ function AppContent() {
       
       return () => clearTimeout(timer);
     }
-  }, [loading, domReady]);
+  }, [domReady]);
 
   return (
     <>

@@ -22,12 +22,17 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
-import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
+// PERFORMANCE: Hero image hosted on Cloudinary for optimization
+// TODO: Replace with your Cloudinary URL after uploading the optimized image
+// Recommended: Upload as WebP format, quality 85, max width 1920px
+// PERFORMANCE: Hero image hosted on Cloudinary with automatic optimization
+// Cloudinary transformations: f_auto (WebP/AVIF), q_85 (quality), w_1920 (max width)
+const heroImage = import.meta.env.VITE_HERO_IMAGE_URL || "https://res.cloudinary.com/ddls0gpui/image/upload/f_auto,q_85,w_1920/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg";
 import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
 import { apiRequest } from "@/lib/queryClient";
-import { getOptimizedImageUrl, getResponsiveImageSrcSet, getResponsiveImageSizes } from "@/utils/imageCDN";
+// PERFORMANCE: Removed unused imageCDN imports - using OptimizedImage component instead
 import { MenuItemCard } from "@/components/MenuItemCard";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -65,11 +70,13 @@ export default function CustomerMenu() {
     return () => clearTimeout(timer);
   }, []);
 
-  // OPTIMIZED: WebSocket connection (non-blocking, doesn't delay page render)
+  // PERFORMANCE: WebSocket connection deferred - don't block initial render
   useEffect(() => {
-    // Don't block rendering - connect in background
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
-    const socket = new WebSocket(wsUrl);
+    // Defer WebSocket connection to avoid blocking FCP/LCP
+    // Use requestIdleCallback or setTimeout to connect after page is interactive
+    const connectWebSocket = () => {
+      const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+      const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
       console.log("Customer Menu WebSocket connected");
@@ -100,10 +107,24 @@ export default function CustomerMenu() {
       console.log("Customer Menu WebSocket disconnected");
     };
 
-    // Cleanup function to close the WebSocket connection
-    return () => {
-      socket.close();
+      // Cleanup function to close the WebSocket connection
+      return () => {
+        socket.close();
+      };
     };
+
+    // Defer WebSocket connection - connect after page is interactive
+    if ('requestIdleCallback' in window) {
+      const id = (window as any).requestIdleCallback(connectWebSocket, { timeout: 2000 });
+      return () => {
+        (window as any).cancelIdleCallback(id);
+      };
+    } else {
+      const timeoutId = setTimeout(connectWebSocket, 2000);
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    }
   }, []); // Empty deps - WebSocket doesn't block rendering
   const [showQRCode, setShowQRCode] = useState(false);
 
@@ -347,20 +368,20 @@ export default function CustomerMenu() {
         title="Home - Order Authentic Nigerian Cuisine Online"
         description="Browse our menu of delicious Nigerian dishes. Order jollof rice, suya, pounded yam, egusi soup, pepper soup, fried rice and more. Fast online ordering with pickup service. Fresh meals prepared daily."
         keywords="Nigerian food menu, order jollof rice online, suya delivery, Nigerian restaurant menu, African food online, pounded yam, egusi soup, order Nigerian food, online food ordering"
-        ogUrl="https://nibbleskitchen.netlify.app/"
-        canonicalUrl="https://nibbleskitchen.netlify.app/"
+        ogUrl="https://nibblesfastfood.com/"
+        canonicalUrl="https://nibblesfastfood.com/"
       />
-      <div className="min-h-screen bg-background">
+      <main className="min-h-screen bg-background" role="main" aria-label="Menu page">
         {/* Kitchen Closed Banner - Very Prominent */}
         {!kitchenStatus.isOpen && (
-          <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80">
+          <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80" role="alert" aria-live="polite">
             <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
-              <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+              <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" aria-hidden="true" />
               <div className="text-center">
                 <h2 className="text-lg md:text-2xl font-bold mb-1">⚠️ KITCHEN IS CLOSED</h2>
                 <p className="text-sm md:text-base">We are currently not accepting orders. Please check back later.</p>
               </div>
-              <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+              <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" aria-hidden="true" />
             </div>
           </div>
         )}
@@ -378,11 +399,14 @@ export default function CustomerMenu() {
         {/* Hero Section */}
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
+          {/* PERFORMANCE: Hero image from Cloudinary - automatically optimized via OptimizedImage */}
           <OptimizedImage
             src={heroImage}
             alt="Nibbles Kitchen - Authentic Nigerian Cuisine"
             aspectRatio="auto"
-            priority={true} // Load hero image immediately
+            priority={true} // Load hero image immediately (critical for LCP)
+            width={1920}
+            height={1080}
             className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
@@ -418,12 +442,16 @@ export default function CustomerMenu() {
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  type="text"
+                  type="search"
+                  id="search-menu-desktop"
+                  name="search-menu"
                   placeholder="Search menu items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 text-sm py-2 sm:py-3"
                   data-testid="input-search"
+                  aria-label="Search menu items"
+                  autoComplete="off"
                 />
               </div>
             </div>
@@ -441,6 +469,16 @@ export default function CustomerMenu() {
                     data-testid={`filter-${category
                       .toLowerCase()
                       .replace(" ", "-")}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Filter by ${category} category`}
+                    aria-pressed={selectedCategory === category}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedCategory(category);
+                      }
+                    }}
                   >
                     {category}
                   </Badge>
@@ -455,6 +493,7 @@ export default function CustomerMenu() {
                 className="relative shrink-0"
                 onClick={() => setCartOpen(true)}
                 data-testid="button-cart"
+                aria-label={`Shopping cart${cart.length > 0 ? ` with ${cart.length} item${cart.length !== 1 ? 's' : ''}` : ''}`}
               >
                 <ShoppingCart className="w-4 h-4" />
                 {cart.length > 0 && (
@@ -472,12 +511,16 @@ export default function CustomerMenu() {
             <div className="relative w-full">
               <Search className="absolute left-2.5 sm:left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
               <Input
-                type="text"
+                type="search"
+                id="search-menu-mobile"
+                name="search-menu-mobile"
                 placeholder="Search menu items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-7 sm:pl-8 text-xs py-1.5"
                 data-testid="input-search-mobile"
+                aria-label="Search menu items"
+                autoComplete="off"
               />
             </div>
 
@@ -496,6 +539,16 @@ export default function CustomerMenu() {
                       data-testid={`filter-mobile-${category
                         .toLowerCase()
                         .replace(" ", "-")}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Filter by ${category} category`}
+                      aria-pressed={selectedCategory === category}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedCategory(category);
+                        }
+                      }}
                     >
                       {category}
                     </Badge>
@@ -640,8 +693,8 @@ export default function CustomerMenu() {
                     <CardContent className="p-2.5 sm:p-3 space-y-2">
                       <div className="flex gap-2">
                         <OptimizedImage
-                          src={item.menuItem.imageUrl}
-                          alt={item.menuItem.name}
+                          src={item.menuItem.imageUrl || ''}
+                          alt={item.menuItem.name || 'Menu item'}
                           width={48}
                           height={48}
                           aspectRatio="square"
@@ -662,6 +715,7 @@ export default function CustomerMenu() {
                           onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
                           data-testid={`button-remove-${item.menuItem.id}`}
                           className="h-7 sm:h-8 w-7 sm:w-8"
+                          aria-label={`Remove ${item.menuItem.name} from cart`}
                         >
                           <X className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                         </Button>
@@ -674,6 +728,7 @@ export default function CustomerMenu() {
                           onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
                           data-testid={`button-decrease-${item.menuItem.id}`}
                           className="h-7 sm:h-8 w-7 sm:w-8 p-1"
+                          aria-label={`Decrease quantity of ${item.menuItem.name}`}
                         >
                           <Minus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                         </Button>
@@ -689,12 +744,15 @@ export default function CustomerMenu() {
                           onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
                           data-testid={`button-increase-${item.menuItem.id}`}
                           className="h-7 sm:h-8 w-7 sm:w-8 p-1"
+                          aria-label={`Increase quantity of ${item.menuItem.name}`}
                         >
                           <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                         </Button>
                       </div>
 
                       <Textarea
+                        id={`instructions-${item.menuItem.id}`}
+                        name={`instructions-${item.menuItem.id}`}
                         placeholder="Special instructions (optional)"
                         value={item.specialInstructions || ""}
                         onChange={(e) =>
@@ -782,7 +840,7 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
-      </div>
+      </main>
     </>
   );
 }

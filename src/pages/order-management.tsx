@@ -308,11 +308,15 @@ const getStatusBadge = (status: string) => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  type="search"
+                  id="search-orders"
+                  name="search-orders"
                   placeholder="Search by order number or customer name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                   data-testid="input-search"
+                  aria-label="Search orders"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -335,11 +339,13 @@ const getStatusBadge = (status: string) => {
                 <PopoverTrigger asChild>
                   <Button
                     id="date-range"
+                    name="date-range"
                     variant="outline"
                     className={cn(
                       "w-full md:w-[280px] justify-start text-left font-normal",
                       !dateRange.from && "text-muted-foreground"
                     )}
+                    aria-label="Select date range for orders"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateRange.from && dateRange.to ? (
@@ -364,6 +370,7 @@ const getStatusBadge = (status: string) => {
                       variant="outline"
                       size="sm"
                       className="w-full"
+                      aria-label="Reset date range to today"
                       onClick={() => {
                         const today = new Date();
                         setDateRange({
@@ -459,6 +466,7 @@ const getStatusBadge = (status: string) => {
                               variant="ghost"
                               onClick={() => setSelectedOrder(order)}
                               data-testid={`button-view-${order.id}`}
+                              aria-label={`View order ${order.orderNumber} details`}
                               title="View order details"
                             >
                               <Eye className="w-4 h-4" />
@@ -469,6 +477,7 @@ const getStatusBadge = (status: string) => {
                                   size="icon"
                                   variant="ghost"
                                   data-testid={`button-print-${order.id}`}
+                                  aria-label={`Print options for order ${order.orderNumber}`}
                                   title="Print options"
                                 >
                                   <Printer className="w-4 h-4" />
@@ -535,6 +544,7 @@ const getStatusBadge = (status: string) => {
                     <Button
                       variant="outline"
                       className="flex items-center gap-2"
+                      aria-label="Print order"
                     >
                       <Printer className="w-4 h-4" />
                       Print

@@ -39,9 +39,11 @@ export const MenuItemCard = memo<MenuItemCardProps>(
       >
         <div className="aspect-square overflow-hidden relative">
           <OptimizedImage
-            src={item.imageUrl}
+            src={item.imageUrl || ''}
             alt={item.name}
             aspectRatio="square"
+            width={400}
+            height={400}
             priority={false} // Lazy load menu items
             className={isOutOfStock ? 'opacity-60' : ''}
           />

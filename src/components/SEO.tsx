@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { useLocation } from 'wouter';
 
 interface SEOProps {
   title: string;
@@ -23,10 +24,14 @@ export function SEO({
   canonicalUrl,
   type = 'website',
 }: SEOProps) {
+  const [location] = useLocation();
   const fullTitle = `${title} | Nibbles Kitchen`;
   const finalOgTitle = ogTitle || title;
   const finalOgDescription = ogDescription || description;
-  const finalCanonicalUrl = canonicalUrl || ogUrl;
+  
+  // Build canonical URL - use current path if not provided or if it's just the root
+  const baseUrl = 'https://nibblesfastfood.com';
+  const finalCanonicalUrl = canonicalUrl || ogUrl || `${baseUrl}${location === '/' ? '' : location}`;
 
   return (
     <Helmet>
@@ -36,8 +41,8 @@ export function SEO({
       <meta name="description" content={description} />
       {keywords && <meta name="keywords" content={keywords} />}
 
-      {/* Canonical URL */}
-      {finalCanonicalUrl && <link rel="canonical" href={finalCanonicalUrl} />}
+      {/* Canonical URL - Page-specific */}
+      <link rel="canonical" href={finalCanonicalUrl} />
 
       {/* Open Graph / Facebook */}
       <meta property="og:type" content={type} />
