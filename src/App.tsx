@@ -10,8 +10,6 @@ import { useAuth } from "./hooks/useAuth";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { CartProvider } from "@/context/CartContext";
 import { getGuestSession } from "@/lib/guestSession";
-import { InstallPWA } from "@/components/InstallPWA";
-import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { SplashScreen } from "@/components/SplashScreen";
 
 // PERFORMANCE: Lazy load all routes for code-splitting
@@ -38,21 +36,30 @@ const ProfilePage = lazy(() => import("@/pages/profile"));
 const CustomerAnalyticsPage = lazy(() => import("@/pages/customer-analytics"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
 const DocketPage = lazy(() => import("@/pages/docket"));
-const InventoryPage = lazy(() => import("@/pages/inventory"));
-const CustomerAnalyticsDashboard = lazy(() => import("@/pages/customer-analytics-enhanced"));
-const StoreManagement = lazy(() => import("@/pages/store-management"));
-const EMcard = lazy(() => import("@/pages/EMcard"));
-const ManagerReportsList = lazy(() => import("@/pages/ManagerReportsList"));
-const ManagerReportDetail = lazy(() => import("@/pages/ManagerReportDetail"));
-const ManagerReportsDashboard = lazy(() => import("@/pages/ManagerReportsDashboard"));
-const ManagerReportsByStaff = lazy(() => import("@/pages/ManagerReportsByStaff"));
-const KitchenRequests = lazy(() => import("@/pages/KitchenRequests"));
+const PaymentInstructions = lazy(() => import("@/pages/payment-instructions"));
+
+// Lazy-loaded optional UI utilities
+const InstallPWA = lazy(() =>
+  import("@/components/InstallPWA").then((m) => ({ default: m.InstallPWA }))
+);
+const UpdatePrompt = lazy(() =>
+  import("@/components/UpdatePrompt").then((m) => ({ default: m.UpdatePrompt }))
+);
 const AboutPage = lazy(() => import("@/pages/about"));
 const ContactPage = lazy(() => import("@/pages/contact"));
 const TVDisplay = lazy(() => import("@/pages/tv-display"));
 const CompletedOrders = lazy(() => import("@/pages/completed-orders"));
 const Transactions = lazy(() => import("@/pages/transactions"));
 const PrintReceipt = lazy(() => import("@/pages/print-receipt"));
+const EMcard = lazy(() => import("@/pages/EMcard"));
+const ManagerReportsList = lazy(() => import("@/pages/ManagerReportsList"));
+const ManagerReportDetail = lazy(() => import("@/pages/ManagerReportDetail"));
+const ManagerReportsDashboard = lazy(() => import("@/pages/ManagerReportsDashboard"));
+const ManagerReportsByStaff = lazy(() => import("@/pages/ManagerReportsByStaff"));
+const InventoryPage = lazy(() => import("@/pages/inventory"));
+const StoreManagement = lazy(() => import("@/pages/store-management"));
+const KitchenRequests = lazy(() => import("@/pages/KitchenRequests"));
+const CustomerAnalyticsDashboard = lazy(() => import("@/pages/customer-analytics-enhanced"));
 
 // Loading fallback component
 const RouteLoader = () => (
@@ -399,7 +406,7 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/staff/checkout" component={Checkout} />
-      <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
+      <Route path="/payment-instructions" component={PaymentInstructions} />
       <Route path="/tv-display" component={TVDisplay} />
       <Route path="/print-receipt" component={PrintReceipt} />
       <Route
@@ -721,8 +728,8 @@ function AppContent() {
             </Layout>
           </SidebarProvider>
           <Toaster />
-          <InstallPWA />
-          <UpdatePrompt />
+          <Suspense fallback={null}><InstallPWA /></Suspense>
+          <Suspense fallback={null}><UpdatePrompt /></Suspense>
         </TooltipProvider>
       </CartProvider>
       <SplashScreen isVisible={showSplash} />

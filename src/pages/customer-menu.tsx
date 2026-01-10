@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ShoppingCart,
@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
 // PERFORMANCE: Hero image hosted on Cloudinary for optimization
 // TODO: Replace with your Cloudinary URL after uploading the optimized image
@@ -38,6 +37,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { measurePerformance, logPerformanceMetrics } from "@/utils/performance";
+
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
@@ -126,7 +126,6 @@ export default function CustomerMenu() {
       };
     }
   }, []); // Empty deps - WebSocket doesn't block rendering
-  const [showQRCode, setShowQRCode] = useState(false);
 
   // Fetch menu items with extended stale time for better caching
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
@@ -405,9 +404,11 @@ export default function CustomerMenu() {
             alt="Nibbles Kitchen - Authentic Nigerian Cuisine"
             aspectRatio="auto"
             priority={true} // Load hero image immediately (critical for LCP)
-            width={1920}
-            height={1080}
+            width={1600}
+            height={900}
             className="w-full h-full object-cover object-center"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 60vw"
+            srcSetWidths={[480, 768, 1024, 1366, 1600]}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
@@ -794,52 +795,6 @@ export default function CustomerMenu() {
         </div>
       )}
 
-      {/* QR Code Modal */}
-      {/* {showQRCode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="relative bg-white rounded-xl p-6 max-w-sm w-full mx-auto border">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="absolute top-3 right-3"
-              onClick={() => setShowQRCode(false)}
-              data-testid="button-close-qr-modal"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-            
-            <div className="text-center">
-              <h3 className="font-semibold text-lg mb-3">Scan to Share Menu</h3>
-              <div className="flex justify-center mb-4">
-                <div className="p-3 bg-white border rounded-lg">
-                  <QRCodeSVG 
-                    value={window.location.origin} 
-                    size={180}
-                    level="H"
-                    includeMargin={true}
-                  />
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2 text-center">
-                Scan this QR code with your phone's camera or access from other devices:
-              </p>
-              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md mb-4">
-                <p className="mb-1"><strong>Note:</strong> To access from other devices:</p>
-                <p className="mb-1">1. Ensure devices are on the same network</p>
-                <p className="mb-1">2. Run dev server with: <code className="font-mono bg-gray-200 p-0.5 rounded">npm run dev</code></p>
-                <p className="mt-1">The QR code contains the correct IP address for your network.</p>
-              </div>
-              <Button 
-                onClick={() => navigator.clipboard && navigator.clipboard.writeText(window.location.origin)}
-                variant="outline"
-                className="w-full"
-              >
-                Copy Link
-              </Button>
-            </div>
-          </div>
-        </div>
-      )} */}
       </main>
     </>
   );

@@ -9,7 +9,8 @@ import {
 } from '@/utils/imageOptimization';
 import { getPlaceholderImage } from '@/utils/imageCDN';
 
-interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'srcSet'> {
+interface OptimizedImageProps
+  extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'srcSet'> {
   src?: string | null;
   alt: string;
   width?: number;
@@ -18,6 +19,16 @@ interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 
   priority?: boolean; // If true, load immediately (for above-the-fold images)
   aspectRatio?: 'square' | 'auto';
   fallbackSrc?: string;
+  /**
+   * Override the default responsive sizes attribute when layout demands
+   * a specific width calculation (e.g. hero sections that span 100vw)
+   */
+  sizes?: string;
+  /**
+   * Control which widths are requested in the generated srcset.
+   * Helpful for matching precise breakpoints and avoiding oversized downloads.
+   */
+  srcSetWidths?: number[];
 }
 
 /**
@@ -40,6 +51,8 @@ export function OptimizedImage({
   priority = false,
   aspectRatio = 'square',
   fallbackSrc,
+  sizes,
+  srcSetWidths,
   ...props
 }: OptimizedImageProps) {
   const [imageSrc, setImageSrc] = useState<string>('');
@@ -110,15 +123,24 @@ export function OptimizedImage({
 
   const isCloudinarySource = typeof src === 'string' && isCloudinaryUrl(src);
 
+  const defaultSrcSetWidths =
+    srcSetWidths ||
+    (aspectRatio === 'square'
+      ? [200, 320, 480, 640, 800]
+      : [640, 960, 1280, 1600, 1920]);
+
   // Generate srcset for responsive images (Cloudinary only)
-  const srcSet = isCloudinarySource && src
-    ? generateCloudinarySrcSet(src, [400, 600, 800, 1200])
-    : undefined;
+  const srcSet =
+    isCloudinarySource && src
+      ? generateCloudinarySrcSet(src, defaultSrcSetWidths)
+      : undefined;
 
   // Generate sizes attribute for responsive images
-  const sizes = aspectRatio === 'square'
-    ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'
-    : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
+  const sizesAttr =
+    sizes ||
+    (aspectRatio === 'square'
+      ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'
+      : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw');
 
   // Placeholder URL for blur-up effect
   const placeholderUrl = isCloudinarySource && src
@@ -166,7 +188,7 @@ export function OptimizedImage({
         width={imageWidth}
         height={imageHeight}
         srcSet={srcSet}
-        sizes={sizes}
+        sizes={sizesAttr}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
