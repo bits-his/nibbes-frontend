@@ -11,3 +11,9 @@
   command = "npm run dev"
   port = 3000
   targetPort = 5173
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Embedder-Policy = "unsafe-none"
+    Cross-Origin-Opener-Policy = "unsafe-none"
