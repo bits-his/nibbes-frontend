@@ -4,6 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- CRITICAL PERFORMANCE: Preconnect to Cloudinary CDN for hero image -->
+    <!-- This eliminates the 3,260ms resource load delay by establishing connection early -->
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
+    <link rel="dns-prefetch" href="https://res.cloudinary.com">
+    
+    <!-- CRITICAL PERFORMANCE: Preload hero image (LCP element) -->
+    <!-- Loads hero image immediately, before JavaScript executes, fixing LCP delay -->
+    <link rel="preload" 
+          as="image" 
+          href="https://res.cloudinary.com/ddls0gpui/image/upload/w_768,h_900,c_fill,q_80,f_auto/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg"
+          imagesrcset="https://res.cloudinary.com/ddls0gpui/image/upload/w_480,h_600,c_fill,q_80,f_auto/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg 480w,
+                       https://res.cloudinary.com/ddls0gpui/image/upload/w_768,h_900,c_fill,q_80,f_auto/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg 768w,
+                       https://res.cloudinary.com/ddls0gpui/image/upload/w_1024,h_1200,c_fill,q_80,f_auto/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg 1024w"
+          imagesizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 60vw"
+          fetchpriority="high">
+
     <!-- Primary Meta Tags -->
     <title>Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine | Order Online</title>
     <meta name="title" content="Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine" />

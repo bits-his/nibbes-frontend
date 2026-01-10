@@ -106,6 +106,8 @@ export default defineConfig({
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+        // PERFORMANCE: Reduce chunk size by splitting more aggressively
+        experimentalMinChunkSize: 20000, // 20KB minimum chunk size
       },
       external: [],
     },

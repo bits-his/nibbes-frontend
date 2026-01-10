@@ -399,16 +399,18 @@ export default function CustomerMenu() {
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
           {/* PERFORMANCE: Hero image from Cloudinary - automatically optimized via OptimizedImage */}
+          {/* CRITICAL: Dimensions optimized to match actual display size (max 1024x1200) */}
+          {/* This saves ~60 KiB by not loading oversized 1920x1724 image */}
           <OptimizedImage
             src={heroImage}
             alt="Nibbles Kitchen - Authentic Nigerian Cuisine"
             aspectRatio="auto"
             priority={true} // Load hero image immediately (critical for LCP)
-            width={1600}
-            height={900}
+            width={1024}  // Reduced from 1600 to match actual max display size
+            height={1200} // Adjusted aspect ratio for better display
             className="w-full h-full object-cover object-center"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 60vw"
-            srcSetWidths={[480, 768, 1024, 1366, 1600]}
+            srcSetWidths={[480, 640, 768, 1024]} // Optimized widths to match breakpoints
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>

@@ -156,8 +156,10 @@ export function OptimizedImage({
         height: aspectRatio === 'square' ? 'auto' : '100%',
       }}
     >
-      {/* Blur Placeholder */}
-      {showPlaceholder && placeholderUrl && (
+      {/* Blur Placeholder - Skip for priority images to improve LCP */}
+      {/* PERFORMANCE: Priority images (like hero) don't need blur placeholder */}
+      {/* This prevents the placeholder from being detected as LCP element */}
+      {!priority && showPlaceholder && placeholderUrl && (
         <img
           src={placeholderUrl}
           alt=""
@@ -172,8 +174,8 @@ export function OptimizedImage({
         />
       )}
 
-      {/* Skeleton Placeholder (when no image available) */}
-      {showPlaceholder && !placeholderUrl && (
+      {/* Skeleton Placeholder (when no image available) - Skip for priority images */}
+      {!priority && showPlaceholder && !placeholderUrl && (
         <div
           className="absolute inset-0 bg-muted animate-pulse"
           aria-hidden="true"
