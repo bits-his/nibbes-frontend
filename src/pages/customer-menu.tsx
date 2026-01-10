@@ -187,7 +187,7 @@ export default function CustomerMenu() {
       });
       return;
     }
-    
+
     // Prevent adding unavailable items to cart
     if (!menuItem.available) {
       toast({
@@ -198,7 +198,7 @@ export default function CustomerMenu() {
       });
       return;
     }
-    
+
     // Check stock balance
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
       toast({
@@ -209,7 +209,7 @@ export default function CustomerMenu() {
       });
       return;
     }
-    
+
     // Check if adding would exceed available stock
     const currentInCart = cart.find(item => String(item.menuItem.id) === String(menuItem.id))?.quantity || 0;
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
@@ -223,7 +223,7 @@ export default function CustomerMenu() {
         return;
       }
     }
-    
+
     addToCartContext({ menuItem: menuItem as any });
     toast({
       title: "Added to Cart",
@@ -236,7 +236,7 @@ export default function CustomerMenu() {
     const item = cart.find(item => item.menuItem.id === menuItemId);
     if (item) {
       const newQuantity = item.quantity + delta;
-      
+
       // If decreasing, allow it
       if (delta < 0) {
         if (newQuantity <= 0) {
@@ -246,7 +246,7 @@ export default function CustomerMenu() {
         }
         return;
       }
-      
+
       // If increasing, check stock availability
       const menuItem = menuItems && Array.isArray(menuItems)
         ? menuItems.find((m: MenuItem) => String(m.id) === String(menuItemId))
@@ -262,7 +262,7 @@ export default function CustomerMenu() {
           return;
         }
       }
-      
+
       updateQuantityContext(menuItemId, newQuantity);
     }
   }, [cart, menuItems, toast, updateQuantityContext, removeFromCart]);
@@ -416,7 +416,7 @@ export default function CustomerMenu() {
           <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
             {/* Main Tagline */}
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
-              <span className="block mb-2">Made right. Priced right.</span>
+              <span className="block mb-2">The place you eat Everyday</span>
             </h1>
             
             {/* Secondary Tagline */}

@@ -103,21 +103,15 @@ export default function StoreManagement() {
     }
   }, [toast])
 
-  const resetFormFields = useCallback(
-    (code?: string) => {
-      setFormData({
-        ...initialFormState,
-        itemCode: code ?? nextItemCode ?? "",
-      })
-      // Reset image states
-      setImageFile(null)
-      setImagePreviewUrl(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
-    },
-    [nextItemCode]
-  )
+  const resetFormFields = useCallback(() => {
+    setFormData(initialFormState)
+    // Reset image states
+    setImageFile(null)
+    setImagePreviewUrl(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }, [])
 
   // Set up WebSocket to receive real-time updates for store items
   useEffect(() => {
@@ -174,8 +168,7 @@ export default function StoreManagement() {
   useEffect(() => {
     fetchItems()
     fetchInventoryCategories()
-    fetchNextItemCode()
-  }, [fetchNextItemCode])
+  }, [])
 
   const fetchInventoryCategories = async () => {
     try {
@@ -286,25 +279,47 @@ export default function StoreManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.itemCode) {
+    // Don't submit if still uploading
+    if (isUploading) {
       toast({
+        title: "Please wait",
+        description: "Image is still uploading to Cloudinary...",
         variant: "destructive",
-        title: "Item code not ready",
-        description: "Please wait for the system to generate the next item code",
+      })
+      return
+    }
+
+    // Check if image is uploaded
+    if (!formData.imageUrl) {
+      toast({
+        title: "Error",
+        description: "Please select and upload an image.",
+        variant: "destructive",
       })
       return
     }
 
     try {
-      await apiRequest("POST", "/api/store/items", formData)
+      // Create MenuItem directly (like menu-management) instead of StoreItem
+      // The backend will automatically create the linked StoreItem
+      const menuItemData = {
+        name: formData.name,
+        description: formData.description || "",
+        price: formData.costPrice.toString(), // Convert costPrice to price string
+        category: formData.category,
+        imageUrl: formData.imageUrl,
+        available: true, // Default to available
+        quantity: formData.currentBalance > 0 ? formData.currentBalance : undefined, // Use currentBalance as quantity
+      }
+
+      await apiRequest("POST", "/api/menu", menuItemData)
       toast({
         title: "Success",
-        description: "Store item created successfully",
+        description: "Menu item created successfully",
       })
       setShowAddDialog(false)
       fetchItems()
       resetFormFields()
-      fetchNextItemCode()
       // Reset image states
       setImageFile(null)
       setImagePreviewUrl(null)
@@ -536,10 +551,7 @@ export default function StoreManagement() {
           </div>
           <Dialog open={showAddDialog} onOpenChange={(open) => {
             setShowAddDialog(open)
-            if (open) {
-              resetFormFields()
-              fetchNextItemCode()
-            } else {
+            if (!open) {
               resetFormFields()
             }
           }}>
@@ -554,98 +566,75 @@ export default function StoreManagement() {
                 <DialogTitle className="text-xl text-gray-900">Add New Item</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-gray-700 font-semibold">Item Code *</Label>
-                    <Input
-                      value={formData.itemCode}
-                      readOnly
-                      placeholder={generatingCode ? "Generating code..." : "Auto-generated"}
-                      required
-                      className="bg-gray-100 border-slate-300 text-gray-700 placeholder-gray-500 mt-1 cursor-not-allowed"
-                      title="Item code is auto-generated"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Codes use the format ITEM-XXX (e.g., ITEM-001, ITEM-002)</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-700 font-semibold">Name *</Label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Basmati Rice"
-                      required
-                      className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-                    />
-                  </div>
+                <div>
+                  <Label className="text-gray-700 font-semibold">Item Name *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Jollof Rice"
+                    required
+                    className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
+                  />
                 </div>
                 <div>
                   <Label className="text-gray-700 font-semibold">Description</Label>
                   <Input
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Optional description"
+                    placeholder="Describe the dish..."
                     className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-gray-700 font-semibold">Initial Quantity *</Label>
+                    <Label className="text-gray-700 font-semibold">Price (₦) *</Label>
                     <Input
                       type="number"
                       step="0.01"
-                      value={formData.currentBalance}
-                      onChange={(e) =>
-                        setFormData({ ...formData, currentBalance: Number.parseFloat(e.target.value) || 0 })
-                      }
+                      value={formData.costPrice}
+                      onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
                       required
                       className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
                     />
                   </div>
                   <div>
-                    <Label className="text-gray-700 font-semibold">Unit *</Label>
+                    <Label className="text-gray-700 font-semibold">Initial Quantity</Label>
                     <Input
-                      value={formData.unit}
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                      placeholder="e.g., kg, pcs"
-                      required
+                      type="number"
+                      step="1"
+                      value={formData.currentBalance}
+                      onChange={(e) =>
+                        setFormData({ ...formData, currentBalance: Number.parseInt(e.target.value) || 0 })
+                      }
+                      placeholder="20"
                       className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
                     />
                   </div>
-                </div>
-                <div>
-                  <Label className="text-gray-700 font-semibold">Cost Price (₦) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.costPrice}
-                    onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })}
-                    required
-                    className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-700 font-semibold">Category *</Label>
-                  {loadingCategories ? (
-                    <Input
-                      value="Loading categories..."
-                      disabled
-                      className="bg-gray-100 border-slate-300 text-gray-500 mt-1"
-                    />
-                  ) : (
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      required
-                      className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
-                    >
-                      <option value="">Select a category</option>
-                      {categories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <div>
+                    <Label className="text-gray-700 font-semibold">Category *</Label>
+                    {loadingCategories ? (
+                      <Input
+                        value="Loading categories..."
+                        disabled
+                        className="bg-gray-100 border-slate-300 text-gray-500 mt-1"
+                      />
+                    ) : (
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        required
+                        className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+                      >
+                        <option value="">Select a category</option>
+                        {categories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-gray-700 font-semibold">Upload Image</Label>
@@ -675,12 +664,30 @@ export default function StoreManagement() {
                     </div>
                   )}
                 </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="text-base font-semibold text-gray-700">
+                      Available for Order
+                    </Label>
+                    <p className="text-sm text-gray-500">
+                      Customers can order this item
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      readOnly
+                      className="w-5 h-5 text-[#50BAA8] border-gray-300 rounded focus:ring-[#50BAA8]"
+                    />
+                  </div>
+                </div>
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold mt-6"
-                  disabled={generatingCode || isUploading}
+                  disabled={isUploading}
                 >
-                  {generatingCode ? "Preparing item code..." : isUploading ? "Uploading image..." : "Create Item"}
+                  {isUploading ? "Uploading image..." : "Create Item"}
                 </Button>
               </form>
             </DialogContent>
@@ -1286,3 +1293,4 @@ export default function StoreManagement() {
     </div>
   )
 }
+

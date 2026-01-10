@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Minus, X, ChefHat, AlertCircle } from "lucide-react";
+import { Plus, Minus, X, ChefHat, AlertCircle, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -442,7 +442,17 @@ export default function StaffOrders() {
           </div>
         </div>
       )}
-      
+
+      {/* Network Status Indicator (subtle) */}
+      {networkStatus.isSlow && (
+        <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 py-1 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-xs text-orange-700 dark:text-orange-300">
+            <Wifi className="w-3 h-3" />
+            <span>Slow network detected - Optimizing for faster loading</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row h-auto md:h-screen overflow-hidden">
         {/* Menu Section - Full width on mobile, flex-1 on desktop */}
         <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">

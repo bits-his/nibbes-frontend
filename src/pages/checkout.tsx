@@ -702,7 +702,51 @@ export default function Checkout() {
           }
           
           if (respCode === "00") {
-            // Payment successful
+            // Payment successful - verify with backend before redirecting
+            console.log('✅ Payment successful, verifying with backend...');
+            
+            // Poll payment status until confirmed or timeout
+            let pollAttempts = 0;
+            const maxPollAttempts = 20; // Poll for up to 20 seconds (2s intervals)
+            let paymentVerified = false;
+            
+            const pollPaymentStatus = async () => {
+              try {
+                const verifyResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payments/verify`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ transactionRef: txnRef })
+                });
+                
+                if (verifyResponse.ok) {
+                  const verifyData = await verifyResponse.json();
+                  if (verifyData.status === 'success' || verifyData.status === 'paid') {
+                    paymentVerified = true;
+                    console.log('✅ Payment verified as successful by backend');
+                    return true;
+                  }
+                }
+              } catch (error) {
+                console.warn('⚠️ Error verifying payment:', error);
+              }
+              return false;
+            };
+            
+            // Poll immediately, then every 2 seconds
+            if (await pollPaymentStatus()) {
+              paymentVerified = true;
+            } else {
+              const pollInterval = setInterval(async () => {
+                pollAttempts++;
+                if (await pollPaymentStatus() || pollAttempts >= maxPollAttempts) {
+                  clearInterval(pollInterval);
+                  if (pollAttempts >= maxPollAttempts) {
+                    console.warn('⚠️ Payment verification timeout - webhook/reconciliation will handle it');
+                  }
+                }
+              }, 2000); // Poll every 2 seconds
+            }
+            
             toast({
               title: "Payment Successful! 🎉",
               description: `Order #${createdOrder.orderNumber} has been paid and sent to kitchen.`,
@@ -718,11 +762,61 @@ export default function Checkout() {
               }, 1500)
             })
           } else if (respCode === "10") {
-            // Payment pending (e.g., bank transfer initiated)
+            // Payment pending (e.g., bank transfer initiated) - poll for status
+            console.log('⏳ Payment pending, polling for status updates...');
+            
             toast({
               title: "Payment Pending",
-              description: "Your payment is being processed. You'll be notified when confirmed.",
+              description: "Your payment is being processed. We'll verify it shortly...",
             })
+            
+            // Poll payment status for pending payments
+            let pollAttempts = 0;
+            const maxPollAttempts = 30; // Poll for up to 60 seconds (2s intervals)
+            
+            const pollInterval = setInterval(async () => {
+              pollAttempts++;
+              try {
+                const verifyResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payments/verify`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ transactionRef: txnRef })
+                });
+                
+                if (verifyResponse.ok) {
+                  const verifyData = await verifyResponse.json();
+                  if (verifyData.status === 'success' || verifyData.status === 'paid') {
+                    clearInterval(pollInterval);
+                    toast({
+                      title: "Payment Confirmed! ✅",
+                      description: `Order #${createdOrder.orderNumber} payment has been confirmed.`,
+                    });
+                    // Redirect to docket
+                    startTransition(() => {
+                      setLocation("/docket");
+                    });
+                  } else if (verifyData.status === 'failed') {
+                    clearInterval(pollInterval);
+                    toast({
+                      title: "Payment Failed",
+                      description: "Your payment could not be confirmed. Please contact support.",
+                      variant: "destructive",
+                    });
+                  }
+                }
+              } catch (error) {
+                console.warn('⚠️ Error polling payment status:', error);
+              }
+              
+              if (pollAttempts >= maxPollAttempts) {
+                clearInterval(pollInterval);
+                console.warn('⚠️ Payment polling timeout - reconciliation job will handle it');
+                toast({
+                  title: "Payment Processing",
+                  description: "Your payment is being processed. You'll be notified when confirmed.",
+                });
+              }
+            }, 2000); // Poll every 2 seconds
             
             startTransition(() => {
               setTimeout(() => {
@@ -1101,25 +1195,46 @@ export default function Checkout() {
             
             // Call backend payment callback to update paymentStatus
             // This ensures the order paymentStatus is updated even if Interswitch webhook fails
-            try {
-              const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  txnref: transactionRef,
-                  resp: respCode,
-                  amount: amountInKobo
+            // Add retry logic for reliability
+            let callbackAttempts = 0;
+            const maxCallbackAttempts = 3;
+            let callbackSuccess = false;
+            
+            while (!callbackSuccess && callbackAttempts < maxCallbackAttempts) {
+              try {
+                const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    txnref: transactionRef,
+                    resp: respCode,
+                    amount: amountInKobo
+                  })
                 })
-              })
-              
-              if (callbackResponse.ok) {
-                console.log('✅ Payment callback processed successfully')
-              } else {
-                console.error('⚠️ Payment callback failed:', await callbackResponse.text())
+                
+                if (callbackResponse.ok) {
+                  const callbackData = await callbackResponse.json();
+                  console.log('✅ Payment callback processed successfully:', callbackData);
+                  callbackSuccess = true;
+                } else {
+                  callbackAttempts++;
+                  const errorText = await callbackResponse.text();
+                  console.error(`⚠️ Payment callback failed (attempt ${callbackAttempts}/${maxCallbackAttempts}):`, errorText);
+                  if (callbackAttempts < maxCallbackAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                  }
+                }
+              } catch (callbackError) {
+                callbackAttempts++;
+                console.error(`⚠️ Error calling payment callback (attempt ${callbackAttempts}/${maxCallbackAttempts}):`, callbackError);
+                if (callbackAttempts < maxCallbackAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                }
               }
-            } catch (callbackError) {
-              console.error('⚠️ Error calling payment callback:', callbackError)
-              // Don't fail the payment flow if callback fails - webhook should handle it
+            }
+            
+            if (!callbackSuccess) {
+              console.error('❌ Payment callback failed after all retry attempts. Webhook should handle payment status update.');
             }
             
             if (respCode === '00') {
@@ -1987,22 +2102,17 @@ export default function Checkout() {
                     </div>
 
                     {/* CTA Button */}
-                    <Button
-                      type="submit"
-                      size="lg"
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
-                      disabled={createOrderMutation.isPending || isProcessingPayment}
-                      data-testid="button-place-order"
-                    >
-                      {createOrderMutation.isPending || isProcessingPayment ? (
-                        <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                          Processing
-                        </span>
-                      ) : (
-                        "Complete Order"
-                      )}
-                    </Button>
+                    <div className="w-full">
+                      <Button
+                        type="submit"
+                        size="lg"
+                        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
+                        disabled={createOrderMutation.isPending || isProcessingPayment}
+                        data-testid="button-place-order"
+                      >
+                        {createOrderMutation.isPending || isProcessingPayment ? "Processing..." : "Complete Order"}
+                      </Button>
+                    </div>
 
                     {/* Security note */}
                     <p className="text-xs text-muted-foreground text-center pt-2">
@@ -2119,28 +2229,16 @@ export default function Checkout() {
             </div>
 
             <DialogFooter className="flex-col space-y-2">
-              <Button
-                onClick={handlePaymentConfirmation}
-                className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
-                disabled={isProcessingPayment || createOrderMutation.isPending || !kitchenStatus.isOpen}
-              >
-                {isProcessingPayment || createOrderMutation.isPending ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                    Processing...
-                  </>
-                ) : !kitchenStatus.isOpen ? (
-                  <>
-                    <ChefHat className="mr-2 h-4 w-4" />
-                    Kitchen Closed
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Confirm Order
-                  </>
-                )}
-              </Button>
+              <div className="w-full">
+                <Button
+                  className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
+                  onClick={handlePaymentConfirmation}
+                  disabled={createOrderMutation.isPending || isProcessingPayment}
+                >
+                  {isProcessingPayment ? "Processing..." : "Confirm Order"}
+                  <Check className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
