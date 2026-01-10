@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, Minus, X, ChefHat, AlertCircle } from "lucide-react";
@@ -14,6 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem, CartItem } from "@shared/schema";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 // Service Charge interface
 interface ServiceCharge {
@@ -38,6 +40,9 @@ export default function StaffOrders() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   
+  // Network status for adaptive loading
+  const networkStatus = useNetworkStatus();
+  
   // Service charges state
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
   const [loadingCharges, setLoadingCharges] = useState(true)
@@ -53,34 +58,58 @@ export default function StaffOrders() {
     },
   });
 
+  // PERFORMANCE: Fetch menu items with caching (reduces network payload)
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
-  // Fetch categories from API with refetch on mount and focus
+  // Fetch categories from API
   const { data: categoriesData } = useQuery<string[]>({
     queryKey: ["/api/menu/categories"],
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    staleTime: 0, // Always consider data stale
+    staleTime: 10 * 60 * 1000, // Cache categories for 10 minutes
   });
 
-  // Add "All" to the beginning of categories
-  const categories = ["All", ...(categoriesData || [])];
+  // Add "All" to the beginning of categories (memoized)
+  const categories = useMemo(() => {
+    return ["All", ...(categoriesData || [])];
+  }, [categoriesData]);
 
-  const filteredItems = menuItems?.filter(
-    (item) => {
-      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-      const matchesSearch = searchQuery === "" || 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Show all items, including SOLD OUT ones
-      return matchesCategory && matchesSearch;
-    }
-  );
+  // Filter items (memoized to prevent unnecessary recalculations)
+  const filteredItems = useMemo(() => {
+    if (!menuItems) return [];
+    return menuItems.filter(
+      (item) => {
+        const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+        const matchesSearch = searchQuery === "" || 
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        // Show all items, including SOLD OUT ones
+        return matchesCategory && matchesSearch;
+      }
+    );
+  }, [menuItems, selectedCategory, searchQuery]);
+
+  // PERFORMANCE: Infinite scroll for pagination (reduces initial payload from 68MB to manageable chunks)
+  const {
+    visibleItems,
+    hasMore,
+    isLoading: isLoadingMore,
+    loadMore,
+    reset: resetPagination,
+    sentinelRef,
+  } = useInfiniteScroll(filteredItems, {
+    itemsPerLoad: networkStatus.isSlow ? 8 : 16, // Load fewer items on slow networks
+    threshold: 300,
+    enabled: true,
+  });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [selectedCategory, searchQuery, resetPagination]);
 
   const addToCart = (menuItem: MenuItem) => {
     // Check if kitchen is closed
@@ -461,8 +490,9 @@ export default function StaffOrders() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                {filteredItems?.map((item) => {
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  {visibleItems.map((item) => {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
                   const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
                   
@@ -483,9 +513,12 @@ export default function StaffOrders() {
                     >
                       <div className="aspect-video overflow-hidden relative">
                         <img
-                          src={item.imageUrl}
+                          src={item.imageUrl || ''}
                           alt={item.name}
+                          width={400}
+                          height={300}
                           className="w-full h-full object-cover"
+                          loading="lazy"
                         />
                         {isInCart && (
                           <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1">
@@ -530,8 +563,32 @@ export default function StaffOrders() {
                       </CardContent>
                     </Card>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+                
+                {/* Infinite Scroll Sentinel and Load More */}
+                {hasMore && (
+                  <>
+                    <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+                    {isLoadingMore && (
+                      <div className="flex justify-center py-4">
+                        <div className="text-sm text-muted-foreground">Loading more items...</div>
+                      </div>
+                    )}
+                    {!isLoadingMore && (
+                      <div className="flex justify-center py-4">
+                        <Button
+                          variant="outline"
+                          onClick={loadMore}
+                          className="w-full max-w-xs"
+                        >
+                          Load More Items
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -572,6 +629,7 @@ export default function StaffOrders() {
                       <FormControl>
                         <Input
                           type="tel"
+                          id="customer-phone"
                           placeholder="08012345678"
                           {...field}
                           data-testid="input-customer-phone"

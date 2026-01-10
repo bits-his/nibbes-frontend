@@ -19,15 +19,16 @@ export function SplashScreen({ isVisible }: SplashScreenProps) {
     }
   }, [isVisible]);
 
-  if (!shouldRender) {
+  // PERFORMANCE: Don't render splash screen if not visible - avoid blocking render
+  if (!shouldRender || !isVisible) {
     return null;
   }
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-b from-[#50BAA8] to-[#50BAA8] transition-opacity duration-500 ${
-        isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-      }`}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-b from-[#50BAA8] to-[#50BAA8] transition-opacity duration-300"
+      aria-hidden="true"
+      role="presentation"
     >
       <div className="relative">
         {/* Glow effect */}
@@ -37,8 +38,12 @@ export function SplashScreen({ isVisible }: SplashScreenProps) {
         <div className="relative animate-zoom-in-out">
           <img
             src="/nibbles.jpg"
-            alt="Nibbles Logo"
+            alt="Nibbles Kitchen Logo"
+            width="208"
+            height="160"
             className="h-32 w-40 sm:h-40 sm:w-52 rounded-full object-cover shadow-2xl border-4 border-white/30"
+            loading="eager"
+            fetchPriority="high"
           />
         </div>
       </div>

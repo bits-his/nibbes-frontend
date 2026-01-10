@@ -95,7 +95,7 @@ export default function TVDisplay() {
       setLoading(true)
       
       // Fetch orders without authentication from public TV Display endpoint
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050'
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen')
       const response = await fetch(`${backendUrl}/api/orders/tv-display/ready`, {
         method: 'GET',
         headers: {

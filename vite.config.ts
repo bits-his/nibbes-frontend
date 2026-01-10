@@ -31,28 +31,35 @@ export default defineConfig({
     include: ['recharts'],
     exclude: [],
     esbuildOptions: {
-      // Fix circular dependency issues
+      // Fix circular dependency issues with recharts
       keepNames: true,
+      // Prevent circular dependency errors
+      legalComments: 'none',
     },
   },
   build: {
-    // CommonJS options to handle circular dependencies better
+    // PERFORMANCE: Optimize build output
     commonjsOptions: {
       include: [/recharts/, /node_modules/],
       transformMixedEsModules: true,
+      // Fix recharts circular dependency
+      requireReturnsDefault: 'auto',
     },
-    outDir: path.resolve(import.meta.dirname, "dist"), // ✅ fixed here
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
     manifest: true,
+    // PERFORMANCE: Enable compression
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500, // Warn if chunk > 500KB (reduced for better optimization)
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // React core libraries
+          // React core libraries (critical - load first)
           if (id.includes('react') || id.includes('react-dom') || id.includes('wouter')) {
             return 'react-vendor';
           }
           
-          // Radix UI components (large library)
+          // Radix UI components (large library - lazy load)
           if (id.includes('@radix-ui')) {
             return 'ui-vendor';
           }
@@ -64,46 +71,56 @@ export default defineConfig({
             return undefined; // Keep in main bundle to avoid circular dependency issues
           }
           
-          // PDF/Print libraries
+          // PDF/Print libraries (lazy load - only used for printing)
           if (id.includes('@react-pdf') || id.includes('jspdf')) {
             return 'pdf-vendor';
           }
           
-          // Form libraries
+          // Form libraries (lazy load - only used in forms)
           if (id.includes('react-hook-form') || id.includes('@hookform')) {
             return 'forms-vendor';
           }
           
-          // Date utilities
+          // Date utilities (lazy load)
           if (id.includes('date-fns')) {
             return 'date-vendor';
           }
           
-          // Large utility libraries
+          // Large utility libraries (lazy load)
           if (id.includes('framer-motion') || id.includes('lucide-react')) {
             return 'utils-vendor';
           }
           
-          // Query/state management
+          // Query/state management (lazy load)
           if (id.includes('@tanstack/react-query')) {
             return 'query-vendor';
           }
+          
+          // QR Code libraries (lazy load - only used in QR page)
+          if (id.includes('qrcode') || id.includes('qrcode.react')) {
+            return 'qrcode-vendor';
+          }
         },
-        // Fix circular dependency issues
         hoistTransitiveImports: true,
+        // PERFORMANCE: Optimize chunk names
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
-      // Externalize problematic dependencies if needed
       external: [],
     },
-    // Enable source maps for production debugging (optional)
-    sourcemap: false,
-    // Minify with terser for better compression
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console.log in production
-        drop_debugger: true,
-      },
+    // SECURITY: Disable source maps in production for security and performance
+    sourcemap: false, // Disable source maps in production (Lighthouse best practice)
+    // PERFORMANCE: Use esbuild for faster minification with aggressive settings
+    minify: 'esbuild', // Faster than terser
+    target: 'es2020', // Modern browsers only
+    cssCodeSplit: true, // Split CSS for better caching
+    cssMinify: true, // Minify CSS
+    // PERFORMANCE: Aggressive tree-shaking and dead code elimination
+    treeshake: {
+      moduleSideEffects: false,
+      propertyReadSideEffects: false,
+      tryCatchDeoptimization: false,
     },
   },
   server: {

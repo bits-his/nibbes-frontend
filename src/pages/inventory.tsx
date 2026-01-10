@@ -904,7 +904,10 @@ export default function InventoryManagement() {
                 </DialogHeader>
                 <AddEditInventoryForm
                   onSubmit={(data) => handleEditItem({ ...currentItem, ...data })}
-                  onCancel={() => setIsEditDialogOpen(false)}
+                  onCancel={() => {
+                    setIsEditDialogOpen(false)
+                    setCurrentItem(null)
+                  }}
                   isEdit={true}
                   initialData={currentItem}
                   inventoryCategories={inventoryCategories}
@@ -1093,7 +1096,6 @@ const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, o
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          required
           className="border-slate-200"
         />
       </div>

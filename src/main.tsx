@@ -2,34 +2,44 @@ import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import "./index.css";
-import { register } from "./utils/serviceWorker";
 
 // ============================================================================
-// Service Worker Registration with Proper Update Handling
+// PERFORMANCE: Defer Service Worker Registration - Don't block initial render
 // ============================================================================
-register({
-  onSuccess: (registration) => {
-    console.log('✅ Service Worker registered - Content cached for offline use');
-    
-    // Auto-check for updates every 30 minutes
-    setInterval(() => {
-      registration.update();
-    }, 30 * 60 * 1000);
-    
-    // Check on visibility change
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        registration.update();
-      }
+// Register service worker after page load to avoid blocking FCP
+if ('serviceWorker' in navigator) {
+  // Use requestIdleCallback if available, otherwise setTimeout
+  const registerSW = () => {
+    import("./utils/serviceWorker").then(({ register }) => {
+      register({
+        onSuccess: (registration) => {
+          // Auto-check for updates every 30 minutes
+          setInterval(() => {
+            registration.update();
+          }, 30 * 60 * 1000);
+          
+          // Check on visibility change
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              registration.update();
+            }
+          });
+        },
+        onUpdate: (registration) => {
+          window.dispatchEvent(new CustomEvent('swUpdateReady', {
+            detail: { registration }
+          }));
+        },
+      });
     });
-  },
-  onUpdate: (registration) => {
-    console.log('🆕 New version available!');
-    window.dispatchEvent(new CustomEvent('swUpdateReady', {
-      detail: { registration }
-    }));
-  },
-});
+  };
+
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(registerSW, { timeout: 2000 });
+  } else {
+    setTimeout(registerSW, 2000);
+  }
+}
 
 // ============================================================================
 // Helper function to clear all caches (for debugging)

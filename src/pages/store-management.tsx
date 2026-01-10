@@ -25,6 +25,7 @@ interface StoreItem {
   minimumStock: number
   costPrice: number
   category: string
+  imageUrl?: string
 }
 
 interface Category {
@@ -44,6 +45,7 @@ const initialFormState = {
   unit: "pcs",
   costPrice: 0,
   category: "",
+  imageUrl: "",
 }
 
 type FormState = typeof initialFormState
@@ -71,6 +73,10 @@ export default function StoreManagement() {
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -103,6 +109,12 @@ export default function StoreManagement() {
         ...initialFormState,
         itemCode: code ?? nextItemCode ?? "",
       })
+      // Reset image states
+      setImageFile(null)
+      setImagePreviewUrl(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     },
     [nextItemCode]
   )
@@ -218,6 +230,59 @@ export default function StoreManagement() {
     }
   }
 
+  const onImageFileChange = async (file: File) => {
+    setImageFile(file)
+    setIsUploading(true)
+    
+    // Upload image directly to Cloudinary immediately on selection
+    try {
+      const uploadFormData = new FormData()
+      uploadFormData.append("file", file)
+      uploadFormData.append("upload_preset", "nibbes_kitchen_unsigned") // Using unsigned preset
+
+      // Upload to Cloudinary
+      const response = await fetch("https://api.cloudinary.com/v1_1/dv0gb0cy2/image/upload", {
+        method: "POST",
+        body: uploadFormData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to upload image to Cloudinary")
+      }
+
+      const result = await response.json()
+      const cloudinaryUrl = result.secure_url // Get the secure URL from Cloudinary response
+      
+      // Update the form's imageUrl field
+      setFormData((prev) => ({ ...prev, imageUrl: cloudinaryUrl }))
+      
+      // Create a preview URL for the selected image
+      setImagePreviewUrl(cloudinaryUrl)
+      
+      toast({
+        title: "Success",
+        description: "Image uploaded to Cloudinary successfully.",
+      })
+    } catch (error) {
+      console.error("Error uploading image to Cloudinary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upload image to Cloudinary. Please try again.",
+        variant: "destructive",
+      })
+      // Clear the imageUrl if upload failed
+      setFormData({ ...formData, imageUrl: "" })
+      setImageFile(null)
+      setImagePreviewUrl(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -240,6 +305,12 @@ export default function StoreManagement() {
       fetchItems()
       resetFormFields()
       fetchNextItemCode()
+      // Reset image states
+      setImageFile(null)
+      setImagePreviewUrl(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     } catch (error) {
       console.error("Error creating item:", error)
       toast({
@@ -333,7 +404,14 @@ export default function StoreManagement() {
       unit: item.unit,
       costPrice: item.costPrice,
       category: item.category,
+      imageUrl: item.imageUrl || "",
     })
+    // Set image preview if item has image
+    setImagePreviewUrl(item.imageUrl || null)
+    setImageFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
     setShowEditDialog(true)
   }
 
@@ -348,7 +426,7 @@ export default function StoreManagement() {
       })
       setShowEditDialog(false)
       setSelectedItemForEdit(null)
-      setFormData(initialFormState)
+      resetFormFields()
       fetchItems()
     } catch (error) {
       console.error("Error updating item:", error)
@@ -569,12 +647,40 @@ export default function StoreManagement() {
                     </select>
                   )}
                 </div>
+                <div>
+                  <Label className="text-gray-700 font-semibold">Upload Image</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        onImageFileChange(file)
+                      }
+                    }}
+                    disabled={isUploading}
+                    className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
+                  />
+                  {isUploading && (
+                    <p className="text-xs text-gray-500 mt-1">Uploading image...</p>
+                  )}
+                  {(imagePreviewUrl || formData.imageUrl) && (
+                    <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-slate-200">
+                      <img
+                        src={imagePreviewUrl || formData.imageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold mt-6"
-                  disabled={generatingCode}
+                  disabled={generatingCode || isUploading}
                 >
-                  {generatingCode ? "Preparing item code..." : "Create Item"}
+                  {generatingCode ? "Preparing item code..." : isUploading ? "Uploading image..." : "Create Item"}
                 </Button>
               </form>
             </DialogContent>
@@ -972,11 +1078,43 @@ export default function StoreManagement() {
                 </div>
               )}
             </div>
+            <div>
+              <Label className="text-gray-700 font-semibold">Upload Image</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    onImageFileChange(file)
+                  }
+                }}
+                disabled={isUploading}
+                className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
+              />
+              {isUploading && (
+                <p className="text-xs text-gray-500 mt-1">Uploading image...</p>
+              )}
+              {(imagePreviewUrl || formData.imageUrl) && (
+                <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-slate-200">
+                  <img
+                    src={imagePreviewUrl || formData.imageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+            </div>
             <div className="flex gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowEditDialog(false)}
+                onClick={() => {
+                  setShowEditDialog(false)
+                  setSelectedItemForEdit(null)
+                  resetFormFields()
+                }}
                 className="flex-1"
               >
                 Cancel
