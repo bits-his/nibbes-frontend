@@ -20,6 +20,7 @@ import CustomerMenu from "@/pages/customer-menu";
 
 // Lazy load all other routes
 const Checkout = lazy(() => import("@/pages/checkout"));
+const CheckoutAlt = lazy(() => import("@/pages/checkout-alt"));
 const OrderStatus = lazy(() => import("@/pages/order-status"));
 const StaffOrders = lazy(() => import("@/pages/staff-orders"));
 const KitchenDisplay = lazy(() => import("@/pages/kitchen-display"));
@@ -398,6 +399,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/checkout-alt" component={CheckoutAlt} />
       <Route path="/staff/checkout" component={Checkout} />
       <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
       <Route path="/tv-display" component={TVDisplay} />

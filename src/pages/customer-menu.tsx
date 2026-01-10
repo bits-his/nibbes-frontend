@@ -788,6 +788,17 @@ export default function CustomerMenu() {
                 >
                   Proceed to Checkout
                 </Button>
+                {/* Alternative checkout temporarily disabled
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs sm:text-sm py-2 mt-2"
+                  onClick={() => setLocation("/checkout-alt")}
+                  data-testid="button-checkout-alt"
+                >
+                  Alternative Checkout
+                </Button>
+                */}
               </div>
             )}
           </div>

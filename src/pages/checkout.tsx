@@ -667,176 +667,82 @@ export default function Checkout() {
         
         // Callback when payment is completed
         onComplete: async function(response: any) {
-          console.log('Payment completed:', response)
-          console.log('Response code:', response.resp || response.responseCode)
+          console.log('🔔 Payment completed:', response)
+          console.log('📝 Response description:', response.desc)
+          console.log('📝 Transaction ref:', txnRef)
+          console.log('📝 Amount (kobo):', amount)
           
-          // Clear cart on any response using context method
-          clearCart()
-          
-          // Check payment response
-          // Interswitch success codes: "00" or "10" (pending)
-          const respCode = response.resp || response.responseCode
-          const paymentStatus = respCode === "00" ? "success" : respCode === "10" ? "pending" : "failed"
-          
-          // Call backend payment callback to update paymentStatus
-          // This ensures the order paymentStatus is updated even if Interswitch webhook fails
-          try {
-            const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                txnref: txnRef,
-                resp: respCode,
-                amount: amount
-              })
-            })
-            
-            if (callbackResponse.ok) {
-              console.log('✅ Payment callback processed successfully')
-            } else {
-              console.error('⚠️ Payment callback failed:', await callbackResponse.text())
-            }
-          } catch (callbackError) {
-            console.error('⚠️ Error calling payment callback:', callbackError)
-            // Don't fail the payment flow if callback fails - webhook should handle it
-          }
-          
-          if (respCode === "00") {
-            // Payment successful - verify with backend before redirecting
-            console.log('✅ Payment successful, verifying with backend...');
-            
-            // Poll payment status until confirmed or timeout
-            let pollAttempts = 0;
-            const maxPollAttempts = 20; // Poll for up to 20 seconds (2s intervals)
-            let paymentVerified = false;
-            
-            const pollPaymentStatus = async () => {
-              try {
-                const verifyResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payments/verify`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ transactionRef: txnRef })
-                });
-                
-                if (verifyResponse.ok) {
-                  const verifyData = await verifyResponse.json();
-                  if (verifyData.status === 'success' || verifyData.status === 'paid') {
-                    paymentVerified = true;
-                    console.log('✅ Payment verified as successful by backend');
-                    return true;
-                  }
-                }
-              } catch (error) {
-                console.warn('⚠️ Error verifying payment:', error);
-              }
-              return false;
-            };
-            
-            // Poll immediately, then every 2 seconds
-            if (await pollPaymentStatus()) {
-              paymentVerified = true;
-            } else {
-              const pollInterval = setInterval(async () => {
-                pollAttempts++;
-                if (await pollPaymentStatus() || pollAttempts >= maxPollAttempts) {
-                  clearInterval(pollInterval);
-                  if (pollAttempts >= maxPollAttempts) {
-                    console.warn('⚠️ Payment verification timeout - webhook/reconciliation will handle it');
-                  }
-                }
-              }, 2000); // Poll every 2 seconds
-            }
-            
-            toast({
-              title: "Payment Successful! 🎉",
-              description: `Order #${createdOrder.orderNumber} has been paid and sent to kitchen.`,
-            })
-            
-            // Clear cart using context method
-            clearCart()
-            
-            // Redirect to docket (works for both authenticated users and guests)
-            startTransition(() => {
-              setTimeout(() => {
-                setLocation("/docket")
-              }, 1500)
-            })
-          } else if (respCode === "10") {
-            // Payment pending (e.g., bank transfer initiated) - poll for status
-            console.log('⏳ Payment pending, polling for status updates...');
-            
-            toast({
-              title: "Payment Pending",
-              description: "Your payment is being processed. We'll verify it shortly...",
-            })
-            
-            // Poll payment status for pending payments
-            let pollAttempts = 0;
-            const maxPollAttempts = 30; // Poll for up to 60 seconds (2s intervals)
-            
-            const pollInterval = setInterval(async () => {
-              pollAttempts++;
-              try {
-                const verifyResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payments/verify`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ transactionRef: txnRef })
-                });
-                
-                if (verifyResponse.ok) {
-                  const verifyData = await verifyResponse.json();
-                  if (verifyData.status === 'success' || verifyData.status === 'paid') {
-                    clearInterval(pollInterval);
-                    toast({
-                      title: "Payment Confirmed! ✅",
-                      description: `Order #${createdOrder.orderNumber} payment has been confirmed.`,
-                    });
-                    // Redirect to docket
-                    startTransition(() => {
-                      setLocation("/docket");
-                    });
-                  } else if (verifyData.status === 'failed') {
-                    clearInterval(pollInterval);
-                    toast({
-                      title: "Payment Failed",
-                      description: "Your payment could not be confirmed. Please contact support.",
-                      variant: "destructive",
-                    });
-                  }
-                }
-              } catch (error) {
-                console.warn('⚠️ Error polling payment status:', error);
-              }
+          // Verify payment with Interswitch API (like reference implementation)
+          if (response.desc === "Approved by Financial Institution") {
+            try {
+              // Verify transaction with Interswitch
+              const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`
+              console.log('🔍 Verifying with Interswitch:', verifyUrl)
               
-              if (pollAttempts >= maxPollAttempts) {
-                clearInterval(pollInterval);
-                console.warn('⚠️ Payment polling timeout - reconciliation job will handle it');
+              const verifyResponse = await fetch(verifyUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+              })
+              const verifyData = await verifyResponse.json()
+              console.log('✅ Interswitch verification response:', verifyData)
+              
+              if (verifyData.ResponseCode === "00") {
+                // Payment verified - update backend with retry
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'
+                let callbackSuccess = false
+                
+                for (let attempt = 1; attempt <= 3 && !callbackSuccess; attempt++) {
+                  try {
+                    console.log(`📤 Calling backend callback (attempt ${attempt}/3)...`)
+                    const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        txnref: txnRef,
+                        resp: "00",
+                        amount: amount,
+                        orderId: createdOrder.id,
+                        interswitchResponse: verifyData
+                      })
+                    })
+                    const callbackData = await callbackRes.json()
+                    console.log('✅ Backend callback response:', callbackData)
+                    callbackSuccess = true
+                  } catch (err) {
+                    console.error(`❌ Backend callback attempt ${attempt} failed:`, err)
+                    if (attempt < 3) await new Promise(r => setTimeout(r, 1000))
+                  }
+                }
+                
+                clearCart()
                 toast({
-                  title: "Payment Processing",
-                  description: "Your payment is being processed. You'll be notified when confirmed.",
-                });
+                  title: "Payment Successful! 🎉",
+                  description: `Order #${createdOrder.orderNumber} has been paid.`,
+                })
+                startTransition(() => {
+                  setTimeout(() => setLocation("/docket"), 1500)
+                })
+              } else {
+                console.error('❌ Interswitch verification failed:', verifyData)
+                toast({
+                  title: "Payment Verification Failed",
+                  description: verifyData.ResponseDescription || "Could not verify payment.",
+                  variant: "destructive",
+                })
               }
-            }, 2000); // Poll every 2 seconds
-            
-            startTransition(() => {
-              setTimeout(() => {
-                setLocation("/docket")
-              }, 1500)
-            })
+            } catch (err) {
+              console.error('❌ Verification error:', err)
+              toast({
+                title: "Verification Error", 
+                description: "Payment may have succeeded. Please check your orders.",
+                variant: "destructive",
+              })
+            }
           } else {
-            // Payment failed or other status
-            console.error('Payment failed with response:', response)
             toast({
               title: "Payment Failed",
-              description: "Payment could not be completed. Redirecting to home page...",
+              description: response.desc || "Payment was not approved.",
               variant: "destructive",
-            })
-            
-            // Redirect to home
-            startTransition(() => {
-              setTimeout(() => {
-                setLocation("/")
-              }, 2000)
             })
           }
         },
@@ -1189,71 +1095,19 @@ export default function Checkout() {
           
           onComplete: async function (response: any) {
             console.log("Walk-in payment completed:", response)
-            console.log("Response code:", response.responseCode)
-            
             const respCode = response.responseCode || response.resp
             
-            // Call backend payment callback to update paymentStatus
-            // This ensures the order paymentStatus is updated even if Interswitch webhook fails
-            // Add retry logic for reliability
-            let callbackAttempts = 0;
-            const maxCallbackAttempts = 3;
-            let callbackSuccess = false;
-            
-            while (!callbackSuccess && callbackAttempts < maxCallbackAttempts) {
-              try {
-                const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    txnref: transactionRef,
-                    resp: respCode,
-                    amount: amountInKobo
-                  })
-                })
-                
-                if (callbackResponse.ok) {
-                  const callbackData = await callbackResponse.json();
-                  console.log('✅ Payment callback processed successfully:', callbackData);
-                  callbackSuccess = true;
-                } else {
-                  callbackAttempts++;
-                  const errorText = await callbackResponse.text();
-                  console.error(`⚠️ Payment callback failed (attempt ${callbackAttempts}/${maxCallbackAttempts}):`, errorText);
-                  if (callbackAttempts < maxCallbackAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-                  }
-                }
-              } catch (callbackError) {
-                callbackAttempts++;
-                console.error(`⚠️ Error calling payment callback (attempt ${callbackAttempts}/${maxCallbackAttempts}):`, callbackError);
-                if (callbackAttempts < maxCallbackAttempts) {
-                  await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-                }
-              }
-            }
-            
-            if (!callbackSuccess) {
-              console.error('❌ Payment callback failed after all retry attempts. Webhook should handle payment status update.');
-            }
-            
             if (respCode === '00') {
-              // Payment successful
               toast({
                 title: "Payment Successful!",
                 description: `Order #${createdOrder.orderNumber} has been paid.`,
               })
-              
-              // Clear walk-in order and redirect
               localStorage.removeItem("pendingWalkInOrder")
-              startTransition(() => {
-                setLocation("/docket")
-              })
+              startTransition(() => setLocation("/docket"))
             } else {
-              // Payment failed
               toast({
                 title: "Payment Failed",
-                description: response.responseDescription || "Payment was not successful. Please try again.",
+                description: response.desc || "Payment was not successful.",
                 variant: "destructive",
               })
             }

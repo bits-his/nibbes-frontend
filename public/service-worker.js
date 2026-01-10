@@ -13,7 +13,7 @@ const PRECACHE_URLS = [
   '/manifest.json',
   '/nibbles.jpg',
   '/offline.html'
-];
+];  
 
 // ============================================================================
 // INSTALL: Cache essential assets and activate immediately
