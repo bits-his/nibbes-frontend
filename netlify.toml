@@ -2,12 +2,6 @@
   publish = "dist"
   command = "rm -rf node_modules package-lock.json && npm install && npm run build"
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cross-Origin-Embedder-Policy = "credentialless"
-    Cross-Origin-Opener-Policy = "same-origin"
-
 [[redirects]]
   from = "/*"
   to = "/index.html"
