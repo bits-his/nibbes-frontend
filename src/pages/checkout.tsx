@@ -1958,13 +1958,15 @@ export default function Checkout() {
                     {/* CTA Button */}
                     <div className="w-full">
                       <Button
-                        type="submit"
+                        type="button"
                         size="lg"
                         className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
-                        disabled={createOrderMutation.isPending || isProcessingPayment}
+                        onClick={() => {
+                          alert("Working on the online payment. Would be active soon.");
+                        }}
                         data-testid="button-place-order"
                       >
-                        {createOrderMutation.isPending || isProcessingPayment ? "Processing..." : "Complete Order"}
+                        Complete Order
                       </Button>
                     </div>
 
@@ -2086,10 +2088,11 @@ export default function Checkout() {
               <div className="w-full">
                 <Button
                   className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
-                  onClick={handlePaymentConfirmation}
-                  disabled={createOrderMutation.isPending || isProcessingPayment}
+                  onClick={() => {
+                    alert("Working on the online payment. Would be active soon.");
+                  }}
                 >
-                  {isProcessingPayment ? "Processing..." : "Confirm Order"}
+                  Confirm Order
                   <Check className="ml-2 h-4 w-4" />
                 </Button>
               </div>
