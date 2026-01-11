@@ -76,6 +76,15 @@ export default function DocketPage() {
       // Use WebSocket data directly - no HTTP refetch needed!
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         if (data.order) {
+          // IMPORTANT: Only process orders that belong to the current user/guest
+          const orderBelongsToUser = user && (data.order.userId === user.id || data.order.customerEmail === user.email);
+          const orderBelongsToGuest = guestSession && data.order.guestId === guestSession.guestId;
+          
+          if (!orderBelongsToUser && !orderBelongsToGuest) {
+            // This order doesn't belong to the current user - ignore it
+            return;
+          }
+
           // Normalize order structure
           const normalizeOrder = (order: any): OrderWithItems => {
             const normalized = { ...order };
