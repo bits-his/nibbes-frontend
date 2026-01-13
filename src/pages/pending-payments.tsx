@@ -97,7 +97,7 @@ const PendingPayments: React.FC = () => {
     }
   };
 
-  const verifyPayment = async (transactionRef: string) => {
+  const verifyPayment = async (transactionRef: string, forceSuccess = false) => {
     try {
       setVerifyingPayments(prev => new Set(prev).add(transactionRef));
       
@@ -108,7 +108,8 @@ const PendingPayments: React.FC = () => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ forceSuccess })
       });
 
       const data = await response.json();
@@ -116,15 +117,20 @@ const PendingPayments: React.FC = () => {
       if (data.success) {
         toast({
           title: "Payment Verified! ✅",
-          description: "Payment has been successfully verified and marked as paid.",
+          description: data.message || "Payment has been successfully verified and marked as paid.",
         });
         
         // Remove the payment from the list since it's now paid
         setPayments(prev => prev.filter(p => p.transactionRef !== transactionRef));
       } else {
+        // Show error with suggestion for force verification
+        const description = data.suggestion 
+          ? `${data.message}. ${data.suggestion}`
+          : data.message || "Payment could not be verified as successful.";
+          
         toast({
           title: "Verification Failed",
-          description: data.message || "Payment could not be verified as successful.",
+          description,
           variant: "destructive",
         });
       }
@@ -308,6 +314,16 @@ const PendingPayments: React.FC = () => {
                         <Search className="h-4 w-4" />
                       )}
                       {verifyingPayments.has(payment.transactionRef) ? 'Verifying...' : 'Verify Payment'}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => verifyPayment(payment.transactionRef, true)}
+                      disabled={verifyingPayments.has(payment.transactionRef)}
+                      variant="secondary"
+                      className="flex items-center gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Force Verify
                     </Button>
                     
                     <Button
