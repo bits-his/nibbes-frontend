@@ -283,7 +283,7 @@ const PendingPayments: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-green-600">
-                        {formatCurrency(payment.amount)}
+                        {formatCurrency(payment.order?.totalAmount || payment.amount)}
                       </div>
                       <Badge variant="secondary" className="mt-1">
                         {payment.paymentMethod}
