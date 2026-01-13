@@ -170,9 +170,9 @@ const PendingPayments: React.FC = () => {
   };
 
   const calculateTotalCharged = (payment: PendingPayment) => {
-    // Calculate actual charged amount: base amount * 1.075 (includes 7.5% VAT)
+    // Calculate actual charged amount: base amount * 1.10 (includes 2.5% service + 7.5% VAT)
     const baseAmount = payment.order?.totalAmount || payment.amount;
-    return (parseFloat(baseAmount) * 1.075).toFixed(2);
+    return (parseFloat(baseAmount) * 1.10).toFixed(2);
   };
 
   useEffect(() => {
