@@ -169,6 +169,12 @@ const PendingPayments: React.FC = () => {
     return `₦${parseFloat(amount).toLocaleString()}`;
   };
 
+  const calculateTotalCharged = (payment: PendingPayment) => {
+    // Calculate actual charged amount: base amount * 1.075 (includes 7.5% VAT)
+    const baseAmount = payment.order?.totalAmount || payment.amount;
+    return (parseFloat(baseAmount) * 1.075).toFixed(2);
+  };
+
   useEffect(() => {
     fetchPendingPayments();
   }, [dateFrom, dateTo]);
@@ -283,7 +289,7 @@ const PendingPayments: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-green-600">
-                        {formatCurrency(payment.order?.totalAmount || payment.amount)}
+                        {formatCurrency(calculateTotalCharged(payment))}
                       </div>
                       <Badge variant="secondary" className="mt-1">
                         {payment.paymentMethod}
