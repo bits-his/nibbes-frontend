@@ -14,6 +14,7 @@ import {
   Store,
   CreditCard,
   ShoppingCart,
+  AlertCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -78,6 +79,13 @@ const menuItems: MenuItem[] = [
     title: "Order Management",
     url: "/orders",
     icon: LayoutDashboard,
+    roles: ["admin"],
+    permissions: ["order_management"],
+  },
+  {
+    title: "Pending Payments",
+    url: "/pending-payments",
+    icon: AlertCircle,
     roles: ["admin"],
     permissions: ["order_management"],
   },

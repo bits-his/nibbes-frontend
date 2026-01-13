@@ -48,6 +48,7 @@ const ManagerReportDetail = lazy(() => import("@/pages/ManagerReportDetail"));
 const ManagerReportsDashboard = lazy(() => import("@/pages/ManagerReportsDashboard"));
 const ManagerReportsByStaff = lazy(() => import("@/pages/ManagerReportsByStaff"));
 const KitchenRequests = lazy(() => import("@/pages/KitchenRequests"));
+const PendingPayments = lazy(() => import("@/pages/pending-payments"));
 const AboutPage = lazy(() => import("@/pages/about"));
 const ContactPage = lazy(() => import("@/pages/contact"));
 const TVDisplay = lazy(() => import("@/pages/tv-display"));
@@ -493,6 +494,15 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["menu_management"]}>
             <EMcard />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/pending-payments"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["order_management"]}>
+            <PendingPayments />
           </ProtectedRoute>
         )}
       />
