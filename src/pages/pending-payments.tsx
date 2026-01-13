@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Search, RefreshCw, CheckCircle, AlertCircle, Phone } from 'lucide-react';
+import { Loader2, Search, RefreshCw, CheckCircle, AlertCircle, Phone, Calendar } from 'lucide-react';
 
 interface PendingPayment {
   id: string;
@@ -33,6 +35,16 @@ const PendingPayments: React.FC = () => {
   const [payments, setPayments] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifyingPayments, setVerifyingPayments] = useState<Set<string>>(new Set());
+  const [dateFrom, setDateFrom] = useState(() => {
+    // Default to today
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    // Default to today
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [pagination, setPagination] = useState<PaginationInfo>({
     total: 0,
     page: 1,
@@ -47,7 +59,14 @@ const PendingPayments: React.FC = () => {
       setLoading(true);
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`${backendUrl}/api/payments/pending?page=${page}&limit=20`, {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        dateFrom,
+        dateTo
+      });
+      
+      const response = await fetch(`${backendUrl}/api/payments/pending?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -146,7 +165,7 @@ const PendingPayments: React.FC = () => {
 
   useEffect(() => {
     fetchPendingPayments();
-  }, []);
+  }, [dateFrom, dateTo]);
 
   if (loading) {
     return (
@@ -175,6 +194,51 @@ const PendingPayments: React.FC = () => {
           Refresh
         </Button>
       </div>
+
+      {/* Date Range Filter */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Date Range Filter
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <Label htmlFor="dateFrom">From Date</Label>
+              <Input
+                id="dateFrom"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="dateTo">To Date</Label>
+              <Input
+                id="dateTo"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                const today = new Date().toISOString().split('T')[0];
+                setDateFrom(today);
+                setDateTo(today);
+              }}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              Today Only
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {payments.length === 0 ? (
         <Card>
