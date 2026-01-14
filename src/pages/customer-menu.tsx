@@ -678,101 +678,122 @@ export default function CustomerMenu() {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4">
               {cart.length === 0 ? (
                 <div className="text-center py-12">
                   <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">Your cart is empty</p>
                 </div>
               ) : (
-                cart.map((item) => (
-                  <Card
-                    key={item.menuItem.id}
-                    data-testid={`cart-item-${item.menuItem.id}`}
-                  >
-                    <CardContent className="p-2.5 sm:p-3 space-y-2">
-                      <div className="flex gap-2">
+                <div className="space-y-0 divide-y">
+                  {cart.map((item) => (
+                    <div
+                      key={item.menuItem.id}
+                      className="py-3 first:pt-0"
+                      data-testid={`cart-item-${item.menuItem.id}`}
+                    >
+                      <div className="flex gap-3">
                         <OptimizedImage
                           src={item.menuItem.imageUrl || ''}
                           alt={item.menuItem.name || 'Menu item'}
-                          width={48}
-                          height={48}
+                          width={40}
+                          height={40}
                           aspectRatio="square"
                           priority={false}
-                          className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg"
+                          className="w-10 h-10 rounded-md object-cover flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm truncate">
-                            {item.menuItem.name}
-                          </h4>
-                          <p className="text-xs text-muted-foreground">
-                            ₦{parseFloat(item.menuItem.price).toLocaleString()}
-                          </p>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h4 className="font-medium text-sm leading-tight">
+                              {item.menuItem.name}
+                            </h4>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
+                              data-testid={`button-remove-${item.menuItem.id}`}
+                              className="h-6 w-6 -mt-1 -mr-2 text-muted-foreground hover:text-destructive"
+                              aria-label={`Remove ${item.menuItem.name} from cart`}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-sm font-semibold">
+                              ₦{parseFloat(item.menuItem.price).toLocaleString()}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
+                                data-testid={`button-decrease-${item.menuItem.id}`}
+                                className="h-7 w-7 rounded-full"
+                                aria-label={`Decrease quantity of ${item.menuItem.name}`}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span
+                                className="w-6 text-center font-medium text-sm"
+                                data-testid={`quantity-${item.menuItem.id}`}
+                              >
+                                {item.quantity}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
+                                data-testid={`button-increase-${item.menuItem.id}`}
+                                className="h-7 w-7 rounded-full"
+                                aria-label={`Increase quantity of ${item.menuItem.name}`}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {item.specialInstructions ? (
+                            <Textarea
+                              id={`instructions-${item.menuItem.id}`}
+                              name={`instructions-${item.menuItem.id}`}
+                              placeholder="Special instructions (optional)"
+                              value={item.specialInstructions || ""}
+                              onChange={(e) =>
+                                item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
+                              }
+                              className="text-xs py-1.5 mt-2"
+                              rows={2}
+                              data-testid={`input-instructions-${item.menuItem.id}`}
+                            />
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const textarea = document.getElementById(`instructions-${item.menuItem.id}`) as HTMLTextAreaElement;
+                                if (textarea) {
+                                  item.menuItem.id && updateInstructions(item.menuItem.id, " ");
+                                  setTimeout(() => textarea.focus(), 100);
+                                }
+                              }}
+                              className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add note
+                            </button>
+                          )}
                         </div>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
-                          data-testid={`button-remove-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8"
-                          aria-label={`Remove ${item.menuItem.name} from cart`}
-                        >
-                          <X className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                        </Button>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
-                          data-testid={`button-decrease-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
-                          aria-label={`Decrease quantity of ${item.menuItem.name}`}
-                        >
-                          <Minus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                        </Button>
-                        <span
-                          className="w-7 sm:w-8 text-center font-medium text-sm"
-                          data-testid={`quantity-${item.menuItem.id}`}
-                        >
-                          {item.quantity}
-                        </span>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
-                          data-testid={`button-increase-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
-                          aria-label={`Increase quantity of ${item.menuItem.name}`}
-                        >
-                          <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                        </Button>
-                      </div>
-
-                      <Textarea
-                        id={`instructions-${item.menuItem.id}`}
-                        name={`instructions-${item.menuItem.id}`}
-                        placeholder="Special instructions (optional)"
-                        value={item.specialInstructions || ""}
-                        onChange={(e) =>
-                          item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
-                        }
-                        className="text-xs py-1.5"
-                        rows={2}
-                        data-testid={`input-instructions-${item.menuItem.id}`}
-                      />
-                    </CardContent>
-                  </Card>
-                ))
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
             {cart.length > 0 && (
-              <div className="p-3 sm:p-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-sm sm:text-base">Subtotal</span>
-                  <span className="font-bold text-sm sm:text-base" data-testid="text-subtotal">
+              <div className="p-4 border-t bg-background sticky bottom-0">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-semibold">Subtotal</span>
+                  <span className="font-bold text-lg" data-testid="text-subtotal">
                     ₦
                     {subtotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -781,8 +802,8 @@ export default function CustomerMenu() {
                   </span>
                 </div>
                 <Button
-                  size="sm"
-                  className="w-full text-xs sm:text-sm py-2"
+                  size="lg"
+                  className="w-full"
                   onClick={handleCheckout}
                   data-testid="button-checkout"
                 >
