@@ -144,15 +144,28 @@ export default function CustomerMenu() {
   // Use loading state from menu only
   const isLoading = menuLoading;
 
-  // Helper function to sort Foodie items first
-  const sortFoodieFirst = (items: typeof menuItems) => {
+  // Helper function to sort items by category priority
+  const sortByCategoryPriority = (items: typeof menuItems) => {
+    // Define category priority order (lower number = appears first)
+    const categoryPriority: { [key: string]: number } = {
+      'Rice Meals': 1,
+      'Burger': 2,
+      'Wings': 3,
+      'Wraps': 4,
+      'Fries': 5,
+      // Everything else gets priority 999 (appears last)
+    };
+    
     return [...items].sort((a, b) => {
-      const aIsFoodie = a.category.toLowerCase().includes('foodie');
-      const bIsFoodie = b.category.toLowerCase().includes('foodie');
+      const aPriority = categoryPriority[a.category] || 999;
+      const bPriority = categoryPriority[b.category] || 999;
       
-      if (aIsFoodie && !bIsFoodie) return -1; // Foodie items first
-      if (!aIsFoodie && bIsFoodie) return 1;  // Non-foodie items after
-      return 0; // Keep original order within same category
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority; // Sort by priority
+      }
+      
+      // If same priority, keep original order
+      return 0;
     });
   };
 
@@ -168,10 +181,10 @@ export default function CustomerMenu() {
           item.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
-    // Sort: Foodie items first (only when viewing "All" categories)
+    // Sort: Priority categories first (only when viewing "All" categories)
     // To disable this sorting, comment out the next line and uncomment the line after
-    return selectedCategory === "All" ? sortFoodieFirst(filtered) : filtered;
-    // return filtered; // Uncomment this to disable Foodie-first sorting
+    return selectedCategory === "All" ? sortByCategoryPriority(filtered) : filtered;
+    // return filtered; // Uncomment this to disable priority sorting
   }, [menuItems, selectedCategory, searchQuery]);
 
   // Infinite scroll for pagination (reduces initial payload)
