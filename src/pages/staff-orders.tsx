@@ -76,10 +76,36 @@ export default function StaffOrders() {
     return ["All", ...(categoriesData || [])];
   }, [categoriesData]);
 
+  // Helper function to sort items by category priority
+  const sortByCategoryPriority = (items: typeof menuItems) => {
+    // Define category priority order (lower number = appears first)
+    const categoryPriority: { [key: string]: number } = {
+      'Rice Meals': 1,
+      'Burger': 2,
+      'Wings': 3,
+      'Wraps': 4,
+      'Fries': 5,
+      // Everything else gets priority 999 (appears last)
+    };
+    
+    return [...items].sort((a, b) => {
+      const aPriority = categoryPriority[a.category] || 999;
+      const bPriority = categoryPriority[b.category] || 999;
+      
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority; // Sort by priority
+      }
+      
+      // If same priority, keep original order
+      return 0;
+    });
+  };
+
   // Filter items (memoized to prevent unnecessary recalculations)
   const filteredItems = useMemo(() => {
     if (!menuItems) return [];
-    return menuItems.filter(
+    
+    const filtered = menuItems.filter(
       (item) => {
         const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
         const matchesSearch = searchQuery === "" || 
@@ -90,6 +116,9 @@ export default function StaffOrders() {
         return matchesCategory && matchesSearch;
       }
     );
+
+    // Sort: Priority categories first (only when viewing "All" categories)
+    return selectedCategory === "All" ? sortByCategoryPriority(filtered) : filtered;
   }, [menuItems, selectedCategory, searchQuery]);
 
   // PERFORMANCE: Infinite scroll for pagination (reduces initial payload from 68MB to manageable chunks)
