@@ -145,7 +145,7 @@ export default function CustomerMenu() {
   const isLoading = menuLoading;
 
   // Helper function to sort items by category priority
-  const sortByCategoryPriority = (items: typeof menuItems) => {
+  const sortByCategoryPriority = (items: any[]) => {
     // Define category priority order (lower number = appears first)
     const categoryPriority: { [key: string]: number } = {
       'Rice Meals': 1,

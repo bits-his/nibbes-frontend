@@ -10,13 +10,6 @@ const CLOUDINARY_CLOUD_NAME = 'dv0gb0cy2';
 const CLOUDINARY_BASE_URL = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 /**
- * Check if URL is already a Cloudinary URL
- */
-function isCloudinaryUrl(url: string): boolean {
-  return url.includes('cloudinary.com') || url.includes('res.cloudinary.com');
-}
-
-/**
  * Check if URL is a local/relative path
  */
 function isLocalPath(url: string): boolean {
