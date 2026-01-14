@@ -1580,7 +1580,7 @@ export default function Checkout() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex gap-3 sm:gap-4">
-                      {["pickup", "delivery"].map((type) => {
+                      {["pickup"/* , "delivery" */].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
