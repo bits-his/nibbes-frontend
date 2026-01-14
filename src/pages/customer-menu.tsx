@@ -695,11 +695,11 @@ export default function CustomerMenu() {
                         <OptimizedImage
                           src={item.menuItem.imageUrl || ''}
                           alt={item.menuItem.name || 'Menu item'}
-                          width={48}
-                          height={48}
+                          width={40}
+                          height={40}
                           aspectRatio="square"
                           priority={false}
-                          className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg"
+                          className="w-10 h-10 rounded-lg"
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm truncate">
