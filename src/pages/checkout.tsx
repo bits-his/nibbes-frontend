@@ -1579,13 +1579,38 @@ export default function Checkout() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex justify-center">
-                      {["pickup", "delivery"].map((type) => {
+                      {/* Delivery button temporarily commented out - will be re-enabled when delivery people are available */}
+                      {/* {["pickup", "delivery"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
                             key={type}
                             type="button"
                             className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+                              ${
+                                isActive
+                                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
+                                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
+                              }`}
+                            onClick={() => {
+                              form.setValue("orderType", type as "delivery" | "pickup")
+                            }}
+                          >
+                            <div className="font-semibold text-base capitalize">{type}</div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {type === "pickup" ? "At our location" : "To your location"}
+                            </div>
+                          </button>
+                        )
+                      })} */}
+                      {/* Only show pickup option for now - centered */}
+                      {["pickup"].map((type) => {
+                        const isActive = form.watch("orderType") === type
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            className={`w-full max-w-xs p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
                               ${
                                 isActive
                                   ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
