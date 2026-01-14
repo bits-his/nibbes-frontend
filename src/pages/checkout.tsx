@@ -903,6 +903,7 @@ export default function Checkout() {
           // Include delivery pricing information
           geoPricingId: geoPricingId,
           deliveryFee: deliveryFee,
+          deliveryRoute: deliveryRoute ? `${deliveryRoute.from} → ${deliveryRoute.to}` : null,
         }),
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
@@ -1578,39 +1579,14 @@ export default function Checkout() {
                     <CardTitle className="text-lg">2. Delivery Method</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <div className="flex justify-center">
-                      {/* Delivery button temporarily commented out - will be re-enabled when delivery people are available */}
-                      {/* {["pickup", "delivery"].map((type) => {
+                    <div className="flex gap-3 sm:gap-4">
+                      {["pickup", "delivery"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
                             key={type}
                             type="button"
-                            className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
-                              ${
-                                isActive
-                                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
-                                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
-                              }`}
-                            onClick={() => {
-                              form.setValue("orderType", type as "delivery" | "pickup")
-                            }}
-                          >
-                            <div className="font-semibold text-base capitalize">{type}</div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {type === "pickup" ? "At our location" : "To your location"}
-                            </div>
-                          </button>
-                        )
-                      })} */}
-                      {/* Only show pickup option for now - centered */}
-                      {["pickup"].map((type) => {
-                        const isActive = form.watch("orderType") === type
-                        return (
-                          <button
-                            key={type}
-                            type="button"
-                            className={`w-full max-w-xs p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+                            className={`flex-1 p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
                               ${
                                 isActive
                                   ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
@@ -1961,10 +1937,14 @@ export default function Checkout() {
                         type="submit"
                         size="lg"
                         className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
-                        disabled={createOrderMutation.isPending || isProcessingPayment}
+                        disabled={createOrderMutation.isPending || isProcessingPayment || isCalculatingDelivery}
                         data-testid="button-place-order"
                       >
-                        {createOrderMutation.isPending || isProcessingPayment ? "Processing..." : "Complete Order"}
+                        {isCalculatingDelivery 
+                          ? "Calculating Delivery Fee..." 
+                          : createOrderMutation.isPending || isProcessingPayment 
+                            ? "Processing..." 
+                            : "Complete Order"}
                       </Button>
                     </div>
 

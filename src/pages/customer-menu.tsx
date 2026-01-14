@@ -147,14 +147,32 @@ export default function CustomerMenu() {
   // Filter items (memoized to prevent unnecessary recalculations)
   const filteredItems = useMemo(() => {
     if (!menuItems) return [];
-    return menuItems.filter(
+    
+    const filtered = menuItems.filter(
       (item) =>
         // Show all items (including unavailable) - they will show as "sold out"
         (selectedCategory === "All" || item.category === selectedCategory) &&
         (searchQuery === "" ||
           item.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
+
+    // Sort: Foodie items first (only when viewing "All" categories)
+    // To disable this sorting, comment out the next line and uncomment the line after
+    return selectedCategory === "All" ? sortFoodieFirst(filtered) : filtered;
+    // return filtered; // Uncomment this to disable Foodie-first sorting
   }, [menuItems, selectedCategory, searchQuery]);
+
+  // Helper function to sort Foodie items first
+  const sortFoodieFirst = (items: typeof menuItems) => {
+    return [...items].sort((a, b) => {
+      const aIsFoodie = a.category.toLowerCase().includes('foodie');
+      const bIsFoodie = b.category.toLowerCase().includes('foodie');
+      
+      if (aIsFoodie && !bIsFoodie) return -1; // Foodie items first
+      if (!aIsFoodie && bIsFoodie) return 1;  // Non-foodie items after
+      return 0; // Keep original order within same category
+    });
+  };
 
   // Infinite scroll for pagination (reduces initial payload)
   const {
@@ -665,140 +683,185 @@ export default function CustomerMenu() {
             className="flex-1 bg-black/50 backdrop-blur-sm"
             onClick={() => setCartOpen(false)}
           />
-          <div className="w-full max-w-[95vw] md:max-w-md bg-background border-l flex flex-col">
-            <div className="p-3 sm:p-4 border-b flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Your Cart</h2>
+          <div className="w-full sm:w-[90vw] sm:max-w-md md:w-96 bg-background border-l flex flex-col shadow-2xl">
+            {/* Cart Header */}
+            <div className="p-3 sm:p-5 border-b bg-gradient-to-r from-accent/10 to-primary/5 flex items-center justify-between sticky top-0 bg-background z-10">
+              <div>
+                <h2 className="text-lg sm:text-2xl font-semibold sm:font-bold text-foreground">Your Cart</h2>
+                {cart.length > 0 && (
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                    {cart.length} {cart.length === 1 ? 'item' : 'items'}
+                  </p>
+                )}
+              </div>
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => setCartOpen(false)}
                 data-testid="button-close-cart"
+                className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                aria-label="Close cart"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+            {/* Cart Items */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 sm:space-y-4">
               {cart.length === 0 ? (
-                <div className="text-center py-12">
-                  <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Your cart is empty</p>
+                <div className="text-center py-16 sm:py-20">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                    <ShoppingCart className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground" />
+                  </div>
+                  <p className="text-base sm:text-lg font-medium text-foreground mb-2">Your cart is empty</p>
+                  <p className="text-sm text-muted-foreground">Add items from the menu to get started</p>
                 </div>
               ) : (
                 cart.map((item) => (
                   <Card
                     key={item.menuItem.id}
                     data-testid={`cart-item-${item.menuItem.id}`}
+                    className="border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                   >
-                    <CardContent className="p-2.5 sm:p-3 space-y-2">
-                      <div className="flex gap-2">
+                    <CardContent className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+                      {/* Item Image and Info */}
+                      <div className="flex gap-2 sm:gap-4">
                         <OptimizedImage
                           src={item.menuItem.imageUrl || ''}
                           alt={item.menuItem.name || 'Menu item'}
-                          width={40}
-                          height={40}
+                          width={120}
+                          height={120}
                           aspectRatio="square"
                           priority={false}
-                          className="w-10 h-10 rounded-lg"
+                          className="w-16 h-16 sm:w-24 sm:h-24 rounded-lg object-cover flex-shrink-0 border border-border/30"
+                          style={{ aspectRatio: '1 / 1' }}
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm truncate">
+                          <h4 className="font-medium sm:font-semibold text-sm sm:text-lg text-foreground line-clamp-2 mb-0.5 sm:mb-1">
                             {item.menuItem.name}
                           </h4>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs sm:text-base font-semibold sm:font-bold text-[#4EB5A4]">
                             ₦{parseFloat(item.menuItem.price).toLocaleString()}
                           </p>
                         </div>
+                        {/* Remove Button - Top Right - More Prominent */}
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
                           data-testid={`button-remove-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8"
+                          className="h-8 w-8 sm:h-10 sm:w-10 hover:bg-destructive hover:text-destructive-foreground transition-colors flex-shrink-0 border border-destructive/20 hover:border-destructive"
                           aria-label={`Remove ${item.menuItem.name} from cart`}
                         >
-                          <X className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                          <X className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" />
                         </Button>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      {/* Quantity Controls - Below Image and Name */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs sm:text-sm font-medium text-muted-foreground">Quantity</span>
+                        <div className="flex items-center gap-1.5 sm:gap-2 bg-muted/50 rounded-lg p-0.5 sm:p-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
+                            data-testid={`button-decrease-${item.menuItem.id}`}
+                            className="h-7 w-7 sm:h-10 sm:w-10 hover:bg-background hover:text-destructive transition-colors"
+                            aria-label={`Decrease quantity of ${item.menuItem.name}`}
+                          >
+                            <Minus className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                          </Button>
+                          <span
+                            className="w-8 sm:w-12 text-center font-semibold sm:font-bold text-sm sm:text-lg text-foreground"
+                            data-testid={`quantity-${item.menuItem.id}`}
+                          >
+                            {item.quantity}
+                          </span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
+                            data-testid={`button-increase-${item.menuItem.id}`}
+                            className="h-7 w-7 sm:h-10 sm:w-10 hover:bg-background hover:text-[#4EB5A4] transition-colors"
+                            aria-label={`Increase quantity of ${item.menuItem.name}`}
+                          >
+                            <Plus className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Remove Button - Also Below for Easy Access */}
+                      <div className="pt-1">
                         <Button
-                          size="icon"
                           variant="outline"
-                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
-                          data-testid={`button-decrease-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
-                          aria-label={`Decrease quantity of ${item.menuItem.name}`}
+                          size="sm"
+                          onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
+                          data-testid={`button-remove-bottom-${item.menuItem.id}`}
+                          className="w-full h-9 text-xs sm:text-sm border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                          aria-label={`Remove ${item.menuItem.name} from cart`}
                         >
-                          <Minus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                          <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+                          Remove Item
                         </Button>
-                        <span
-                          className="w-7 sm:w-8 text-center font-medium text-sm"
-                          data-testid={`quantity-${item.menuItem.id}`}
-                        >
-                          {item.quantity}
+                      </div>
+
+                      {/* Special Instructions */}
+                      <div className="pt-2 border-t border-border/30">
+                        <Textarea
+                          id={`instructions-${item.menuItem.id}`}
+                          name={`instructions-${item.menuItem.id}`}
+                          placeholder="Add special instructions (optional)"
+                          value={item.specialInstructions || ""}
+                          onChange={(e) =>
+                            item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
+                          }
+                          className="text-xs sm:text-sm resize-none min-h-[50px] sm:min-h-[60px] focus:ring-2 focus:ring-[#4EB5A4]/20"
+                          rows={2}
+                          data-testid={`input-instructions-${item.menuItem.id}`}
+                        />
+                      </div>
+                      
+                      {/* Item Total */}
+                      <div className="flex justify-between items-center pt-2 border-t border-border/30">
+                        <span className="text-xs sm:text-sm text-muted-foreground">Item Total</span>
+                        <span className="font-semibold sm:font-bold text-sm sm:text-lg text-foreground">
+                          ₦{(parseFloat(item.menuItem.price) * item.quantity).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
-                          data-testid={`button-increase-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
-                          aria-label={`Increase quantity of ${item.menuItem.name}`}
-                        >
-                          <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                        </Button>
                       </div>
-
-                      <Textarea
-                        id={`instructions-${item.menuItem.id}`}
-                        name={`instructions-${item.menuItem.id}`}
-                        placeholder="Special instructions (optional)"
-                        value={item.specialInstructions || ""}
-                        onChange={(e) =>
-                          item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
-                        }
-                        className="text-xs py-1.5"
-                        rows={2}
-                        data-testid={`input-instructions-${item.menuItem.id}`}
-                      />
                     </CardContent>
                   </Card>
                 ))
               )}
             </div>
 
+            {/* Cart Footer */}
             {cart.length > 0 && (
-              <div className="p-3 sm:p-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-sm sm:text-base">Subtotal</span>
-                  <span className="font-bold text-sm sm:text-base" data-testid="text-subtotal">
-                    ₦
-                    {subtotal.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
+              <div className="p-3 sm:p-5 border-t bg-muted/30 space-y-3 sm:space-y-4 sticky bottom-0 bg-background">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm sm:text-lg font-semibold text-foreground">Subtotal</span>
+                    <span className="font-bold text-base sm:text-xl text-[#4EB5A4]" data-testid="text-subtotal">
+                      ₦{subtotal.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Delivery fee and charges calculated at checkout
+                  </p>
                 </div>
                 <Button
-                  size="sm"
-                  className="w-full text-xs sm:text-sm py-2"
+                  size="lg"
+                  className="w-full h-11 sm:h-14 text-sm sm:text-lg font-semibold bg-gradient-to-r from-[#4EB5A4] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all"
                   onClick={handleCheckout}
                   data-testid="button-checkout"
                 >
                   Proceed to Checkout
                 </Button>
-                {/* Alternative checkout temporarily disabled
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-xs sm:text-sm py-2 mt-2"
-                  onClick={() => setLocation("/checkout-alt")}
-                  data-testid="button-checkout-alt"
-                >
-                  Alternative Checkout
-                </Button>
-                */}
               </div>
             )}
           </div>
