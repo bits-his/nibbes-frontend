@@ -27,7 +27,7 @@ import type { MenuItem } from "@shared/schema";
 // Recommended: Upload as WebP format, quality 85, max width 1920px
 // PERFORMANCE: Hero image hosted on Cloudinary with automatic optimization
 // Cloudinary transformations: f_auto (WebP/AVIF), q_85 (quality), w_1920 (max width)
-const heroImage = import.meta.env.VITE_HERO_IMAGE_URL || "https://res.cloudinary.com/ddls0gpui/image/upload/f_auto,q_85,w_1920/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg";
+const heroImage = import.meta.env.VITE_HERO_IMAGE_URL || "https://res.cloudinary.com/ddls0gpui/image/upload/v1768411975/WhatsApp_Image_2026-01-06_at_23.36.28_dyhvre.jpg";
 import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
