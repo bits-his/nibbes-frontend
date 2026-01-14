@@ -1879,16 +1879,15 @@ export default function Checkout() {
                           )}
                         </div>
                       )}
-                      {/* Service Charges - Dynamic from API */}
-                      {serviceCharges.length > 0 && serviceCharges.map((charge) => (
-                        <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                          <span>
-                            {charge.description} 
-                            {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                          </span>
-                          <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      ))}
+                      {/* Service Charges - From preloaded context */}
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Service charge ({serviceChargeRate}%)</span>
+                        <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>VAT ({vatRate}%)</span>
+                        <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
                         <span className="font-semibold text-foreground">Total</span>
                         <span className="text-2xl font-bold " data-testid="text-total">
@@ -1968,16 +1967,15 @@ export default function Checkout() {
                       )}
                     </div>
                   )}
-                  {/* Service Charges - Dynamic from API */}
-                  {serviceCharges.length > 0 && serviceCharges.map((charge) => (
-                    <div key={charge.id} className="flex justify-between">
-                      <span>
-                        {charge.description}
-                        {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                      </span>
-                      <span>₦{calculateServiceChargeAmount(charge).toLocaleString()}</span>
-                    </div>
-                  ))}
+                  {/* Service Charges - From preloaded context */}
+                  <div className="flex justify-between">
+                    <span>Service charge ({serviceChargeRate}%)</span>
+                    <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>VAT ({vatRate}%)</span>
+                    <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString()}</span>
+                  </div>
                   <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Total</span>
                     <span>₦{calculateTotal().toLocaleString()}</span>
