@@ -20,6 +20,7 @@ import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
+import { useServiceCharges } from "@/context/ServiceChargesContext"
 import { usePrint } from "@/hooks/usePrint"
 
 // Service Charge interface
@@ -109,9 +110,8 @@ export default function Checkout() {
   const [multiPaymentEnabled, setMultiPaymentEnabled] = useState(false)
   const [paymentSplits, setPaymentSplits] = useState<Array<{ method: string; amount: number }>>([{ method: 'cash', amount: 0 }])
   
-  // Service charges state
-  const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
-  const [loadingCharges, setLoadingCharges] = useState(true)
+  // Get service charges from context (preloaded on app start)
+  const { serviceChargeRate, vatRate } = useServiceCharges()
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
@@ -177,29 +177,6 @@ export default function Checkout() {
   useEffect(() => {
     const txnRef = `NIB-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     setTransactionRef(txnRef)
-  }, [])
-  
-  // Fetch active service charges
-  useEffect(() => {
-    const fetchServiceCharges = async () => {
-      try {
-        setLoadingCharges(true)
-        const response = await apiRequest("GET", "/api/service-charges/active")
-        if (response.ok) {
-          const charges = await response.json()
-          setServiceCharges(charges)
-          console.log('✅ Service charges loaded:', charges)
-        }
-      } catch (error) {
-        console.error('❌ Error fetching service charges:', error)
-        // Don't show error to user, just use empty array
-        setServiceCharges([])
-      } finally {
-        setLoadingCharges(false)
-      }
-    }
-    
-    fetchServiceCharges()
   }, [])
 
   useEffect(() => {
@@ -517,22 +494,13 @@ export default function Checkout() {
     
     const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
     
-    // Apply service charges only if there are items
-    let totalWithCharges = baseAmount
-    if (hasItems) {
-      serviceCharges.forEach(charge => {
-        const chargeAmount = Number(charge.amount) || 0
-        if (charge.type === 'percentage') {
-          totalWithCharges += (baseAmount * (chargeAmount / 100))
-        } else {
-          totalWithCharges += chargeAmount
-        }
-      })
-    }
+    // Apply service charges using preloaded rates
+    const serviceChargeAmount = baseAmount * (serviceChargeRate / 100)
+    const vatAmount = baseAmount * (vatRate / 100)
+    const totalWithCharges = baseAmount + serviceChargeAmount + vatAmount
     
     return totalWithCharges
   }
-  
   // Helper function to calculate individual service charge amounts
   const calculateServiceChargeAmount = (charge: ServiceCharge) => {
     // Don't calculate if there are no items
@@ -1417,7 +1385,7 @@ export default function Checkout() {
               <div className="border-t pt-6">
                 {!multiPaymentEnabled && (
                   <div className="space-y-3 mb-6">
-                    {/* Service Charges - Dynamic from API */}
+                    {/* Service Charges - From preloaded context */}
                     {walkInOrder && walkInOrder.items?.length > 0 ? (
                       // Walk-in order: show breakdown with service charges
                       <>
@@ -1425,15 +1393,14 @@ export default function Checkout() {
                           <span>Subtotal</span>
                           <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
-                        {serviceCharges.map((charge) => (
-                          <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                            <span>
-                              {charge.description}
-                              {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                            </span>
-                            <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Service charge ({serviceChargeRate}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT ({vatRate}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
                           <span>Total</span>
                           <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -1446,15 +1413,14 @@ export default function Checkout() {
                           <span>Subtotal</span>
                           <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
-                        {serviceCharges.map((charge) => (
-                          <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                            <span>
-                              {charge.description}
-                              {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                            </span>
-                            <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Service charge ({serviceChargeRate}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT ({vatRate}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
                           <span>Total</span>
                           <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>

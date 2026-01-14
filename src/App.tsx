@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "./hooks/useAuth";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { CartProvider } from "@/context/CartContext";
+import { ServiceChargesProvider } from "@/context/ServiceChargesContext";
 import { getGuestSession } from "@/lib/guestSession";
 import { InstallPWA } from "@/components/InstallPWA";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
@@ -746,7 +747,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AppContent />
+        <ServiceChargesProvider>
+          <AppContent />
+        </ServiceChargesProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
