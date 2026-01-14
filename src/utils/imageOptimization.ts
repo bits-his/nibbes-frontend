@@ -1,6 +1,8 @@
 /**
- * Image optimization utilities for Cloudinary and other image sources
+ * Image optimization utilities for CDN and Cloudinary image sources
  */
+
+import { getCDNImageUrl, isCDNUrl, isCloudinaryUrl as checkCDNUrl } from './cdnClient';
 
 export interface ImageOptions {
   width?: number;
@@ -11,22 +13,33 @@ export interface ImageOptions {
 }
 
 /**
- * Check if URL is a Cloudinary URL
+ * Check if URL is a Cloudinary URL (legacy)
  */
 export function isCloudinaryUrl(url: string): boolean {
   return url.includes('cloudinary.com') || url.includes('res.cloudinary.com');
 }
 
 /**
- * Generate optimized Cloudinary URL with transformations
- * Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/image/upload/{transformations}/{public_id}
+ * Generate optimized image URL (CDN or Cloudinary)
+ * Supports both Nibbles CDN (new) and Cloudinary (legacy)
  */
 export function getOptimizedCloudinaryUrl(
   originalUrl: string,
   options: ImageOptions = {}
 ): string {
+  // If CDN URL, use CDN client
+  if (isCDNUrl(originalUrl)) {
+    return getCDNImageUrl(originalUrl, {
+      width: options.width,
+      height: options.height,
+      quality: options.quality || 80,
+      format: options.format === 'auto' ? 'webp' : (options.format as 'webp' | 'jpg' | 'png' | undefined),
+    });
+  }
+
+  // Legacy Cloudinary support
   if (!isCloudinaryUrl(originalUrl)) {
-    return originalUrl; // Return original if not Cloudinary
+    return originalUrl; // Return original if not Cloudinary or CDN
   }
 
   const {

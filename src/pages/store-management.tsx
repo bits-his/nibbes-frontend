@@ -227,41 +227,47 @@ export default function StoreManagement() {
     setImageFile(file)
     setIsUploading(true)
     
-    // Upload image directly to Cloudinary immediately on selection
+    // Upload image to CDN via backend
     try {
       const uploadFormData = new FormData()
       uploadFormData.append("file", file)
-      uploadFormData.append("upload_preset", "nibbes_kitchen_unsigned") // Using unsigned preset
 
-      // Upload to Cloudinary
-      const response = await fetch("https://api.cloudinary.com/v1_1/dv0gb0cy2/image/upload", {
+      // Upload to CDN via backend endpoint
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/cdn/upload`, {
         method: "POST",
+        headers: {
+          // Authorization header will be added by axios interceptor if using axios
+          // For fetch, you may need to add it manually
+          ...(localStorage.getItem('token') && {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }),
+        },
         body: uploadFormData,
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || "Failed to upload image to Cloudinary")
+        throw new Error(errorData.error || errorData.message || "Failed to upload image to CDN")
       }
 
       const result = await response.json()
-      const cloudinaryUrl = result.secure_url // Get the secure URL from Cloudinary response
+      const cdnUrl = result.url // Get the CDN URL from response
       
       // Update the form's imageUrl field
-      setFormData((prev) => ({ ...prev, imageUrl: cloudinaryUrl }))
+      setFormData((prev) => ({ ...prev, imageUrl: cdnUrl }))
       
       // Create a preview URL for the selected image
-      setImagePreviewUrl(cloudinaryUrl)
+      setImagePreviewUrl(cdnUrl)
       
       toast({
         title: "Success",
-        description: "Image uploaded to Cloudinary successfully.",
+        description: "Image uploaded to CDN successfully.",
       })
-    } catch (error) {
-      console.error("Error uploading image to Cloudinary:", error)
+    } catch (error: any) {
+      console.error("Error uploading image to CDN:", error)
       toast({
         title: "Error",
-        description: "Failed to upload image to Cloudinary. Please try again.",
+        description: error.message || "Failed to upload image to CDN. Please try again.",
         variant: "destructive",
       })
       // Clear the imageUrl if upload failed

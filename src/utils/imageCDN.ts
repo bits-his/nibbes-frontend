@@ -1,7 +1,10 @@
 /**
  * Image CDN Utility
- * Transforms image URLs to use Cloudinary CDN with optimizations
+ * Transforms image URLs to use CDN or Cloudinary with optimizations
+ * Supports both Cloudinary (legacy) and Nibbles CDN (new)
  */
+
+import { getCDNImageUrl, isCDNUrl, isCloudinaryUrl } from './cdnClient';
 
 const CLOUDINARY_CLOUD_NAME = 'dv0gb0cy2';
 const CLOUDINARY_BASE_URL = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -21,10 +24,10 @@ function isLocalPath(url: string): boolean {
 }
 
 /**
- * Transform image URL to optimized Cloudinary CDN URL
+ * Transform image URL to optimized CDN URL (CDN or Cloudinary)
  * @param imageUrl - Original image URL
  * @param options - Optimization options
- * @returns Optimized Cloudinary URL
+ * @returns Optimized CDN URL
  */
 export function getOptimizedImageUrl(
   imageUrl: string | null | undefined,
@@ -42,18 +45,27 @@ export function getOptimizedImageUrl(
     return getPlaceholderImage();
   }
 
-  // If already Cloudinary URL, just add optimizations
+  // If CDN URL, use CDN client
+  if (isCDNUrl(imageUrl)) {
+    return getCDNImageUrl(imageUrl, {
+      width: options.width,
+      height: options.height,
+      quality: options.quality || 80,
+      format: options.format === 'auto' ? 'webp' : (options.format as 'webp' | 'jpg' | 'png' | undefined),
+    });
+  }
+
+  // If already Cloudinary URL, just add optimizations (legacy support)
   if (isCloudinaryUrl(imageUrl)) {
     return addCloudinaryTransformations(imageUrl, options);
   }
 
   // If local path, return as-is (will be served by backend)
-  // In production, you might want to upload these to Cloudinary
   if (isLocalPath(imageUrl)) {
     return imageUrl;
   }
 
-  // For other URLs, try to fetch via Cloudinary fetch API
+  // For other URLs, try to fetch via Cloudinary fetch API (legacy)
   // This requires the image to be publicly accessible
   const encodedUrl = encodeURIComponent(imageUrl);
   const transformations = buildTransformations(options);

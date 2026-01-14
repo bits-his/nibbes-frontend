@@ -144,6 +144,18 @@ export default function CustomerMenu() {
   // Use loading state from menu only
   const isLoading = menuLoading;
 
+  // Helper function to sort Foodie items first
+  const sortFoodieFirst = (items: typeof menuItems) => {
+    return [...items].sort((a, b) => {
+      const aIsFoodie = a.category.toLowerCase().includes('foodie');
+      const bIsFoodie = b.category.toLowerCase().includes('foodie');
+      
+      if (aIsFoodie && !bIsFoodie) return -1; // Foodie items first
+      if (!aIsFoodie && bIsFoodie) return 1;  // Non-foodie items after
+      return 0; // Keep original order within same category
+    });
+  };
+
   // Filter items (memoized to prevent unnecessary recalculations)
   const filteredItems = useMemo(() => {
     if (!menuItems) return [];
@@ -161,18 +173,6 @@ export default function CustomerMenu() {
     return selectedCategory === "All" ? sortFoodieFirst(filtered) : filtered;
     // return filtered; // Uncomment this to disable Foodie-first sorting
   }, [menuItems, selectedCategory, searchQuery]);
-
-  // Helper function to sort Foodie items first
-  const sortFoodieFirst = (items: typeof menuItems) => {
-    return [...items].sort((a, b) => {
-      const aIsFoodie = a.category.toLowerCase().includes('foodie');
-      const bIsFoodie = b.category.toLowerCase().includes('foodie');
-      
-      if (aIsFoodie && !bIsFoodie) return -1; // Foodie items first
-      if (!aIsFoodie && bIsFoodie) return 1;  // Non-foodie items after
-      return 0; // Keep original order within same category
-    });
-  };
 
   // Infinite scroll for pagination (reduces initial payload)
   const {
