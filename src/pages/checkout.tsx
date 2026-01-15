@@ -214,7 +214,7 @@ export default function Checkout() {
     defaultValues: {
       customerName: user?.username || "",
       customerPhone: "",
-      orderType: "pickup", // Default to pickup - delivery button commented out temporarily
+      orderType: "pickup", // Default to pickup
     },
   })
 
@@ -1546,7 +1546,7 @@ export default function Checkout() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex gap-3 sm:gap-4">
-                      {["pickup"/* , "delivery" */].map((type) => {
+                      {["pickup", "delivery"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button

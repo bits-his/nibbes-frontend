@@ -20,6 +20,7 @@ import { SplashScreen } from "@/components/SplashScreen";
 import CustomerMenu from "@/pages/customer-menu";
 
 // Lazy load all other routes
+// Checkout loaded with Suspense boundary - CartProvider wraps Router so context is available
 const Checkout = lazy(() => import("@/pages/checkout"));
 const CheckoutAlt = lazy(() => import("@/pages/checkout-alt"));
 const OrderStatus = lazy(() => import("@/pages/order-status"));
@@ -340,6 +341,13 @@ const PublicRoute: React.FC<{
   return <>{children}</>;
 };
 
+// Wrapper component for Checkout to ensure CartProvider context is available
+const CheckoutWrapper = () => (
+  <PublicRoute>
+    <Checkout />
+  </PublicRoute>
+);
+
 function Router() {
   const { user } = React.useContext(AuthContext);
 
@@ -400,9 +408,9 @@ function Router() {
       <Route path="/" component={CustomerMenu} />
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
-      <Route path="/checkout" component={Checkout} />
+      <Route path="/checkout" component={CheckoutWrapper} />
       <Route path="/checkout-alt" component={CheckoutAlt} />
-      <Route path="/staff/checkout" component={Checkout} />
+      <Route path="/staff/checkout" component={CheckoutWrapper} />
       <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
       <Route path="/tv-display" component={TVDisplay} />
       <Route path="/print-receipt" component={PrintReceipt} />

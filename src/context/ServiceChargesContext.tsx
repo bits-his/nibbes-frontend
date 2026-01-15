@@ -18,12 +18,13 @@ interface ServiceChargesContextType {
 const ServiceChargesContext = createContext<ServiceChargesContextType | undefined>(undefined);
 
 const DEFAULT_CHARGES = {
-  serviceCharge: 2.5,  // 2.5%
-  vat: 7.5             // 7.5%
+  serviceCharge: 0,  // 0% - No service charge
+  vat: 0             // 0% - No VAT
 };
 
 const CACHE_KEY = 'service_charges_cache';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_VERSION = 'v2'; // Increment to invalidate old cache
 
 export function ServiceChargesProvider({ children }: { children: ReactNode }) {
   const [serviceChargeRate, setServiceChargeRate] = useState(DEFAULT_CHARGES.serviceCharge);
@@ -50,7 +51,8 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       const newCharges = {
         serviceCharge: serviceCharge?.amount || DEFAULT_CHARGES.serviceCharge,
         vat: vat?.amount || DEFAULT_CHARGES.vat,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        version: CACHE_VERSION
       };
 
       // Update state
@@ -67,7 +69,8 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       return {
         serviceCharge: DEFAULT_CHARGES.serviceCharge,
         vat: DEFAULT_CHARGES.vat,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        version: CACHE_VERSION
       };
     }
   };
@@ -82,8 +85,8 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
         const cachedData = JSON.parse(cached);
         const age = Date.now() - cachedData.timestamp;
         
-        // Use cache if less than 24 hours old
-        if (age < CACHE_DURATION) {
+        // Check cache version and age
+        if (cachedData.version === CACHE_VERSION && age < CACHE_DURATION) {
           setServiceChargeRate(cachedData.serviceCharge);
           setVatRate(cachedData.vat);
           setIsLoading(false);
@@ -94,7 +97,7 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Cache expired or doesn't exist - fetch fresh data
+    // Cache expired, wrong version, or doesn't exist - fetch fresh data
     await fetchCharges();
     setIsLoading(false);
   };
