@@ -734,18 +734,16 @@ function AppContent() {
 
   return (
     <>
-      <CartProvider>
-        <TooltipProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
-            <Layout>
-              <Router />
-            </Layout>
-          </SidebarProvider>
-          <Toaster />
-          <InstallPWA />
-          <UpdatePrompt />
-        </TooltipProvider>
-      </CartProvider>
+      <TooltipProvider>
+        <SidebarProvider style={style as React.CSSProperties}>
+          <Layout>
+            <Router />
+          </Layout>
+        </SidebarProvider>
+        <Toaster />
+        <InstallPWA />
+        <UpdatePrompt />
+      </TooltipProvider>
       <SplashScreen isVisible={showSplash} />
     </>
   );
@@ -755,9 +753,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ServiceChargesProvider>
-          <AppContent />
-        </ServiceChargesProvider>
+        <CartProvider>
+          <ServiceChargesProvider>
+            <AppContent />
+          </ServiceChargesProvider>
+        </CartProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
