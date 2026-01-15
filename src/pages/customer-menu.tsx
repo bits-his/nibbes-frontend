@@ -91,6 +91,9 @@ export default function CustomerMenu() {
         // Update kitchen status in real-time
         setKitchenStatus(data.status);
         console.log("Kitchen status updated:", data.status);
+      } else if (data.type === "service-charges-updated") {
+        // Trigger service charges refresh by dispatching custom event
+        window.dispatchEvent(new CustomEvent('service-charges-updated', { detail: data.charges }));
       } else if (
         data.type === "order_update" ||
         data.type === "new_order" ||

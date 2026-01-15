@@ -120,33 +120,19 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
     loadCharges();
   }, []);
 
-  // WebSocket listener for real-time service charge updates
+  // Listen for service charge updates from existing WebSocket connections
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
-    const socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => {
-      console.log('ServiceCharges WebSocket connected');
-    };
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'service-charges-updated') {
-        console.log('📢 Service charges updated via WebSocket:', data.charges);
-        updateChargesFromData(data.charges);
+    const handleServiceChargesUpdate = (event: any) => {
+      console.log('📢 Service charges updated via custom event:', event.detail);
+      if (event.detail) {
+        updateChargesFromData(event.detail);
       }
     };
 
-    socket.onerror = (error) => {
-      console.error('ServiceCharges WebSocket error:', error);
-    };
-
-    socket.onclose = () => {
-      console.log('ServiceCharges WebSocket disconnected');
-    };
+    window.addEventListener('service-charges-updated', handleServiceChargesUpdate);
 
     return () => {
-      socket.close();
+      window.removeEventListener('service-charges-updated', handleServiceChargesUpdate);
     };
   }, []);
 

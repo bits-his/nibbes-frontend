@@ -453,6 +453,9 @@ export default function StaffOrders() {
         // Refresh menu data and categories when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
+      } else if (data.type === "service-charges-updated") {
+        // Trigger service charges refresh by dispatching custom event
+        window.dispatchEvent(new CustomEvent('service-charges-updated', { detail: data.charges }));
       }
     };
 
