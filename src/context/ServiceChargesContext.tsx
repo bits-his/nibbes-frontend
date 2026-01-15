@@ -31,6 +31,31 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
   const [vatRate, setVatRate] = useState(DEFAULT_CHARGES.vat);
   const [isLoading, setIsLoading] = useState(true);
 
+  const updateChargesFromData = (charges: ServiceCharge[]) => {
+    // Find service charge and VAT
+    const serviceCharge = charges.find(c => 
+      c.description.toLowerCase().includes('service') && c.type === 'percentage'
+    );
+    const vat = charges.find(c => 
+      c.description.toLowerCase().includes('vat') && c.type === 'percentage'
+    );
+
+    const newServiceCharge = serviceCharge?.amount || DEFAULT_CHARGES.serviceCharge;
+    const newVat = vat?.amount || DEFAULT_CHARGES.vat;
+
+    setServiceChargeRate(newServiceCharge);
+    setVatRate(newVat);
+
+    // Update cache
+    const newCharges = {
+      serviceCharge: newServiceCharge,
+      vat: newVat,
+      timestamp: Date.now(),
+      version: CACHE_VERSION
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(newCharges));
+  };
+
   const fetchCharges = async () => {
     try {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -40,29 +65,14 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       
       const charges: ServiceCharge[] = await response.json();
       
-      // Find service charge and VAT
-      const serviceCharge = charges.find(c => 
-        c.description.toLowerCase().includes('service') && c.type === 'percentage'
-      );
-      const vat = charges.find(c => 
-        c.description.toLowerCase().includes('vat') && c.type === 'percentage'
-      );
-
-      const newCharges = {
+      updateChargesFromData(charges);
+      
+      return {
         serviceCharge: serviceCharge?.amount || DEFAULT_CHARGES.serviceCharge,
         vat: vat?.amount || DEFAULT_CHARGES.vat,
         timestamp: Date.now(),
         version: CACHE_VERSION
       };
-
-      // Update state
-      setServiceChargeRate(newCharges.serviceCharge);
-      setVatRate(newCharges.vat);
-
-      // Cache in localStorage
-      localStorage.setItem(CACHE_KEY, JSON.stringify(newCharges));
-      
-      return newCharges;
     } catch (error) {
       console.error('Error fetching service charges:', error);
       // Use defaults on error
@@ -108,6 +118,36 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadCharges();
+  }, []);
+
+  // WebSocket listener for real-time service charge updates
+  useEffect(() => {
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log('ServiceCharges WebSocket connected');
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'service-charges-updated') {
+        console.log('📢 Service charges updated via WebSocket:', data.charges);
+        updateChargesFromData(data.charges);
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error('ServiceCharges WebSocket error:', error);
+    };
+
+    socket.onclose = () => {
+      console.log('ServiceCharges WebSocket disconnected');
+    };
+
+    return () => {
+      socket.close();
+    };
   }, []);
 
   return (
