@@ -138,6 +138,7 @@ export default function CustomerMenu() {
         const response = await apiRequest("GET", "/api/kitchen/status");
         if (response.ok) {
           const status = await response.json();
+          console.log('🍳 Kitchen status fetched:', status);
           setKitchenStatus(status);
         }
       } catch (error) {
@@ -235,8 +236,12 @@ export default function CustomerMenu() {
 
   // Memoize callbacks to prevent unnecessary re-renders
   const addToCart = useCallback((menuItem: MenuItem) => {
+    // Debug: Log kitchen status
+    console.log('🔍 addToCart called - Kitchen status:', kitchenStatus);
+    
     // Check if kitchen is closed
     if (!kitchenStatus.isOpen) {
+      console.log('❌ Kitchen is closed - blocking add to cart');
       toast({
         title: "Kitchen is Closed",
         description: "The kitchen is currently closed. Please try again later.",
@@ -245,6 +250,8 @@ export default function CustomerMenu() {
       });
       return;
     }
+    
+    console.log('✅ Kitchen is open - allowing add to cart');
 
     // Prevent adding unavailable items to cart
     if (!menuItem.available) {
