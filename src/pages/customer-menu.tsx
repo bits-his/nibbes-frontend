@@ -177,18 +177,18 @@ export default function CustomerMenu() {
     // Define item priority order (lower number = appears first)
     // Using lowercase for case-insensitive matching
     const itemPriority: { [key: string]: number } = {
-      'beef loaded fries': 1,
-      'chicken loaded fries': 2,
-      'oriental rice, charcoal grilled chicken and coleslaw': 3,
-      'signature rice, charcoal grilled chicken and coleslaw': 4,
-      'chicken shawarma': 5,
-      'beef shawarma': 6,
-      'smokey jollof rice, charcoal grilled chicken and coleslaw': 7,
-      'beef philadelphia': 8,
-      'chicken philadelphia': 9,
-      'creamy wings': 10, // Using "Creamy Wings" instead of "Wings & fries"
-      'chicken burger': 11,
-      'beef burger': 12,
+      'beef philadelphia': 1,
+      'chicken philadelphia': 2,
+      'beef loaded fries': 3,
+      'chicken loaded fries': 4,
+      'beef shawarma': 5,
+      'chicken shawarma': 6,
+      'beef burger': 7,
+      'chicken burger': 8,
+      'oriental rice, charcoal grilled chicken and coleslaw': 9,
+      'signature rice, charcoal grilled chicken and coleslaw': 10,
+      'smokey jollof rice, charcoal grilled chicken and coleslaw': 11,
+      'creamy wings': 12, // "Wings & fries" = "Creamy Wings" in database
       'beef kofta wrap': 13,
       'chicken kofta wrap': 14,
       'meat pie': 15,
