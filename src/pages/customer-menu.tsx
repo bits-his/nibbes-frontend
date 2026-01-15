@@ -87,6 +87,10 @@ export default function CustomerMenu() {
       if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+      } else if (data.type === "kitchen-status") {
+        // Update kitchen status in real-time
+        setKitchenStatus(data.status);
+        console.log("Kitchen status updated:", data.status);
       } else if (
         data.type === "order_update" ||
         data.type === "new_order" ||
@@ -126,6 +130,29 @@ export default function CustomerMenu() {
       };
     }
   }, []); // Empty deps - WebSocket doesn't block rendering
+  
+  // Fetch kitchen status on mount and poll every 30 seconds
+  useEffect(() => {
+    const fetchKitchenStatus = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/kitchen/status");
+        if (response.ok) {
+          const status = await response.json();
+          setKitchenStatus(status);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching kitchen status:', error);
+        // Default to open if check fails
+        setKitchenStatus({ isOpen: true });
+      }
+    };
+    
+    fetchKitchenStatus();
+    // Poll kitchen status every 30 seconds
+    const interval = setInterval(fetchKitchenStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+  
   const [showQRCode, setShowQRCode] = useState(false);
 
   // Fetch menu items with extended stale time for better caching
