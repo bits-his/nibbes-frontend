@@ -76,21 +76,36 @@ export default function StaffOrders() {
     return ["All", ...(categoriesData || [])];
   }, [categoriesData]);
 
-  // Helper function to sort items by category priority
-  const sortByCategoryPriority = (items: any[]) => {
-    // Define category priority order (lower number = appears first)
-    const categoryPriority: { [key: string]: number } = {
-      'Rice Meals': 1,
-      'Burger': 2,
-      'Wings': 3,
-      'Wraps': 4,
-      'Fries': 5,
+  // Helper function to sort items by specific item priority
+  const sortByItemPriority = (items: any[]) => {
+    // Define item priority order (lower number = appears first)
+    // Using lowercase for case-insensitive matching
+    const itemPriority: { [key: string]: number } = {
+      'beef loaded fries': 1,
+      'chicken loaded fries': 2,
+      'oriental rice': 3,
+      'signature rice': 4,
+      'chicken shawarma': 5,
+      'beef shawarma': 6,
+      'smokey jollof': 7,
+      'beef philadelphia': 8,
+      'chicken philadelphia': 9,
+      'wings & fries': 10,
+      'chicken burger': 11,
+      'beef burger': 12,
+      'beef kofta wrap': 13,
+      'chicken kofta wrap': 14,
+      'meatpie': 15,
+      'meat pie': 15, // Alternative spelling
+      'french fries and ketchup': 16,
       // Everything else gets priority 999 (appears last)
     };
     
     return [...items].sort((a, b) => {
-      const aPriority = categoryPriority[a.category] || 999;
-      const bPriority = categoryPriority[b.category] || 999;
+      const aName = a.name.toLowerCase().trim();
+      const bName = b.name.toLowerCase().trim();
+      const aPriority = itemPriority[aName] || 999;
+      const bPriority = itemPriority[bName] || 999;
       
       if (aPriority !== bPriority) {
         return aPriority - bPriority; // Sort by priority
@@ -117,8 +132,8 @@ export default function StaffOrders() {
       }
     );
 
-    // Sort: Priority categories first (only when viewing "All" categories)
-    return selectedCategory === "All" ? sortByCategoryPriority(filtered) : filtered;
+    // Sort: Priority items first (only when viewing "All" categories)
+    return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
   }, [menuItems, selectedCategory, searchQuery]);
 
   // PERFORMANCE: Infinite scroll for pagination (reduces initial payload from 68MB to manageable chunks)

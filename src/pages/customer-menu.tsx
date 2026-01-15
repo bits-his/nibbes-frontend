@@ -172,21 +172,36 @@ export default function CustomerMenu() {
   // Use loading state from menu only
   const isLoading = menuLoading;
 
-  // Helper function to sort items by category priority
-  const sortByCategoryPriority = (items: any[]) => {
-    // Define category priority order (lower number = appears first)
-    const categoryPriority: { [key: string]: number } = {
-      'Rice Meals': 1,
-      'Burger': 2,
-      'Wings': 3,
-      'Wraps': 4,
-      'Fries': 5,
+  // Helper function to sort items by specific item priority
+  const sortByItemPriority = (items: any[]) => {
+    // Define item priority order (lower number = appears first)
+    // Using lowercase for case-insensitive matching
+    const itemPriority: { [key: string]: number } = {
+      'beef loaded fries': 1,
+      'chicken loaded fries': 2,
+      'oriental rice': 3,
+      'signature rice': 4,
+      'chicken shawarma': 5,
+      'beef shawarma': 6,
+      'smokey jollof': 7,
+      'beef philadelphia': 8,
+      'chicken philadelphia': 9,
+      'wings & fries': 10,
+      'chicken burger': 11,
+      'beef burger': 12,
+      'beef kofta wrap': 13,
+      'chicken kofta wrap': 14,
+      'meatpie': 15,
+      'meat pie': 15, // Alternative spelling
+      'french fries and ketchup': 16,
       // Everything else gets priority 999 (appears last)
     };
     
     return [...items].sort((a, b) => {
-      const aPriority = categoryPriority[a.category] || 999;
-      const bPriority = categoryPriority[b.category] || 999;
+      const aName = a.name.toLowerCase().trim();
+      const bName = b.name.toLowerCase().trim();
+      const aPriority = itemPriority[aName] || 999;
+      const bPriority = itemPriority[bName] || 999;
       
       if (aPriority !== bPriority) {
         return aPriority - bPriority; // Sort by priority
@@ -209,9 +224,9 @@ export default function CustomerMenu() {
           item.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
-    // Sort: Priority categories first (only when viewing "All" categories)
+    // Sort: Priority items first (only when viewing "All" categories)
     // To disable this sorting, comment out the next line and uncomment the line after
-    return selectedCategory === "All" ? sortByCategoryPriority(filtered) : filtered;
+    return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
     // return filtered; // Uncomment this to disable priority sorting
   }, [menuItems, selectedCategory, searchQuery]);
 
