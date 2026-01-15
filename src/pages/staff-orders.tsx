@@ -83,20 +83,19 @@ export default function StaffOrders() {
     const itemPriority: { [key: string]: number } = {
       'beef loaded fries': 1,
       'chicken loaded fries': 2,
-      'oriental rice': 3,
-      'signature rice': 4,
+      'oriental rice, charcoal grilled chicken and coleslaw': 3,
+      'signature rice, charcoal grilled chicken and coleslaw': 4,
       'chicken shawarma': 5,
       'beef shawarma': 6,
-      'smokey jollof': 7,
+      'smokey jollof rice, charcoal grilled chicken and coleslaw': 7,
       'beef philadelphia': 8,
       'chicken philadelphia': 9,
-      'wings & fries': 10,
+      'creamy wings': 10, // Using "Creamy Wings" instead of "Wings & fries"
       'chicken burger': 11,
       'beef burger': 12,
       'beef kofta wrap': 13,
       'chicken kofta wrap': 14,
-      'meatpie': 15,
-      'meat pie': 15, // Alternative spelling
+      'meat pie': 15,
       'french fries and ketchup': 16,
       // Everything else gets priority 999 (appears last)
     };
