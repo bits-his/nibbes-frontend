@@ -616,6 +616,38 @@ export default function StaffOrders() {
                         ) : (
                           <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
                         )}
+                        
+                        {/* Quantity Controls - Show only if item is in cart */}
+                        {isInCart && cartItem && (
+                          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateQuantity(item.id, -1);
+                              }}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="font-semibold text-base min-w-[2rem] text-center">
+                              {cartItem.quantity}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateQuantity(item.id, 1);
+                              }}
+                              disabled={!canAddMore}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );

@@ -157,6 +157,7 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData }) => {
 
         {/* Footer */}
         <Text style={styles.footer}>Thank you for your order!</Text>
+        <Text style={styles.footer}>Powered by Brainstom</Text>
         <Text style={styles.footer}>nibblesfastfood.com</Text>
       </Page>
     </Document>

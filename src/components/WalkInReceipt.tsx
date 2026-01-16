@@ -230,6 +230,7 @@ const WalkInReceipt: React.FC<WalkInReceiptProps> = ({ orderData }) => {
 
         {/* Footer */}
         <Text style={styles.footer}>Thank you for your order!</Text>
+        <Text style={styles.footer}>Powered by Brainstorm</Text>
         <Text style={styles.footer}>nibblesfastfood.com/</Text>
       </Page>
     </Document>
