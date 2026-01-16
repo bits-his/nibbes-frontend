@@ -123,7 +123,7 @@ const ProfilePage: React.FC = () => {
       const response = await apiRequest('PATCH', '/api/auth/me', {
         username: formData.username,
         email: formData.email,
-        phone: formData.phone
+        phoneNumber: formData.phone
       });
 
       if (response.ok) {
