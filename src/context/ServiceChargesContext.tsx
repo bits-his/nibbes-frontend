@@ -67,9 +67,12 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       
       updateChargesFromData(charges);
       
+      const serviceChargeItem = charges.find(c => c.type === 'service_charge');
+      const vatItem = charges.find(c => c.type === 'vat');
+      
       return {
-        serviceCharge: serviceCharge?.amount || DEFAULT_CHARGES.serviceCharge,
-        vat: vat?.amount || DEFAULT_CHARGES.vat,
+        serviceCharge: serviceChargeItem?.amount || DEFAULT_CHARGES.serviceCharge,
+        vat: vatItem?.amount || DEFAULT_CHARGES.vat,
         timestamp: Date.now(),
         version: CACHE_VERSION
       };
