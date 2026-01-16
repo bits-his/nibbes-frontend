@@ -47,12 +47,17 @@ export const orderSchema = z.object({
   tableNumber: z.number(),
   customerName: z.string(), // Added customer name field
   customerPhone: z.string().optional(), // Added customer phone field
-  orderType: z.enum(['online', 'walk-in', 'dine-in']), // Added order type field
+  orderType: z.enum(['online', 'walk-in', 'dine-in', 'delivery', 'pickup']), // Added order type field
   status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']), // Updated status enum to match frontend usage
   totalAmount: z.string(),
   paymentStatus: z.enum(['pending', 'paid', 'failed']).default('pending'), // Added payment status
   paymentMethod: z.string().optional(), // Added payment method
   notes: z.string().optional(), // Added notes field
+  locationAddress: z.string().nullable().optional(), // Delivery address
+  geoPricingId: z.string().nullable().optional(), // Drops API geo pricing route ID
+  deliveryFee: z.number().nullable().optional(), // Delivery fee amount
+  trackingNumber: z.string().nullable().optional(), // Drops delivery tracking number
+  deliveryRequestId: z.string().nullable().optional(), // Drops delivery request ID
   createdAt: z.string(),
   updatedAt: z.string(),
 });

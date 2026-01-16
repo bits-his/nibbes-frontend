@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getGuestSession } from "@/lib/guestSession";
 import { formatDistanceToNow } from "date-fns";
 import { useLocation } from "wouter";
+import { DeliveryStatusCard } from "@/components/DeliveryStatusCard";
 
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -445,6 +446,15 @@ const getStatusCardColor = (status: string) => {
                         <span className="font-semibold">Notes:</span> {order.notes}
                       </p>
                     </div>
+                  )}
+
+                  {/* Delivery Status Card - Show for delivery/online orders with tracking */}
+                  {(order.orderType === "delivery" || order.orderType === "online") && (order.trackingNumber || order.deliveryRequestId) && (
+                    <DeliveryStatusCard
+                      trackingNumber={order.trackingNumber || undefined}
+                      requestNumber={order.deliveryRequestId || undefined}
+                      orderType={order.orderType}
+                    />
                   )}
                 </CardContent>
               </Card>
