@@ -1,7 +1,7 @@
-// Nibbles Service Worker - Version 3.0.0
+// Nibbles Service Worker - Version 3.0.1
 // OPTIMIZED FOR OFFLINE SUPPORT AND PERFORMANCE
 
-const VERSION = '3.0.0';
+const VERSION = '3.0.1';
 const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
 const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 
@@ -84,35 +84,29 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 3: STALE-WHILE-REVALIDATE for Menu API (performance optimization)
+  // Strategy 3: NETWORK-FIRST for Menu API (always fresh data)
   // -------------------------------------------------------------------------
   if (url.pathname === '/api/menu/all' || url.pathname.includes('/api/menu/')) {
     event.respondWith(
-      caches.open(RUNTIME_CACHE).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          // Fetch fresh data in background
-          const fetchPromise = fetch(request)
-            .then((networkResponse) => {
-              // Cache successful responses
-              if (networkResponse && networkResponse.status === 200) {
-                const responseToCache = networkResponse.clone();
-                cache.put(request, responseToCache);
-              }
-              return networkResponse;
-            })
-            .catch(() => {
-              // Network failed, return cached if available
-              return cachedResponse || new Response(
-                JSON.stringify({ error: 'Network unavailable' }),
-                { status: 503, headers: { 'Content-Type': 'application/json' } }
-              );
-            });
+      fetch(request)
+        .then((networkResponse) => {
+          // Don't cache menu API - always fetch fresh to get latest image URLs
+          return networkResponse;
+        })
+        .catch(() => {
+          // Network failed, try cache as fallback
+          return caches.match(request).then((cachedResponse) => {
+            return cachedResponse || new Response(
+              JSON.stringify({ error: 'Network unavailable' }),
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            );
+          });
+        })
+    );
+    return;
+  }
 
           // Return cached version immediately if available, otherwise wait for network
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
     return;
   }
 
