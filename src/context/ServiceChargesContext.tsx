@@ -67,8 +67,8 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       
       updateChargesFromData(charges);
       
-      const serviceChargeItem = charges.find(c => c.type === 'service_charge');
-      const vatItem = charges.find(c => c.type === 'vat');
+      const serviceChargeItem = charges.find(c => c.description.toLowerCase().includes('service'));
+      const vatItem = charges.find(c => c.description.toLowerCase().includes('vat'));
       
       return {
         serviceCharge: serviceChargeItem?.amount || DEFAULT_CHARGES.serviceCharge,
