@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem, CartItem } from "@shared/schema";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
 
 // Service Charge interface
 interface ServiceCharge {
@@ -567,27 +568,20 @@ export default function StaffOrders() {
                       onClick={() => canAddMore && kitchenStatus.isOpen && addToCart(item)}
                       data-testid={`card-menu-item-${item.id}`}
                     >
-                      <div className="aspect-video overflow-hidden relative bg-muted">
-                        <img
+                      <div className="aspect-video overflow-hidden relative">
+                        <ImageWithSkeleton
                           src={item.imageUrl || ''}
                           alt={item.name}
-                          width={400}
-                          height={300}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                          }}
+                          containerClassName="w-full h-full"
                         />
                         {isInCart && (
-                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1">
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1 z-10">
                             <Plus className="w-3 h-3 md:w-4 md:h-4" />
                           </div>
                         )}
                         {/* SOLD OUT Overlay */}
                         {isOutOfStock && (
-                          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
                             <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
                               SOLD OUT
                             </span>
@@ -595,7 +589,7 @@ export default function StaffOrders() {
                         )}
                         {/* Low Stock Badge */}
                         {!isOutOfStock && isLowStock && (
-                          <div className="absolute top-2 left-2">
+                          <div className="absolute top-2 left-2 z-10">
                             <Badge variant="destructive" className="text-xs font-semibold shadow-md">
                               Only {item.stockBalance} left!
                             </Badge>

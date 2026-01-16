@@ -38,7 +38,7 @@ import { insertMenuItemSchema, menuItemFormSchema } from "@shared/schema";
 import { z } from "zod";
 import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
-import { log } from "console";
+import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
 
 type MenuFormValues = z.infer<typeof menuItemFormSchema>;
 
@@ -507,22 +507,15 @@ export default function MenuManagement() {
                 className="overflow-hidden"
                 data-testid={`card-menu-item-${item.id}`}
               >
-                <div className="aspect-square overflow-hidden relative bg-muted">
-                  <img
+                <div className="aspect-square overflow-hidden relative">
+                  <ImageWithSkeleton
                     src={item.imageUrl || ''}
                     alt={item.name}
-                    width={400}
-                    height={400}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
+                    containerClassName="w-full h-full"
                   />
                   {/* Show SOLD OUT badge if stockBalance is 0 */}
                   {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 && (
-                    <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
                       <Badge variant="default" className="text-base font-bold bg-primary text-white">
                         SOLD OUT
                       </Badge>
@@ -530,7 +523,7 @@ export default function MenuManagement() {
                   )}
                   {/* Show Unavailable badge if item is manually set unavailable */}
                   {!item.available && item.stockBalance !== 0 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
                       <Badge variant="secondary" className="text-base">
                         Unavailable
                       </Badge>
