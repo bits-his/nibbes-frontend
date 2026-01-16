@@ -507,7 +507,7 @@ export default function MenuManagement() {
                 className="overflow-hidden"
                 data-testid={`card-menu-item-${item.id}`}
               >
-                <div className="aspect-square overflow-hidden relative">
+                <div className="aspect-square overflow-hidden relative bg-muted">
                   <img
                     src={item.imageUrl || ''}
                     alt={item.name}
@@ -515,6 +515,10 @@ export default function MenuManagement() {
                     height={400}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
                   {/* Show SOLD OUT badge if stockBalance is 0 */}
                   {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 && (

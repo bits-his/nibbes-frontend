@@ -1,7 +1,7 @@
-// Nibbles Service Worker - Version 3.0.1
+// Nibbles Service Worker - Version 3.0.2
 // OPTIMIZED FOR OFFLINE SUPPORT AND PERFORMANCE
 
-const VERSION = '3.0.1';
+const VERSION = '3.0.2';
 const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
 const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 

@@ -13,6 +13,29 @@ export interface ImageOptions {
 }
 
 /**
+ * Detect if running on iOS Safari (which may have WebP issues on older versions)
+ */
+function isIOSSafari(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua);
+  return isIOS && isSafari;
+}
+
+/**
+ * Get best image format for current browser
+ * iOS Safari older versions have WebP issues, use JPEG as fallback
+ */
+function getBestFormat(): 'webp' | 'jpg' {
+  // For iOS Safari, prefer JPEG for maximum compatibility
+  if (isIOSSafari()) {
+    return 'jpg';
+  }
+  return 'webp';
+}
+
+/**
  * Check if URL is a Cloudinary URL (legacy)
  */
 export function isCloudinaryUrl(url: string): boolean {
@@ -27,13 +50,16 @@ export function getOptimizedCloudinaryUrl(
   originalUrl: string,
   options: ImageOptions = {}
 ): string {
+  // Determine best format based on browser
+  const bestFormat = getBestFormat();
+  
   // If CDN URL, use CDN client
   if (isCDNUrl(originalUrl)) {
     return getCDNImageUrl(originalUrl, {
       width: options.width,
       height: options.height,
       quality: options.quality || 80,
-      format: options.format === 'auto' ? 'webp' : (options.format as 'webp' | 'jpg' | 'png' | undefined),
+      format: options.format === 'auto' ? bestFormat : (options.format as 'webp' | 'jpg' | 'png' | undefined),
     });
   }
 
@@ -77,7 +103,8 @@ export function getOptimizedCloudinaryUrl(
   }
 
   transformations.push(`q_${quality}`);
-  transformations.push(`f_${format}`);
+  // Use best format for Cloudinary too
+  transformations.push(`f_${format === 'auto' ? bestFormat : format}`);
 
   // Add fetch format for better compression
   transformations.push('fl_progressive'); // Progressive JPEG

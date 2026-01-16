@@ -6,7 +6,7 @@ import "./index.css";
 // ============================================================================
 // VERSION CHECK: Force cache clear if version changed
 // ============================================================================
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2'; // Bumped to force immediate update
 const STORED_VERSION = localStorage.getItem('app_version');
 
 if (STORED_VERSION !== APP_VERSION) {
@@ -26,13 +26,13 @@ if (STORED_VERSION !== APP_VERSION) {
     });
   }
   
-  // Update stored version
-  localStorage.setItem('app_version', APP_VERSION);
+  // Clear localStorage except version
+  const tempVersion = APP_VERSION;
+  localStorage.clear();
+  localStorage.setItem('app_version', tempVersion);
   
   // Force reload to get fresh content
-  if (STORED_VERSION) {
-    window.location.reload();
-  }
+  window.location.reload();
 }
 
 // ============================================================================

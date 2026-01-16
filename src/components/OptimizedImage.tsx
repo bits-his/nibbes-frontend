@@ -7,6 +7,7 @@ import {
   getQualityForNetwork,
   isCloudinaryUrl,
 } from '@/utils/imageOptimization';
+import { isCDNUrl } from '@/utils/cdnClient';
 
 interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'srcSet'> {
   src: string;
@@ -23,12 +24,12 @@ interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 
  * OptimizedImage Component
  * 
  * Features:
- * - Automatic WebP with fallback
+ * - Automatic WebP with fallback (JPEG for iOS Safari)
  * - Lazy loading (except for priority images)
  * - Progressive image loading with blur placeholder
  * - Network-aware quality adjustment
  * - Responsive srcset for different screen sizes
- * - Error handling with fallback
+ * - Error handling with fallback to original URL
  */
 export function OptimizedImage({
   src,
@@ -45,6 +46,7 @@ export function OptimizedImage({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
   const networkStatus = useNetworkStatus();
 
@@ -65,20 +67,27 @@ export function OptimizedImage({
     // Generate optimized URL
     let optimizedSrc = src;
     
+    // Only apply transformations for Cloudinary URLs
+    // For CDN URLs, use original URL directly (CDN handles optimization server-side)
     if (isCloudinaryUrl(src)) {
       optimizedSrc = getOptimizedCloudinaryUrl(src, {
         width: imageWidth,
         height: imageHeight,
         quality,
-        format: 'auto', // WebP when supported
+        format: 'auto', // Will use JPEG for iOS Safari
         crop: 'fill',
       });
+    } else if (isCDNUrl(src)) {
+      // For CDN URLs, use original URL without client-side transformation
+      // The CDN server handles optimization via query params if needed
+      optimizedSrc = src;
     }
 
     setImageSrc(optimizedSrc);
     setHasError(false);
     setIsLoaded(false);
     setShowPlaceholder(true);
+    setRetryCount(0);
   }, [src, imageWidth, imageHeight, quality]);
 
   const handleLoad = () => {
@@ -90,14 +99,22 @@ export function OptimizedImage({
   };
 
   const handleError = () => {
+    // On first error, try the original URL without any transformations
+    if (retryCount === 0 && imageSrc !== src) {
+      setRetryCount(1);
+      setImageSrc(src);
+      return;
+    }
+    
+    // On second error, try fallback if available
+    if (retryCount === 1 && fallbackSrc && fallbackSrc !== imageSrc) {
+      setRetryCount(2);
+      setImageSrc(fallbackSrc);
+      return;
+    }
+    
     setHasError(true);
     setShowPlaceholder(false);
-    
-    // Try fallback if available
-    if (fallbackSrc && fallbackSrc !== imageSrc) {
-      setImageSrc(fallbackSrc);
-      setHasError(false);
-    }
   };
 
   // Generate srcset for responsive images (Cloudinary only)
@@ -110,7 +127,7 @@ export function OptimizedImage({
     ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'
     : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
 
-  // Placeholder URL for blur-up effect
+  // Placeholder URL for blur-up effect (Cloudinary only)
   const placeholderUrl = isCloudinaryUrl(src)
     ? getPlaceholderUrl(src)
     : undefined;

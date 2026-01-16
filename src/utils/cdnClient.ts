@@ -75,16 +75,26 @@ export function getCDNImageUrl(filename: string, options: ImageOptions = {}): st
     return getPlaceholderImage();
   }
 
-  // If already a CDN URL, return as-is (or add transforms)
-  if (isCDNUrl(filename)) {
+  // If already a full CDN URL, preserve the base URL and add transforms
+  if (isCDNUrl(filename) && filename.startsWith('http')) {
     if (Object.keys(options).length === 0) {
       return filename;
     }
-    // Extract filename from URL
+    
+    // Extract base URL and filename from the full URL
     const urlParts = filename.split('/media/images/');
-    if (urlParts.length > 1) {
-      const filePart = urlParts[1].split('?')[0];
-      return getCDNImageUrl(filePart, options);
+    if (urlParts.length === 2) {
+      const baseUrl = urlParts[0]; // e.g., https://server.brainstorm.ng/nibbleskitchen/cdn
+      const filePart = urlParts[1].split('?')[0]; // Remove existing query params
+      
+      const params = new URLSearchParams();
+      if (options.width) params.set('w', options.width.toString());
+      if (options.height) params.set('h', options.height.toString());
+      params.set('q', (options.quality || 80).toString());
+      params.set('f', options.format || 'webp');
+      
+      const query = params.toString();
+      return `${baseUrl}/media/images/${filePart}${query ? '?' + query : ''}`;
     }
     return filename;
   }

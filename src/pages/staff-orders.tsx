@@ -567,7 +567,7 @@ export default function StaffOrders() {
                       onClick={() => canAddMore && kitchenStatus.isOpen && addToCart(item)}
                       data-testid={`card-menu-item-${item.id}`}
                     >
-                      <div className="aspect-video overflow-hidden relative">
+                      <div className="aspect-video overflow-hidden relative bg-muted">
                         <img
                           src={item.imageUrl || ''}
                           alt={item.name}
@@ -575,6 +575,10 @@ export default function StaffOrders() {
                           height={300}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
                         />
                         {isInCart && (
                           <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1">

@@ -227,11 +227,17 @@ export default function OrderStatus() {
               <CardContent className="space-y-3">
                 {order.orderItems.map((item) => (
                   <div key={item.id} className="flex gap-4 p-4 bg-muted rounded-lg">
-                    <img
-                      src={item.menuItem.imageUrl}
-                      alt={item.menuItem.name}
-                      className="w-20 h-20 rounded-lg object-cover"
-                    />
+                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                      <img
+                        src={item.menuItem.imageUrl}
+                        alt={item.menuItem.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    </div>
                     <div className="flex-1">
                       <div className="font-semibold">{item.menuItem.name}</div>
                       <div className="text-sm text-muted-foreground">
