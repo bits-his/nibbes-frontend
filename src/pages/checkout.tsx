@@ -41,7 +41,7 @@ declare global {
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
-  customerPhone: z.string().optional(),
+  customerPhone: z.string().min(1, "Phone number is required"),
   orderType: z.enum(["delivery", "pickup"], {
     required_error: "Please select an order type",
   }),
@@ -270,6 +270,7 @@ export default function Checkout() {
 
     if (user) {
       form.setValue("customerName", user.username || user.email)
+      form.setValue("customerPhone", user.phone || "")
     } else if (guestSession) {
       form.setValue("customerName", guestSession.guestName)
       form.setValue("customerPhone", guestSession.guestPhone)
@@ -1530,7 +1531,9 @@ export default function Checkout() {
                       name="customerPhone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold">Phone Number</FormLabel>
+                          <FormLabel className="text-base font-semibold">
+                            Phone Number <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="tel"
