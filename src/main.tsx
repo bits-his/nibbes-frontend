@@ -4,6 +4,38 @@ import App from "./App";
 import "./index.css";
 
 // ============================================================================
+// VERSION CHECK: Force cache clear if version changed
+// ============================================================================
+const APP_VERSION = '1.0.1';
+const STORED_VERSION = localStorage.getItem('app_version');
+
+if (STORED_VERSION !== APP_VERSION) {
+  console.log(`[Version Check] Updating from ${STORED_VERSION} to ${APP_VERSION}`);
+  
+  // Clear all caches
+  if ('caches' in window) {
+    caches.keys().then(names => {
+      names.forEach(name => caches.delete(name));
+    });
+  }
+  
+  // Unregister old service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      registrations.forEach(reg => reg.unregister());
+    });
+  }
+  
+  // Update stored version
+  localStorage.setItem('app_version', APP_VERSION);
+  
+  // Force reload to get fresh content
+  if (STORED_VERSION) {
+    window.location.reload();
+  }
+}
+
+// ============================================================================
 // PERFORMANCE: Defer Service Worker Registration - Don't block initial render
 // ============================================================================
 // Register service worker after page load to avoid blocking FCP
