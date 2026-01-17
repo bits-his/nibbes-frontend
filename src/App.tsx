@@ -565,7 +565,7 @@ function Router() {
       <Route
         path="/cashier-analytics"
         component={() => (
-          <ProtectedRoute requiredPermissions={["view_analytics"]}>
+          <ProtectedRoute requiredPermissions={["cashier_analytics"]}>
             <CashierAnalyticsPage />
           </ProtectedRoute>
         )}
