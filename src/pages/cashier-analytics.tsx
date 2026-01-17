@@ -63,7 +63,7 @@ export default function CashierAnalytics() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
-      const response: any = await apiRequest('/api/cashier-analytics', 'GET')
+      const response: any = await apiRequest('GET', '/api/cashier-analytics')
       
       if (response.success) {
         setCashierMetrics(response.data.cashierMetrics)
