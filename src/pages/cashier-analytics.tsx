@@ -179,35 +179,35 @@ export default function CashierAnalytics() {
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Cashier Analytics</h1>
-            <p className="text-gray-600 mt-1">Monitor cashier performance and transactions</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Cashier Analytics</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-1">Monitor cashier performance and transactions</p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Start Date</label>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="col-span-2 md:col-span-1">
+            <label className="text-xs md:text-sm font-medium text-gray-700 mb-1 block">Start Date</label>
             <Input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full"
+              className="w-full text-sm"
             />
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">End Date</label>
+          <div className="col-span-2 md:col-span-1">
+            <label className="text-xs md:text-sm font-medium text-gray-700 mb-1 block">End Date</label>
             <Input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full"
+              className="w-full text-sm"
             />
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Cashier</label>
+          <div className="col-span-2 md:col-span-1">
+            <label className="text-xs md:text-sm font-medium text-gray-700 mb-1 block">Cashier</label>
             <Select value={selectedCashier} onValueChange={setSelectedCashier}>
-              <SelectTrigger>
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Select cashier" />
               </SelectTrigger>
               <SelectContent>
@@ -220,25 +220,29 @@ export default function CashierAnalytics() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleFilter} className="bg-orange-500 hover:bg-orange-600">
-            Apply Filter
-          </Button>
-          <Button onClick={handleReset} variant="outline">
-            Reset
-          </Button>
+          <div className="col-span-1 flex items-end">
+            <Button onClick={handleFilter} className="w-full bg-[#FF6B35] hover:bg-[#FF5722] text-white text-sm">
+              Apply
+            </Button>
+          </div>
+          <div className="col-span-1 flex items-end">
+            <Button onClick={handleReset} variant="outline" className="w-full text-sm">
+              Reset
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Total Orders</CardTitle>
+            <ShoppingCart className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalOrders.toLocaleString()}</div>
-            <p className="text-xs text-gray-600 mt-1">
+            <div className="text-xl md:text-2xl font-bold">{totalOrders.toLocaleString()}</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">
               {totalPaidOrders} paid, {totalPendingOrders} pending, {totalCancelledOrders} cancelled
             </p>
           </CardContent>
@@ -246,45 +250,45 @@ export default function CashierAnalytics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Total Revenue</CardTitle>
+            <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-            <p className="text-xs text-gray-600 mt-1">From paid orders</p>
+            <div className="text-xl md:text-2xl font-bold">₦{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">From paid orders</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Avg Order Value</CardTitle>
-            <TrendingUp className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Avg Order Value</CardTitle>
+            <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-            <p className="text-xs text-gray-600 mt-1">Per transaction</p>
+            <div className="text-xl md:text-2xl font-bold">₦{avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">Per transaction</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Success Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Success Rate</CardTitle>
+            <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{successRate.toFixed(1)}%</div>
-            <p className="text-xs text-gray-600 mt-1">Orders completed</p>
+            <div className="text-xl md:text-2xl font-bold">{successRate.toFixed(1)}%</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">Orders completed</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Active Cashiers</CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-600">Active Cashiers</CardTitle>
+            <Users className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{filteredMetrics.length}</div>
-            <p className="text-xs text-gray-600 mt-1">Currently tracked</p>
+            <div className="text-xl md:text-2xl font-bold">{filteredMetrics.length}</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">Currently tracked</p>
           </CardContent>
         </Card>
       </div>
