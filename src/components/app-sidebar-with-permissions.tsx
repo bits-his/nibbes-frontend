@@ -204,8 +204,8 @@ export function AppSidebar() {
       return menuItems.filter((item) => item.roles.includes("customer"));
     }
 
-    // Admin sees everything
-    if (user.role === "admin") {
+    // Admin sees everything (case-insensitive check)
+    if (user.role.toLowerCase() === "admin") {
       return menuItems;
     }
 
