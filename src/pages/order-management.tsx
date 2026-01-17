@@ -261,7 +261,10 @@ const getStatusBadge = (status: string) => {
             <CardContent className="p-6">
               <div className="text-sm text-muted-foreground mb-1">Today's Orders</div>
               <div className="text-3xl font-bold" data-testid="stat-today-orders">
-                {stats?.todayOrders || 0}
+                {(() => {
+                  console.log('📊 Rendering stats:', stats);
+                  return stats?.todayOrders || 0;
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -269,7 +272,7 @@ const getStatusBadge = (status: string) => {
             <CardContent className="p-6">
               <div className="text-sm text-muted-foreground mb-1">Revenue</div>
               <div className="text-3xl font-bold" data-testid="stat-revenue">
-                ₦{(stats?.todayRevenue || 0).toLocaleString()}
+                ₦{Number(stats?.todayRevenue || 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
