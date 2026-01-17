@@ -138,6 +138,13 @@ const menuItems: MenuItem[] = [
     permissions: ["view_analytics"],
   },
   { 
+    title: "Cashier Analytics", 
+    url: "/cashier-analytics", 
+    icon: BarChart3, 
+    roles: ["C - Suite"],
+    permissions: ["view_analytics"],
+  },
+  { 
     title: "QR Code", 
     url: "/qr-code", 
     icon: ClipboardList, 

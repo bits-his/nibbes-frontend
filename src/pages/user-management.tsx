@@ -93,7 +93,10 @@ export default function UserManagement() {
     let result = users;
 
     // Apply role filter
-    if (roleFilter !== "all") {
+    if (roleFilter === "guest") {
+      // Show only users with role "customer" (guest users)
+      result = result.filter(user => user.role === "customer");
+    } else if (roleFilter !== "all") {
       result = result.filter(user => user.role === roleFilter);
     }
 
@@ -606,6 +609,7 @@ export default function UserManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="guest">👤 Guest Users</SelectItem>
                 {roles.map((roleItem) => (
                   <SelectItem key={roleItem.id} value={roleItem.roleName}>
                     {roleItem.roleName}

@@ -428,7 +428,9 @@ export const usePrint = () => {
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
-          <div class="footer-powered-by">Powered by <a href="https://brainstorm.ng/" target="_blank">Brainstorm</a></div>
+          <div class="footer-powered-by">Powered By: Brainstorm IT Solution</div>
+          <div class="footer-powered-by">Powered By</div>
+          <div class="footer-nibbles">Brainstorm IT Solution</div>
         </div>
 
         <!-- Print Actions (hidden when printing) -->
