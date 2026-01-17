@@ -5,6 +5,7 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { 
   Table, 
   TableBody, 
@@ -31,7 +32,7 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { TrendingUp, Users, DollarSign, ShoppingCart } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, ShoppingCart, Calendar } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen');
 
@@ -53,20 +54,29 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState('30');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
-  }, [dateRange]);
+  }, [dateRange, startDate, endDate]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const to = new Date().toISOString().split('T')[0];
-      const from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0];
+      let from, to;
+      
+      if (startDate && endDate) {
+        from = startDate;
+        to = endDate;
+      } else {
+        to = new Date().toISOString().split('T')[0];
+        from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split('T')[0];
+      }
 
       const response = await fetch(
         `${BACKEND_URL}/api/analytics/dashboard?from=${from}&to=${to}`,
@@ -127,13 +137,20 @@ export default function AnalyticsDashboard() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics & Reports</h1>
-          <p className="text-gray-600 mt-1">Track your business performance</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Analytics & Reports</h1>
+            <p className="text-gray-600 mt-1">Track your business performance</p>
+          </div>
+          <Button onClick={fetchDashboardData}>
+            Export Report
+          </Button>
         </div>
-        <div className="flex items-center gap-4">
-          <Select value={dateRange} onValueChange={setDateRange}>
+        
+        {/* Date Filters */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <Select value={dateRange} onValueChange={(val) => { setDateRange(val); setStartDate(''); setEndDate(''); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
@@ -143,9 +160,25 @@ export default function AnalyticsDashboard() {
               <SelectItem value="90">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={fetchDashboardData}>
-            Export Report
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <Input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => { setStartDate(e.target.value); setDateRange(''); }}
+              className="w-[150px]"
+              placeholder="Start date"
+            />
+            <span className="text-gray-500">to</span>
+            <Input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => { setEndDate(e.target.value); setDateRange(''); }}
+              className="w-[150px]"
+              placeholder="End date"
+            />
+          </div>
         </div>
       </div>
 
