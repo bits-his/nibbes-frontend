@@ -142,7 +142,6 @@ const menuItems: MenuItem[] = [
     url: "/cashier-analytics", 
     icon: BarChart3, 
     roles: ["C - Suite", "admin"],
-    permissions: ["analytics_reports"],
   },
   { 
     title: "QR Code", 
