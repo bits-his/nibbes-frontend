@@ -228,6 +228,15 @@ export function AppSidebar() {
 
   const availableMenuItems = getMenuItems(user, userPermissions);
 
+  console.log('🔍 Sidebar Debug:', {
+    user,
+    userRole: user?.role,
+    userPermissions,
+    totalMenuItems: menuItems.length,
+    availableMenuItems: availableMenuItems.length,
+    cashierAnalyticsItem: menuItems.find(item => item.title === "Cashier Analytics")
+  });
+
   const handleLogout = () => {
     logout();
     setLocation("/login", { replace: true });
