@@ -87,25 +87,20 @@ export default function OrderManagement() {
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters with proper date range (start of from date to end of to date)
+      // Always use date range - default to today if not set
+      const fromDate = dateRange.from ? new Date(dateRange.from) : new Date();
+      fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = dateRange.to ? new Date(dateRange.to) : new Date();
+      toDate.setHours(23, 59, 59, 999);
+
       const params = new URLSearchParams();
-      if (dateRange.from) {
-        // Set time to start of the day (00:00:00)
-        const fromDate = new Date(dateRange.from);
-        fromDate.setHours(0, 0, 0, 0);
-        params.append('from', fromDate.toISOString());
+      params.append('from', fromDate.toISOString());
+      params.append('to', toDate.toISOString());
 
-        // If no 'to' date is set, use the same date as 'from' (single day selection)
-        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
-        toDate.setHours(23, 59, 59, 999);
-        params.append('to', toDate.toISOString());
+      console.log(`📅 Frontend fetching orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
 
-        console.log(`📅 Frontend fetching orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
-      }
-
-      const queryString = params.toString();
-      const url = queryString ? `/api/orders?${queryString}` : '/api/orders';
-
+      const url = `/api/orders?${params.toString()}`;
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -119,23 +114,18 @@ export default function OrderManagement() {
   }>({
     queryKey: ["/api/orders/stats", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters with proper date range (start of from date to end of to date)
+      // Always use date range - default to today if not set
+      const fromDate = dateRange.from ? new Date(dateRange.from) : new Date();
+      fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = dateRange.to ? new Date(dateRange.to) : new Date();
+      toDate.setHours(23, 59, 59, 999);
+
       const params = new URLSearchParams();
-      if (dateRange.from) {
-        // Set time to start of the day (00:00:00)
-        const fromDate = new Date(dateRange.from);
-        fromDate.setHours(0, 0, 0, 0);
-        params.append('from', fromDate.toISOString());
+      params.append('from', fromDate.toISOString());
+      params.append('to', toDate.toISOString());
 
-        // If no 'to' date is set, use the same date as 'from' (single day selection)
-        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
-        toDate.setHours(23, 59, 59, 999);
-        params.append('to', toDate.toISOString());
-      }
-
-      const queryString = params.toString();
-      const url = queryString ? `/api/orders/stats?${queryString}` : '/api/orders/stats';
-
+      const url = `/api/orders/stats?${params.toString()}`;
       const response = await apiRequest("GET", url);
       return await response.json();
     },

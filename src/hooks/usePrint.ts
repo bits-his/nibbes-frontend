@@ -435,7 +435,7 @@ export const usePrint = () => {
 
         <!-- Print Actions (hidden when printing) -->
         <div class="print-actions">
-          <button onclick="window.print()">Print Again</button>
+         <!-- <button onclick="window.print()">Print Again</button> -->
           <button onclick="window.close()">Close Window</button>
         </div>
         <script>
