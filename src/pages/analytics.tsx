@@ -71,11 +71,13 @@ export default function AnalyticsDashboard() {
       if (startDate && endDate) {
         from = startDate;
         to = endDate;
-      } else {
+      } else if (dateRange) {
         to = new Date().toISOString().split('T')[0];
         from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
           .toISOString()
           .split('T')[0];
+      } else {
+        return;
       }
 
       const response = await fetch(
@@ -91,9 +93,9 @@ export default function AnalyticsDashboard() {
         throw new Error('Failed to fetch dashboard data');
       }
 
-      const data = await response.json();
-      console.log('Dashboard data:', data);
-      setDashboardData(data);
+      const result = await response.json();
+      console.log('Dashboard response:', result);
+      setDashboardData(result.data || result);
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data. Please try again later.');
