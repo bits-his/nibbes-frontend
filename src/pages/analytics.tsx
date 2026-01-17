@@ -72,10 +72,17 @@ export default function AnalyticsDashboard() {
         from = startDate;
         to = endDate;
       } else if (dateRange) {
-        to = new Date().toISOString().split('T')[0];
-        from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+        if (dateRange === '1') {
+          // For "Today", use same date for from and to
+          from = today;
+          to = today;
+        } else {
+          to = today;
+          from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0];
+        }
       } else {
         setLoading(false);
         return;
