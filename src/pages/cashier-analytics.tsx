@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, DollarSign, ShoppingCart, TrendingUp, CreditCard, Clock, Calendar } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Users, DollarSign, ShoppingCart, TrendingUp, CreditCard, Clock, Calendar, Download } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
@@ -53,6 +55,8 @@ export default function CashierAnalytics() {
   const [hourlyPerformance, setHourlyPerformance] = useState<HourlyPerformance[]>([])
   const [dailyPerformance, setDailyPerformance] = useState<DailyPerformance[]>([])
   const [selectedCashier, setSelectedCashier] = useState<string>("all")
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
@@ -60,10 +64,15 @@ export default function CashierAnalytics() {
     fetchAnalytics()
   }, [])
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (start?: string, end?: string) => {
     try {
       setLoading(true)
-      const response = await apiRequest('GET', '/api/cashier-analytics')
+      const params = new URLSearchParams()
+      if (start) params.append('startDate', start)
+      if (end) params.append('endDate', end)
+      
+      const url = `/api/cashier-analytics${params.toString() ? '?' + params.toString() : ''}`
+      const response = await apiRequest('GET', url)
       const data: any = await response.json()
       
       if (data.success) {
@@ -81,6 +90,17 @@ export default function CashierAnalytics() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleFilter = () => {
+    fetchAnalytics(startDate, endDate)
+  }
+
+  const handleReset = () => {
+    setStartDate("")
+    setEndDate("")
+    setSelectedCashier("all")
+    fetchAnalytics()
   }
 
   // Filter data by selected cashier
@@ -104,7 +124,10 @@ export default function CashierAnalytics() {
   const totalOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.totalOrders), 0)
   const totalRevenue = filteredMetrics.reduce((sum, m) => sum + Number(m.totalRevenue), 0)
   const totalPaidOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.paidOrders), 0)
+  const totalPendingOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.pendingOrders), 0)
+  const totalCancelledOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.cancelledOrders), 0)
   const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0
+  const successRate = totalOrders > 0 ? (totalPaidOrders / totalOrders) * 100 : 0
 
   // Payment method chart data
   const paymentMethodData = filteredPaymentMethods.reduce((acc: any[], pm) => {
@@ -153,28 +176,61 @@ export default function CashierAnalytics() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Cashier Analytics</h1>
-          <p className="text-gray-600 mt-1">Monitor cashier performance and transactions</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Cashier Analytics</h1>
+            <p className="text-gray-600 mt-1">Monitor cashier performance and transactions</p>
+          </div>
         </div>
-        <Select value={selectedCashier} onValueChange={setSelectedCashier}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select cashier" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Cashiers</SelectItem>
-            {cashierMetrics.map(cashier => (
-              <SelectItem key={cashier.cashierId} value={cashier.cashierId}>
-                {cashier.cashierName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Start Date</label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">End Date</label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Cashier</label>
+            <Select value={selectedCashier} onValueChange={setSelectedCashier}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select cashier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Cashiers</SelectItem>
+                {cashierMetrics.map(cashier => (
+                  <SelectItem key={cashier.cashierId} value={cashier.cashierId}>
+                    {cashier.cashierName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleFilter} className="bg-orange-500 hover:bg-orange-600">
+            Apply Filter
+          </Button>
+          <Button onClick={handleReset} variant="outline">
+            Reset
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Total Orders</CardTitle>
@@ -183,7 +239,7 @@ export default function CashierAnalytics() {
           <CardContent>
             <div className="text-2xl font-bold">{totalOrders.toLocaleString()}</div>
             <p className="text-xs text-gray-600 mt-1">
-              {totalPaidOrders} paid, {totalOrders - totalPaidOrders} pending/cancelled
+              {totalPaidOrders} paid, {totalPendingOrders} pending, {totalCancelledOrders} cancelled
             </p>
           </CardContent>
         </Card>
@@ -207,6 +263,17 @@ export default function CashierAnalytics() {
           <CardContent>
             <div className="text-2xl font-bold">₦{avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             <p className="text-xs text-gray-600 mt-1">Per transaction</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Success Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{successRate.toFixed(1)}%</div>
+            <p className="text-xs text-gray-600 mt-1">Orders completed</p>
           </CardContent>
         </Card>
 
