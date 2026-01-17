@@ -53,7 +53,7 @@ export default function AnalyticsDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState('30');
+  const [dateRange, setDateRange] = useState('1');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -157,6 +157,7 @@ export default function AnalyticsDashboard() {
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="1">Today</SelectItem>
               <SelectItem value="7">Last 7 days</SelectItem>
               <SelectItem value="30">Last 30 days</SelectItem>
               <SelectItem value="90">Last 90 days</SelectItem>
@@ -189,20 +190,20 @@ export default function AnalyticsDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Revenue Today
+              Revenue
             </CardTitle>
             <DollarSign className="w-4 h-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₦{parseFloat(dashboardData.revenueToday).toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Today's earnings</p>
+            <p className="text-xs text-gray-500 mt-1">Total earnings</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Orders Today
+              Orders
             </CardTitle>
             <ShoppingCart className="w-4 h-4 text-blue-500" />
           </CardHeader>
