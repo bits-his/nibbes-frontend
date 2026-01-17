@@ -94,8 +94,8 @@ export default function UserManagement() {
 
     // Apply role filter
     if (roleFilter === "guest") {
-      // Show only users with role "customer" (guest users)
-      result = result.filter(user => user.role === "customer");
+      // Show only users with role "Customer" (case-insensitive)
+      result = result.filter(user => user.role.toLowerCase() === "customer");
     } else if (roleFilter !== "all") {
       result = result.filter(user => user.role === roleFilter);
     }
