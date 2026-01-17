@@ -141,8 +141,8 @@ const menuItems: MenuItem[] = [
     title: "Cashier Analytics", 
     url: "/cashier-analytics", 
     icon: BarChart3, 
-    roles: ["C - Suite"],
-    permissions: ["view_analytics"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["analytics_reports"],
   },
   { 
     title: "QR Code", 
