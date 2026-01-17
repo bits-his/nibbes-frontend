@@ -77,8 +77,11 @@ export default function AnalyticsDashboard() {
           .toISOString()
           .split('T')[0];
       } else {
+        setLoading(false);
         return;
       }
+
+      console.log('Fetching analytics:', { from, to });
 
       const response = await fetch(
         `${BACKEND_URL}/api/analytics/dashboard?from=${from}&to=${to}`,
