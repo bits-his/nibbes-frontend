@@ -425,9 +425,7 @@ export const usePrint = () => {
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
-          <div class="footer-powered-by">Powered By: Brainstorm IT Solution</div>
-          <div class="footer-powered-by">Powered By</div>
-          <div class="footer-nibbles">Brainstorm IT Solution</div>
+          <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
         </div>
 
         <!-- Print Actions (hidden when printing) -->
