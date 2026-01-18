@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
@@ -38,6 +38,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [cart, setCart] = useState<CartItem[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
+  const prevUserRef = useRef(user);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(user?.id);
 
   // Load cart from localStorage when user changes
@@ -135,12 +136,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, toast]);
 
-  // When user logs in, sync the cart with the server
+  // When user logs in, sync the cart with the server (only once)
   useEffect(() => {
     if (user && cart.length > 0) {
-      syncCartWithServer(cart);
+      // Only sync once when user first logs in, not on every cart change
+      const hasUserChanged = user !== prevUserRef.current;
+      if (hasUserChanged) {
+        syncCartWithServer(cart);
+      }
+      prevUserRef.current = user;
     }
-  }, [user, cart, syncCartWithServer]);
+  }, [user, syncCartWithServer]); // Removed cart dependency
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'>) => {
     setCart(prevCart => {
