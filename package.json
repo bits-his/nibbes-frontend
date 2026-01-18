@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "dev-local": "vite",
-    "prebuild": "node scripts/generate-version.js",
+    "prebuild": "node scripts/generate-version.cjs",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
