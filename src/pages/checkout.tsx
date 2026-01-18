@@ -892,16 +892,33 @@ export default function Checkout() {
     }
   }
 
+  const [completedOrder, setCompletedOrder] = useState<any>(null)
+
   const createWalkInOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const response = await apiRequest("POST", "/api/orders", orderData)
-      return await response.json()
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      try {
+        const response = await apiRequest("POST", "/api/orders", orderData, controller.signal)
+        clearTimeout(timeoutId)
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Server error: ${response.status}`)
+        }
+        
+        return await response.json()
+      } catch (error: any) {
+        clearTimeout(timeoutId)
+        if (error.name === 'AbortError') {
+          throw new Error('Request timeout - please check your connection and try again')
+        }
+        throw error
+      }
     },
     onSuccess: (data: any) => {
-      toast({
-        title: "Order Created & Payment Recorded!",
-        description: `Order #${data.orderNumber} has been created and sent to kitchen.`,
-      })
+      console.log('✅ Walk-in order created successfully:', data)
       
       // Prepare order data for printing
       const orderDataForPrint = {
@@ -916,26 +933,35 @@ export default function Checkout() {
         tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
       }
       
-      // 🖨️ Show print preview immediately for walk-in orders
-      console.log('🖨️ Showing print preview for walk-in order #' + data.orderNumber)
+      // Store completed order for print confirmation screen
+      setCompletedOrder(orderDataForPrint)
       
-      // Show print preview immediately with walk-in receipt type (no card list)
-      printInvoice(orderDataForPrint, 'walk-in')
+      // Try to open print window immediately
+      const printOpened = printInvoice(orderDataForPrint, 'walk-in')
       
-      // Clear walk-in order and redirect after a short delay to allow print window to open
-      setTimeout(() => {
-        setWalkInOrder(null)
-        localStorage.removeItem("pendingWalkInOrder")
-        // Redirect to staff page to avoid blank page
-        setLocation("/staff")
-      }, 500)
+      if (!printOpened) {
+        toast({
+          title: "Print Window Blocked",
+          description: "Please allow popups to print receipts, or use the Print Receipt button below.",
+          variant: "destructive",
+        })
+      }
+      
+      toast({
+        title: "Order Created Successfully!",
+        description: `Order #${data.orderNumber} has been sent to kitchen.`,
+      })
       
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('❌ Walk-in order creation failed:', error)
+      
+      const errorMessage = error?.message || 'Unknown error occurred'
+      
       toast({
-        title: "Error",
-        description: "Failed to create order. Please try again.",
+        title: "Order Creation Failed",
+        description: errorMessage,
         variant: "destructive",
       })
     },
@@ -979,6 +1005,12 @@ export default function Checkout() {
   }
 
   const handleWalkInPayment = async () => {
+    // Prevent double submission
+    if (createWalkInOrderMutation.isPending || isProcessingPayment) {
+      console.log('⚠️ Payment already in progress, ignoring duplicate submission')
+      return
+    }
+
     // Check if kitchen is closed
     if (!kitchenStatus.isOpen) {
       toast({
@@ -988,6 +1020,8 @@ export default function Checkout() {
       })
       return
     }
+
+    console.log('💳 Starting payment process...', { method: selectedPaymentMethod, multiPayment: multiPaymentEnabled })
 
     // For card payments, use Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
@@ -1175,6 +1209,76 @@ export default function Checkout() {
       window.removeEventListener('keydown', handleKeyPress);
     };
   }, [walkInOrder, createWalkInOrderMutation.isPending, isProcessingPayment]);
+
+  // Show completion screen after successful order
+  if (completedOrder) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <Card className="border-green-500 shadow-lg">
+            <CardHeader className="bg-green-50 border-b border-green-200">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-green-900">Order Created Successfully!</CardTitle>
+                  <p className="text-sm text-green-700">Order #{completedOrder.orderNumber}</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="text-center space-y-4">
+                <p className="text-lg">The order has been sent to the kitchen.</p>
+                <div className="flex flex-col gap-3">
+                  <Button
+                    size="lg"
+                    onClick={() => {
+                      printInvoice(completedOrder, 'walk-in')
+                    }}
+                    className="w-full"
+                  >
+                    🖨️ Print Receipt
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => {
+                      setCompletedOrder(null)
+                      setWalkInOrder(null)
+                      localStorage.removeItem("pendingWalkInOrder")
+                      setLocation("/staff")
+                    }}
+                    className="w-full"
+                  >
+                    Continue Without Printing
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-2">Order Summary</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Customer:</span>
+                    <span className="font-medium">{completedOrder.customerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Payment Method:</span>
+                    <span className="font-medium">{completedOrder.paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span className="font-bold">₦{completedOrder.total.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   // Handle walk-in order payment
   if (walkInOrder) {
@@ -1439,12 +1543,34 @@ export default function Checkout() {
                   </div>
                 )}
 
+                {createWalkInOrderMutation.isError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>Payment failed. Please try again.</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => createWalkInOrderMutation.reset()}
+                      >
+                        Dismiss
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <Button
                   onClick={handleWalkInPayment}
-                  disabled={createWalkInOrderMutation.isPending}
-                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary"
+                  disabled={createWalkInOrderMutation.isPending || isProcessingPayment}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary disabled:opacity-50"
                 >
-                  {createWalkInOrderMutation.isPending ? "Creating Order..." : "Confirm Payment"}
+                  {createWalkInOrderMutation.isPending || isProcessingPayment ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Processing Payment...
+                    </span>
+                  ) : (
+                    "Confirm Payment"
+                  )}
                 </Button>
               </div>
             </CardContent>
