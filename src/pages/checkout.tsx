@@ -1683,7 +1683,7 @@ export default function Checkout() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex gap-3 sm:gap-4">
-                      {["pickup", "delivery"].map((type) => {
+                      {["pickup"].map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
@@ -1706,6 +1706,16 @@ export default function Checkout() {
                           </button>
                         )
                       })}
+                      {/* Delivery option - Commented out temporarily
+                      <button
+                        type="button"
+                        className="flex-1 p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none opacity-50 cursor-not-allowed"
+                        disabled
+                      >
+                        <div className="font-semibold text-base">Delivery</div>
+                        <div className="text-sm text-muted-foreground mt-1">Coming Soon</div>
+                      </button>
+                      */}
                     </div>
                     <FormMessage />
                   </CardContent>
