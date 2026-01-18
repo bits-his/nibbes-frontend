@@ -186,7 +186,7 @@ const menuItems: MenuItem[] = [
     url: "/settings",
     icon: Settings,
     roles: ["admin"],
-    permissions: ["settings"],
+    permissions: ["user_management"],
   },
   {
     title: "Profile",

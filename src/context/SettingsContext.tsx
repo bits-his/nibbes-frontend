@@ -28,9 +28,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const loadSettings = async () => {
     try {
-      const response = await apiRequest('GET', '/api/settings');
-      const data = await response.json();
-      setSettings(data.settings || defaultSettings);
+      // For now, use localStorage as mock API
+      const stored = localStorage.getItem('restaurant_settings');
+      if (stored) {
+        setSettings(JSON.parse(stored));
+      } else {
+        setSettings(defaultSettings);
+      }
     } catch (error) {
       console.error('Failed to load settings:', error);
       setSettings(defaultSettings);
@@ -42,13 +46,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateSettings = async (newSettings: Partial<Settings>) => {
     try {
       const updatedSettings = { ...settings, ...newSettings };
-      const response = await apiRequest('POST', '/api/settings', { settings: updatedSettings });
-      
-      if (response.ok) {
-        setSettings(updatedSettings);
-      } else {
-        throw new Error('Failed to update settings');
-      }
+      // For now, store in localStorage as mock API
+      localStorage.setItem('restaurant_settings', JSON.stringify(updatedSettings));
+      setSettings(updatedSettings);
     } catch (error) {
       console.error('Failed to update settings:', error);
       throw error;
