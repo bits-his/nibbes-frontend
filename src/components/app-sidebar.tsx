@@ -15,6 +15,7 @@ import {
   CreditCard,
   ShoppingCart,
   AlertCircle,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -179,6 +180,13 @@ const menuItems: MenuItem[] = [
     icon: Users,
     roles: ["admin"],
     permissions: ["user_management"],
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
+    roles: ["admin"],
+    permissions: ["settings"],
   },
   {
     title: "Profile",

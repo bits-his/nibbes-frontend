@@ -18,6 +18,7 @@ import { z } from "zod"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
+import { useSettings } from "@/context/SettingsContext"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
 import { useServiceCharges } from "@/context/ServiceChargesContext"
@@ -86,6 +87,7 @@ export default function Checkout() {
   const [, setLocation] = useLocation()
   const { toast} = useToast()
   const { user, loading } = useAuth()
+  const { settings } = useSettings()
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
   const { printInvoice } = usePrint()
   
@@ -1683,7 +1685,7 @@ export default function Checkout() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex gap-3 sm:gap-4">
-                      {["pickup"].map((type) => {
+                      {(settings.deliveryEnabled ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
@@ -1706,16 +1708,6 @@ export default function Checkout() {
                           </button>
                         )
                       })}
-                      {/* Delivery option - Commented out temporarily
-                      <button
-                        type="button"
-                        className="flex-1 p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none opacity-50 cursor-not-allowed"
-                        disabled
-                      >
-                        <div className="font-semibold text-base">Delivery</div>
-                        <div className="text-sm text-muted-foreground mt-1">Coming Soon</div>
-                      </button>
-                      */}
                     </div>
                     <FormMessage />
                   </CardContent>

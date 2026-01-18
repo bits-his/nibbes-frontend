@@ -1,0 +1,71 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiRequest } from '@/lib/queryClient';
+
+interface Settings {
+  deliveryEnabled: boolean;
+}
+
+interface SettingsContextType {
+  settings: Settings;
+  updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
+  loading: boolean;
+}
+
+const defaultSettings: Settings = {
+  deliveryEnabled: false,
+};
+
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [loading, setLoading] = useState(true);
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const response = await apiRequest('GET', '/api/settings');
+      const data = await response.json();
+      setSettings(data.settings || defaultSettings);
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      setSettings(defaultSettings);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSettings = async (newSettings: Partial<Settings>) => {
+    try {
+      const updatedSettings = { ...settings, ...newSettings };
+      const response = await apiRequest('POST', '/api/settings', { settings: updatedSettings });
+      
+      if (response.ok) {
+        setSettings(updatedSettings);
+      } else {
+        throw new Error('Failed to update settings');
+      }
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+      throw error;
+    }
+  };
+
+  return (
+    <SettingsContext.Provider value={{ settings, updateSettings, loading }}>
+      {children}
+    </SettingsContext.Provider>
+  );
+};
+
+export const useSettings = () => {
+  const context = useContext(SettingsContext);
+  if (context === undefined) {
+    throw new Error('useSettings must be used within a SettingsProvider');
+  }
+  return context;
+};

@@ -11,6 +11,7 @@ import { useAutoLogout } from "./hooks/useAutoLogout";
 import { useVersionCheck } from "./hooks/useVersionCheck";
 import { CartProvider } from "@/context/CartContext";
 import { ServiceChargesProvider } from "@/context/ServiceChargesContext";
+import { SettingsProvider } from "@/context/SettingsContext";
 import { getGuestSession } from "@/lib/guestSession";
 import { InstallPWA } from "@/components/InstallPWA";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
@@ -60,6 +61,7 @@ const TVDisplay = lazy(() => import("@/pages/tv-display"));
 const CompletedOrders = lazy(() => import("@/pages/completed-orders"));
 const Transactions = lazy(() => import("@/pages/transactions"));
 const PrintReceipt = lazy(() => import("@/pages/print-receipt"));
+const Settings = lazy(() => import("@/pages/settings"));
 
 // Loading fallback component
 const RouteLoader = () => (
@@ -476,6 +478,14 @@ function Router() {
         )}
       />
       <Route
+        path="/settings"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["settings"]}>
+            <Settings />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/docket"
         component={() => (
           <PublicRoute>
@@ -769,12 +779,14 @@ function App() {
       <AuthProvider>
         <CartProvider>
           <ServiceChargesProvider>
+            <SettingsProvider>
             <UpdateDialog 
               open={updateAvailable} 
               version={newVersion}
               onDismiss={dismissUpdate}
             />
-            <AppContent />
+              <AppContent />
+            </SettingsProvider>
           </ServiceChargesProvider>
         </CartProvider>
       </AuthProvider>
