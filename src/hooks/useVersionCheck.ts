@@ -46,28 +46,24 @@ export function useVersionCheck() {
         const currentVersion = localStorage.getItem('appVersion');
         const currentBuildHash = localStorage.getItem('appBuildHash');
         
-        // First time - store version
+        // Always update localStorage with latest version
+        localStorage.setItem('appVersion', data.version);
+        localStorage.setItem('appBuildHash', data.buildHash);
+        
+        // First time - no update needed
         if (!currentVersion || !currentBuildHash) {
-          localStorage.setItem('appVersion', data.version);
-          localStorage.setItem('appBuildHash', data.buildHash);
           console.log('📦 App version initialized:', data.version);
+          setUpdateAvailable(false);
           return;
         }
         
-        // Check if version or build hash changed
-        if (currentVersion !== data.version || currentBuildHash !== data.buildHash) {
-          console.log('🔄 Update available:', {
-            current: currentVersion,
-            new: data.version,
-            currentHash: currentBuildHash,
-            newHash: data.buildHash
-          });
+        // Only show update if build hash is different (version might be same)
+        if (currentBuildHash !== data.buildHash) {
+          console.log('🔄 Update available - new build');
           setUpdateAvailable(true);
           setNewVersion(data.version);
         } else {
-          // Versions match - ensure localStorage is up to date and no update notification
-          localStorage.setItem('appVersion', data.version);
-          localStorage.setItem('appBuildHash', data.buildHash);
+          console.log('✅ Already up to date');
           setUpdateAvailable(false);
         }
       } catch (error) {
