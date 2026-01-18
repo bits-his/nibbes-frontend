@@ -6,20 +6,32 @@ interface VersionInfo {
   buildTime: string;
 }
 
+// Global flag to prevent multiple version checkers
+let isVersionCheckActive = false;
+
 export function useVersionCheck() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [newVersion, setNewVersion] = useState('');
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
+    // Prevent multiple instances
+    if (isVersionCheckActive) return;
+    isVersionCheckActive = true;
+    
+    let lastCheck = 0;
+    const MIN_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes minimum between checks
+    
     const checkVersion = async () => {
-      if (checking) return;
+      const now = Date.now();
+      if (checking || (now - lastCheck) < MIN_CHECK_INTERVAL) return;
       
       try {
         setChecking(true);
+        lastCheck = now;
         
         // Check version.json with cache-busting
-        const response = await fetch('/version.json?t=' + Date.now(), {
+        const response = await fetch('/version.json?t=' + now, {
           cache: 'no-cache'
         });
         
@@ -60,25 +72,17 @@ export function useVersionCheck() {
       }
     };
 
-    // Check on mount
+    // Check on mount (only once)
     checkVersion();
     
-    // Check every 5 minutes
-    const interval = setInterval(checkVersion, 5 * 60 * 1000);
-    
-    // Check when tab becomes visible
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkVersion();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Check every 30 minutes (reduced frequency)
+    const interval = setInterval(checkVersion, 30 * 60 * 1000);
     
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      isVersionCheckActive = false;
     };
-  }, [checking]);
+  }, []);
 
   const dismissUpdate = () => {
     setUpdateAvailable(false);
