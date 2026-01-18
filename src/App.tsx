@@ -8,11 +8,13 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "./hooks/useAuth";
 import { useAutoLogout } from "./hooks/useAutoLogout";
+import { useVersionCheck } from "./hooks/useVersionCheck";
 import { CartProvider } from "@/context/CartContext";
 import { ServiceChargesProvider } from "@/context/ServiceChargesContext";
 import { getGuestSession } from "@/lib/guestSession";
 import { InstallPWA } from "@/components/InstallPWA";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
+import { UpdateDialog } from "@/components/UpdateDialog";
 import { SplashScreen } from "@/components/SplashScreen";
 
 // PERFORMANCE: Lazy load all routes for code-splitting
@@ -760,11 +762,18 @@ function AppContent() {
 }
 
 function App() {
+  const { updateAvailable, newVersion, dismissUpdate } = useVersionCheck();
+  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
           <ServiceChargesProvider>
+            <UpdateDialog 
+              open={updateAvailable} 
+              version={newVersion}
+              onDismiss={dismissUpdate}
+            />
             <AppContent />
           </ServiceChargesProvider>
         </CartProvider>
