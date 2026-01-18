@@ -82,12 +82,54 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     
     try {
-      await apiRequest('POST', '/api/cart/sync', { items: cartItems });
-    } catch (error) {
+      const response = await apiRequest('POST', '/api/cart/sync', { items: cartItems });
+      const data = await response.json();
+      
+      if (data.unavailableItems && data.unavailableItems.length > 0) {
+        // Show warning for unavailable items
+        toast({
+          title: 'Some items are unavailable',
+          description: `${data.unavailableItems.length} item(s) removed: ${data.unavailableItems.join(', ')}`,
+          variant: 'destructive',
+        });
+        
+        // Remove unavailable items from cart
+        setCart(prevCart => 
+          prevCart.filter(item => 
+            !data.unavailableItems.includes(item.menuItem.name)
+          )
+        );
+      } else if (data.success) {
+        // Success - silent or show success toast
+        console.log('✅ Cart synced successfully:', data.itemCount, 'items');
+      }
+    } catch (error: any) {
       console.error('Failed to sync cart with server', error);
+      
+      // Parse error for specific message
+      let errorMessage = 'Failed to sync your cart. Please try again.';
+      
+      try {
+        const errorMatch = error.message?.match(/\d+:\s*({.*})/);
+        if (errorMatch && errorMatch[1]) {
+          const errorData = JSON.parse(errorMatch[1]);
+          if (errorData.errorType === 'NOT_AUTHENTICATED') {
+            errorMessage = 'Please log in to sync your cart';
+          } else if (errorData.errorType === 'SERVER_ERROR') {
+            errorMessage = 'Server error. Your cart will sync when connection is restored.';
+          } else {
+            errorMessage = errorData.error || errorMessage;
+          }
+        } else if (error.message?.includes('Failed to fetch')) {
+          errorMessage = 'Connection error. Your cart will sync when you\'re back online.';
+        }
+      } catch (parseError) {
+        // Use default message
+      }
+      
       toast({
-        title: 'Error',
-        description: 'Failed to sync your cart. Some items may not be available.',
+        title: 'Cart Sync Error',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
