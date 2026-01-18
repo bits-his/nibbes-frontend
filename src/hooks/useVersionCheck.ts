@@ -64,6 +64,11 @@ export function useVersionCheck() {
           });
           setUpdateAvailable(true);
           setNewVersion(data.version);
+        } else {
+          // Versions match - ensure localStorage is up to date and no update notification
+          localStorage.setItem('appVersion', data.version);
+          localStorage.setItem('appBuildHash', data.buildHash);
+          setUpdateAvailable(false);
         }
       } catch (error) {
         console.error('Version check error:', error);
@@ -90,5 +95,14 @@ export function useVersionCheck() {
     setTimeout(() => setUpdateAvailable(true), 60 * 60 * 1000);
   };
 
-  return { updateAvailable, newVersion, dismissUpdate };
+  const updateNow = () => {
+    // Update localStorage with current version to prevent showing update again
+    const currentVersion = localStorage.getItem('appVersion');
+    const currentBuildHash = localStorage.getItem('appBuildHash');
+    
+    // Force refresh to get latest version
+    window.location.reload();
+  };
+
+  return { updateAvailable, newVersion, dismissUpdate, updateNow };
 }

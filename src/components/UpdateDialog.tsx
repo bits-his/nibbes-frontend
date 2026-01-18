@@ -17,14 +17,6 @@ interface UpdateDialogProps {
 
 export function UpdateDialog({ open, version, onDismiss }: UpdateDialogProps) {
   const handleUpdate = () => {
-    // Store new version before reload
-    const versionData = {
-      version,
-      buildHash: Date.now().toString(36)
-    };
-    localStorage.setItem('appVersion', versionData.version);
-    localStorage.setItem('appBuildHash', versionData.buildHash);
-    
     // Clear service worker cache if exists
     if ('serviceWorker' in navigator) {
       caches.keys().then(names => {
