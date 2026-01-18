@@ -129,7 +129,7 @@ export default function Checkout() {
     // },
     {
       id: 'card',
-      name: 'Credit/Debit Card',
+      name: 'Card/Transfer',
       description: 'Pay securely with Interswitch',
       icon: CreditCard,
       type: 'card',
