@@ -480,7 +480,7 @@ function Router() {
       <Route
         path="/settings"
         component={() => (
-          <ProtectedRoute requiredPermissions={["user_management"]}>
+          <ProtectedRoute allowedRoles={["admin"]}>
             <Settings />
           </ProtectedRoute>
         )}
