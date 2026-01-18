@@ -311,7 +311,8 @@ export default function MenuManagement() {
       formData.append("file", file);
 
       // Upload to CDN via backend endpoint
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5050'}/api/cdn/upload`, {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+      const response = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
         method: "POST",
         headers: {
           // Authorization header will be added by axios interceptor if using axios
