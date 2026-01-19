@@ -922,6 +922,13 @@ export default function Checkout() {
     onSuccess: (data: any) => {
       console.log('✅ Walk-in order created successfully:', data)
       
+      // Calculate breakdown for display
+      const itemsSubtotal = walkInOrder?.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
+      const baseAmount = itemsSubtotal + deliveryFee
+      const serviceChargeAmount = baseAmount * (serviceChargeRate / 100)
+      const vatAmount = baseAmount * (vatRate / 100)
+      const totalWithCharges = baseAmount + serviceChargeAmount + vatAmount
+      
       // Prepare order data for printing
       const orderDataForPrint = {
         orderNumber: data.orderNumber,
@@ -929,10 +936,16 @@ export default function Checkout() {
         customerName: walkInOrder?.customerName || data.customerName || 'N/A',
         orderType: 'walk-in',
         items: walkInOrder?.items || data.items || [],
-        total: parseFloat(data.totalAmount || walkInOrder?.total || 0),
+        subtotal: itemsSubtotal,
+        deliveryFee: deliveryFee,
+        serviceCharge: serviceChargeAmount,
+        serviceChargeRate: serviceChargeRate,
+        vat: vatAmount,
+        vatRate: vatRate,
+        total: parseFloat(data.totalAmount || totalWithCharges),
         paymentMethod: data.paymentMethod || 'N/A',
         paymentStatus: data.paymentStatus || 'paid',
-        tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
+        tendered: parseFloat(data.totalAmount || totalWithCharges)
       }
       
       // Store completed order for print confirmation screen
@@ -1269,9 +1282,33 @@ export default function Checkout() {
                     <span>Payment Method:</span>
                     <span className="font-medium">{completedOrder.paymentMethod}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="border-t my-2 pt-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>₦{(completedOrder.subtotal || 0).toLocaleString()}</span>
+                    </div>
+                    {completedOrder.deliveryFee > 0 && (
+                      <div className="flex justify-between">
+                        <span>Delivery Fee:</span>
+                        <span>₦{completedOrder.deliveryFee.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {completedOrder.serviceCharge > 0 && (
+                      <div className="flex justify-between">
+                        <span>Service Charge ({completedOrder.serviceChargeRate}%):</span>
+                        <span>₦{completedOrder.serviceCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    {completedOrder.vat > 0 && (
+                      <div className="flex justify-between">
+                        <span>VAT ({completedOrder.vatRate}%):</span>
+                        <span>₦{completedOrder.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between font-bold text-base border-t pt-2">
                     <span>Total:</span>
-                    <span className="font-bold">₦{completedOrder.total.toLocaleString()}</span>
+                    <span>₦{completedOrder.total.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
