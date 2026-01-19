@@ -396,7 +396,7 @@ export const usePrint = () => {
         </div>
         ${receiptType === 'receipt' ? `
         <!-- <div class="dashed-separator"></div> -->  
-
+<!-- <div class="notes-section"> -->
         <!-- Individual Item Notes Sections -->
           <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>

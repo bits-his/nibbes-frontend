@@ -17,6 +17,7 @@ export default function KitchenDisplay() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   // Fetch kitchen status
   const { data: kitchenStatusData, refetch: refetchKitchenStatus } = useQuery<{ isOpen: boolean; updatedAt?: string }>({
@@ -286,18 +287,35 @@ export default function KitchenDisplay() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      setUpdatingOrderId(orderId);
       return await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+    onMutate: async ({ orderId, status }) => {
+      // Optimistic update - instantly update UI
+      queryClient.setQueryData(
+        ["/api/orders/active"],
+        (old: OrderWithItems[] = []) => {
+          return old.map(order => 
+            order.id === parseInt(orderId) 
+              ? { ...order, status } 
+              : order
+          );
+        }
+      );
     },
-    onError: () => {
+    onSuccess: () => {
+      setUpdatingOrderId(null);
+    },
+    onError: (error, { orderId }) => {
+      setUpdatingOrderId(null);
+      // Revert on error - WebSocket will send correct state
       toast({
         title: "Error",
         description: "Failed to update order status.",
         variant: "destructive",
       });
     },
+    // Remove invalidateQueries - WebSocket handles updates
   });
 
   // Kitchen status toggle mutation
@@ -346,28 +364,16 @@ const convertOrderForPrint = (order: OrderWithItems) => {
     };
   };
   // Function to print kitchen ticket for a specific order
-  // Automatically updates order status to "preparing" when print is clicked
+  // Print immediately and update status in parallel
   const handlePrintPreview = (order: OrderWithItems) => {
     const printData = convertOrderForPrint(order);
     
-    // If order is pending, automatically update status to "preparing"
+    // Print immediately - don't wait
+    printInvoice(printData, 'receipt');
+    
+    // Update status in parallel if order is pending
     if (order.status === 'pending') {
-      updateStatusMutation.mutate(
-        { orderId: String(order.id), status: 'preparing' },
-        {
-          onSuccess: () => {
-            // Print after status update succeeds
-            printInvoice(printData, 'receipt');
-          },
-          onError: () => {
-            // Still print even if status update fails
-            printInvoice(printData, 'receipt');
-          }
-        }
-      );
-    } else {
-      // If order is already preparing or beyond, just print
-      printInvoice(printData, 'receipt');
+      updateStatusMutation.mutate({ orderId: String(order.id), status: 'preparing' });
     }
   };
 
@@ -526,18 +532,15 @@ const getStatusBadge = (status: string) => {
 
                   <div className="pt-2 sm:pt-3 border-t">
                     <div className="flex gap-2">
-                      {/* Print button for kitchen ticket */}
-                      
-
                       {order.status === "pending" && (
                         <Button
                           className="flex-1 text-sm sm:text-base"
                           size="lg"
                           onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "preparing" })}
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingOrderId === String(order.id)}
                           data-testid={`button-start-${order.id}`}
                         >
-                          Start Preparing
+                          {updatingOrderId === String(order.id) ? "Updating..." : "Start Preparing"}
                         </Button>
                       )}
                       {order.status === "preparing" && (
@@ -545,10 +548,10 @@ const getStatusBadge = (status: string) => {
                           className="flex-1 text-sm sm:text-base"
                           size="lg"
                           onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "ready" })}
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingOrderId === String(order.id)}
                           data-testid={`button-ready-${order.id}`}
                         >
-                          Mark as Ready
+                          {updatingOrderId === String(order.id) ? "Updating..." : "Mark as Ready"}
                         </Button>
                       )}
                       {order.status === "ready" && (
@@ -557,10 +560,10 @@ const getStatusBadge = (status: string) => {
                           size="lg"
                           variant="secondary"
                           onClick={() => updateStatusMutation.mutate({ orderId: String(order.id), status: "completed" })}
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingOrderId === String(order.id)}
                           data-testid={`button-complete-${order.id}`}
                         >
-                          Collected ✅
+                          {updatingOrderId === String(order.id) ? "Updating..." : "Collected ✅"}
                         </Button>
                       )}
                       <Button
