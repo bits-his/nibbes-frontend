@@ -17,6 +17,7 @@ import { InstallPWA } from "@/components/InstallPWA";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { UpdateDialog } from "@/components/UpdateDialog";
 import { SplashScreen } from "@/components/SplashScreen";
+import { Footer } from "@/components/Footer";
 
 // PERFORMANCE: Lazy load all routes for code-splitting
 // Critical routes loaded immediately (home page)
@@ -711,6 +712,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-auto" ref={mainRef} role="main" id="main-content">
           {children}
         </main>
+        {/* Show footer on home page and when logged in */}
+        <Footer />
       </div>
     </div>
   );

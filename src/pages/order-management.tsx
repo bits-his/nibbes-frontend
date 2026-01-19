@@ -42,6 +42,7 @@ export default function OrderManagement() {
   const { printInvoice } = usePrint();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [orderTypeFilter, setOrderTypeFilter] = useState("all"); // New: filter for online/walk-in
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
     from: new Date(new Date().setHours(0, 0, 0, 0)),  // Start of today
     to: new Date(new Date().setHours(23, 59, 59, 999))   // End of today
@@ -211,6 +212,7 @@ export default function OrderManagement() {
       order.orderNumber.toString().includes(searchQuery) ||
       order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesOrderType = orderTypeFilter === "all" || order.orderType === orderTypeFilter;
     
     // Filter by date range if dates are selected
     const orderDate = new Date(order.createdAt);
@@ -230,7 +232,7 @@ export default function OrderManagement() {
       (!rangeStartOfDay || orderStartOfDay >= rangeStartOfDay) && 
       (!rangeEndOfDay || orderStartOfDay <= rangeEndOfDay);
 
-    return matchesSearch && matchesStatus && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesOrderType && matchesDateRange;
   });
 
 const getStatusBadge = (status: string) => {
@@ -324,6 +326,19 @@ const getStatusBadge = (status: string) => {
                   <SelectItem value="ready">Ready</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Order Type Filter */}
+              <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+                <SelectTrigger className="w-full md:w-48" data-testid="select-order-type-filter">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="online">Online Orders</SelectItem>
+                  <SelectItem value="walk-in">Walk-in Orders</SelectItem>
                 </SelectContent>
               </Select>
               

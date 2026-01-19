@@ -395,9 +395,17 @@ export const usePrint = () => {
           </div>
         </div>
         ${receiptType === 'receipt' ? `
-        <div class="dashed-separator"></div>  
+        <!-- <div class="dashed-separator"></div> -->  
 
         <!-- Individual Item Notes Sections -->
+          <div class="footer">
+          <div class="footer-thanks">Thank you for your order!</div>
+          <div class="footer-name">nibblesfastfood.com</div>
+          <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
+        </div>
+
+        <div class="dashed-separator"></div>
+
         <div class="notes-section">
           ${items.map((item: any, index: number) => {
             const itemName = item.name || item.menuItemName || 'Unknown Item'
@@ -415,18 +423,20 @@ export const usePrint = () => {
                 <div class="item-note-content">${specialInstructions}</div>
                 <div class="item-note-order-number">${orderNumber}</div>
               </div>
-              ${index < items.length - 1 ? '<div class="dashed-separator"></div>' : ''}
+              ${index < items.length - 1 ? '' : ''}
             `
           }).join('')}
         </div>
         ` : ''}
 
         <!-- Footer -->
+        <!--
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
           <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
         </div>
+        -->
 
         <!-- Print Actions (hidden when printing) -->
         <div class="print-actions">
