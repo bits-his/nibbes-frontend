@@ -61,8 +61,8 @@ export default function CashierAnalytics() {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchAnalytics()
-  }, [])
+    fetchAnalytics(startDate, endDate)
+  }, [startDate, endDate])
 
   const fetchAnalytics = async (start?: string, end?: string) => {
     try {

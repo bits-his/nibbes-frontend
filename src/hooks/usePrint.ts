@@ -430,13 +430,12 @@ export const usePrint = () => {
         ` : ''}
 
         <!-- Footer -->
-        <!--
+       
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
           <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
         </div>
-        -->
 
         <!-- Print Actions (hidden when printing) -->
         <div class="print-actions">

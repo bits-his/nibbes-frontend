@@ -923,7 +923,7 @@ export default function Checkout() {
       console.log('✅ Walk-in order created successfully:', data)
       
       // Calculate breakdown for display
-      const itemsSubtotal = walkInOrder?.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
+      const itemsSubtotal = walkInOrder?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
       const baseAmount = itemsSubtotal + deliveryFee
       const serviceChargeAmount = baseAmount * (serviceChargeRate / 100)
       const vatAmount = baseAmount * (vatRate / 100)
