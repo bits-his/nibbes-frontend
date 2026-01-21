@@ -802,19 +802,14 @@ export default function Checkout() {
     onSuccess: (data: any) => {
       toast({
         title: "Order Placed!",
-        description: `Your order #${data.orderNumber} has been received and placed.`,
+        description: `Your order #${data.orderNumber} has been received.`,
       })
       clearCart() // Use clearCart from context
       form.reset()
       
-      // If payment method is card, redirect to payment
-      if (selectedPaymentMethod === 'card' && data.paymentUrl) {
-        window.location.href = data.paymentUrl
-      } else {
-        setTimeout(() => {
-          setLocation("/docket")
-        }, 1500)
-      }
+      // Redirect immediately to docket - don't wait for payment verification
+      // Payment verification will happen in background
+      setLocation("/docket")
     },
     onError: () => {
       toast({
