@@ -881,7 +881,12 @@ export default function Checkout() {
 
     // If card payment, initiate Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
-      handleCardPayment(orderData)
+      // For online orders, set payment method as "online" instead of "card"
+      const onlineOrderData = {
+        ...orderData,
+        paymentMethod: "online"
+      }
+      handleCardPayment(onlineOrderData)
     } else {
       // For cash/transfer, create order directly
       createOrderMutation.mutate(orderData)

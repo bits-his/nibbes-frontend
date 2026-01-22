@@ -124,6 +124,9 @@ export default function KitchenDisplay() {
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         // Use WebSocket data directly - no HTTP query needed for instant updates!
         if (data.order) {
+          // Refresh both active and canceled orders when status changes
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/canceled/today"] });
           // Normalize order structure to ensure orderItems are properly formatted
           const normalizeOrder = (order: any): OrderWithItems => {
             const normalized = { ...order };
