@@ -70,8 +70,11 @@ export default function KitchenDisplay() {
   const { data: canceledOrders, isLoading: isLoadingCanceled } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/canceled/today"],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await apiRequest('GET', `/api/orders?status=cancelled&date=${today}`);
+      const today = new Date();
+      const from = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
+      
+      const response = await apiRequest('GET', `/api/orders?from=${from}&to=${to}&status=cancelled`);
       const data = await response.json();
       
       // Normalize canceled orders same as active orders
