@@ -1717,7 +1717,7 @@ export default function Checkout() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex gap-3 sm:gap-4">
-                      {(settings.deliveryEnabled ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
+                      {(settings.deliveryEnabled && user?.role !== 'customer' ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
