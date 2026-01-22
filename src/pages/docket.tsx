@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList } from "lucide-react";
+import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList, Volume2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,16 @@ import { getGuestSession } from "@/lib/guestSession";
 import { formatDistanceToNow } from "date-fns";
 import { useLocation } from "wouter";
 import { DeliveryStatusCard } from "@/components/DeliveryStatusCard";
+import { playOrderReadyBeep, requestAudioPermission, isAudioPermissionGranted } from "@/utils/audio";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
   const guestSession = getGuestSession();
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   // Get user-specific or guest-specific active orders
   const { data: orders, isLoading, refetch } = useQuery<OrderWithItems[]>({
@@ -44,7 +48,7 @@ export default function DocketPage() {
     return order.paymentStatus === 'paid';
   });
 
-  // Request notification permission on mount
+  // Request notification and audio permission on mount
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().then(permission => {
@@ -142,6 +146,17 @@ export default function DocketPage() {
                     );
                   }
                 }
+                
+                // Check if order became ready and play notification sound
+                if (data.type === "order_status_change" && normalizedOrder.status === 'ready' && audioEnabled) {
+                  playOrderReadyBeep();
+                  toast({
+                    title: "🔔 Order Ready!",
+                    description: `Your order #${normalizedOrder.orderNumber} is ready for pickup!`,
+                    duration: 5000,
+                  });
+                }
+                
                 return old;
               }
             );
@@ -184,6 +199,17 @@ export default function DocketPage() {
                     };
                   }
                 }
+                
+                // Check if order became ready and play notification sound
+                if (data.type === "order_status_change" && normalizedOrder.status === 'ready' && audioEnabled) {
+                  playOrderReadyBeep();
+                  toast({
+                    title: "🔔 Order Ready!",
+                    description: `Your order #${normalizedOrder.orderNumber} is ready for pickup!`,
+                    duration: 5000,
+                  });
+                }
+                
                 return old;
               }
             );
@@ -371,6 +397,39 @@ const getStatusCardColor = (status: string) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-normal">
+            {/* Audio notification toggle */}
+            <Button
+              variant={audioEnabled ? "default" : "outline"}
+              size="sm"
+              onClick={async () => {
+                if (!audioEnabled) {
+                  const granted = await requestAudioPermission();
+                  if (granted) {
+                    setAudioEnabled(true);
+                    toast({
+                      title: "🔔 Audio Notifications Enabled",
+                      description: "You'll hear a beep when your order is ready!",
+                    });
+                  } else {
+                    toast({
+                      title: "Audio Permission Required",
+                      description: "Please interact with the page first, then try again.",
+                      variant: "destructive",
+                    });
+                  }
+                } else {
+                  setAudioEnabled(false);
+                  toast({
+                    title: "🔇 Audio Notifications Disabled",
+                    description: "You won't hear beeps for ready orders.",
+                  });
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <Volume2 className="w-4 h-4" />
+              {audioEnabled ? "🔔 On" : "🔇 Off"}
+            </Button>
             <Badge variant="outline" className="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base whitespace-nowrap">
               Orders: {activeOrders?.length || 0}
             </Badge>
