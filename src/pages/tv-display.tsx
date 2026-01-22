@@ -64,15 +64,15 @@ export default function TVDisplay() {
   const [currentPage, setCurrentPage] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
   
-  // Pagination: 8 orders per page (4 columns x 2 rows)
-  const ordersPerPage = 8
+  // Pagination: 20 orders per page (4 columns x 5 rows)
+  const ordersPerPage = 20
   const totalPages = Math.ceil(readyOrders.length / ordersPerPage)
   const displayedOrders = readyOrders.slice(
     currentPage * ordersPerPage,
     (currentPage + 1) * ordersPerPage
   )
   
-  // Auto-scroll every 5 seconds if there are more than 8 orders
+  // Auto-scroll every 5 seconds if there are more than 20 orders
   useEffect(() => {
     if (readyOrders.length <= ordersPerPage) {
       setCurrentPage(0)
@@ -333,8 +333,8 @@ export default function TVDisplay() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            {/* Grid container - 2 rows x 4 columns, fills available space */}
-            <div className="grid grid-cols-4 grid-rows-2 gap-3 md:gap-4 lg:gap-6 h-full">
+            {/* Grid container - 5 rows x 4 columns, fills available space */}
+            <div className="grid grid-cols-4 grid-rows-5 gap-3 md:gap-4 lg:gap-6 h-full">
               {displayedOrders.map((order) => (
                 <div
                   key={order.id}
