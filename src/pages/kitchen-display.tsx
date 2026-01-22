@@ -16,6 +16,7 @@ export default function KitchenDisplay() {
   const { printInvoice } = usePrint();
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'active' | 'canceled'>('active');
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
@@ -63,6 +64,38 @@ export default function KitchenDisplay() {
       );
     },
     // Remove refetchInterval since we're using WebSockets for real-time updates
+  });
+
+  // Fetch canceled orders for today
+  const { data: canceledOrders, isLoading: isLoadingCanceled } = useQuery<OrderWithItems[]>({
+    queryKey: ["/api/orders/canceled/today"],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await apiRequest('GET', `/api/orders?status=cancelled&date=${today}`);
+      const data = await response.json();
+      
+      // Normalize canceled orders same as active orders
+      const normalizedData = data.map((order: any) => {
+        if (order.orderItems && Array.isArray(order.orderItems)) {
+          order.orderItems = order.orderItems.map((item: any) => {
+            const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+              || (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim())
+              || 'Unknown Item';
+            return {
+              ...item,
+              menuItemName: menuItemName,
+              menuItem: menuItemName !== 'Unknown Item' ? { name: menuItemName } : (item.menuItem || null)
+            };
+          });
+        }
+        return order;
+      });
+      
+      return normalizedData.sort((a: OrderWithItems, b: OrderWithItems) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    },
+    enabled: activeTab === 'canceled', // Only fetch when canceled tab is active
   });
 
   // WebSocket connection for real-time updates with auto-reconnect
@@ -395,14 +428,14 @@ const getStatusBadge = (status: string) => {
   );
 };
 
-  // Filter orders based on search term
-  const filteredOrders = orders?.filter((order) => {
+  // Filter orders based on search term and active tab
+  const filteredOrders = (activeTab === 'active' ? orders : canceledOrders)?.filter((order) => {
     if (!searchTerm) return true; // If no search term, show all orders
     // Check if the search term matches the order number (case insensitive)
     return order.orderNumber.toString().toLowerCase().includes(searchTerm.toLowerCase());
   }) || [];
 
-  const activeOrders = filteredOrders?.filter((order) => {
+  const activeOrders = activeTab === 'active' ? filteredOrders?.filter((order) => {
     // Exclude completed and cancelled orders
     if (order.status === "completed" || order.status === "cancelled") {
       return false;
@@ -412,7 +445,7 @@ const getStatusBadge = (status: string) => {
       return false;
     }
     return true;
-  });
+  }) : filteredOrders; // For canceled tab, show all filtered canceled orders
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6">
@@ -444,15 +477,31 @@ const getStatusBadge = (status: string) => {
               />
             </div>
             <div className="flex items-center gap-3 sm:gap-4">
-              <Badge variant="outline" className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base whitespace-nowrap">
-                Active: {activeOrders?.length || 0}
-              </Badge>
+              {/* Tab Buttons */}
+              <div className="flex bg-muted rounded-lg p-1">
+                <Button
+                  variant={activeTab === 'active' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveTab('active')}
+                  className="text-xs sm:text-sm"
+                >
+                  Active: {orders?.filter(o => o.status !== "completed" && o.status !== "cancelled" && !(o.paymentStatus === 'pending' && o.status === 'pending')).length || 0}
+                </Button>
+                <Button
+                  variant={activeTab === 'canceled' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveTab('canceled')}
+                  className="text-xs sm:text-sm"
+                >
+                  Canceled: {canceledOrders?.length || 0}
+                </Button>
+              </div>
               <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
             </div>
           </div>
         </div>
 
-        {isLoading ? (
+        {(activeTab === 'active' ? isLoading : isLoadingCanceled) ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
               <Card key={i} className="overflow-hidden">
@@ -474,7 +523,7 @@ const getStatusBadge = (status: string) => {
             {activeOrders.map((order) => (
               <Card
                 key={order.id}
-                className="overflow-hidden border-2"
+                className={`overflow-hidden border-2 ${activeTab === 'canceled' ? 'border-red-200 bg-red-50' : ''}`}
                 data-testid={`card-order-${order.id}`}
               >
                 <CardHeader className="p-4 sm:p-6 bg-card space-y-2 sm:space-y-3">
@@ -584,9 +633,14 @@ const getStatusBadge = (status: string) => {
         ) : (
           <div className="text-center py-16 sm:py-20 md:py-24">
             <ChefHat className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 mx-auto text-muted-foreground mb-4 sm:mb-6" />
-            <h2 className="text-xl sm:text-2xl font-semibold mb-2">No Active Orders</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold mb-2">
+              {activeTab === 'active' ? 'No Active Orders' : 'No Canceled Orders Today'}
+            </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
-              New orders will appear here automatically
+              {activeTab === 'active' 
+                ? 'New orders will appear here automatically' 
+                : 'Canceled orders for today will appear here'
+              }
             </p>
           </div>
         )}
