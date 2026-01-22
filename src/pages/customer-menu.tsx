@@ -223,7 +223,11 @@ export default function CustomerMenu() {
     const filtered = menuItems.filter(
       (item) => {
         // Hide delivery items from customers (show only for staff/cashiers)
-        if (item.category === "Delivery" && user?.role === 'customer') {
+        // Check for various delivery category names
+        const isDeliveryItem = item.category?.toLowerCase().includes('delivery') || 
+                              item.name?.toLowerCase().includes('delivery');
+        
+        if (isDeliveryItem && (!user || user?.role === 'customer')) {
           return false;
         }
         
