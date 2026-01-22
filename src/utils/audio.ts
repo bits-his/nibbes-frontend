@@ -4,31 +4,46 @@ let audioPermissionGranted = false;
 
 export const requestAudioPermission = async (): Promise<boolean> => {
   try {
-    // Test if audio can be played (requires user interaction)
+    // Create a silent audio to test permission
     const audio = new Audio();
-    await audio.play();
-    audio.pause();
+    audio.volume = 0;
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+      await playPromise;
+      audio.pause();
+    }
+    
     audioPermissionGranted = true;
+    console.log('✅ Audio permission granted');
     return true;
   } catch (error) {
-    console.log('Audio permission not granted yet');
+    console.log('❌ Audio permission denied:', error);
     return false;
   }
 };
 
 export const playOrderReadyBeep = async (): Promise<void> => {
   try {
+    console.log('🔔 Attempting to play order ready beep...');
+    
+    // Try to play the beep sound
     const audio = new Audio('/sounds/order-ready-beep.mp3');
-    audio.volume = 0.7; // 70% volume
-    await audio.play();
-    console.log('🔔 Order ready beep played');
+    audio.volume = 0.8; // 80% volume
+    
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      await playPromise;
+      console.log('✅ Order ready beep played successfully');
+    }
   } catch (error) {
-    console.error('Failed to play order ready beep:', error);
+    console.warn('⚠️ Failed to play beep sound, trying fallback:', error);
     // Fallback: try to generate beep with Web Audio API
     try {
       generateBeep();
+      console.log('✅ Fallback beep played');
     } catch (fallbackError) {
-      console.error('Fallback beep also failed:', fallbackError);
+      console.error('❌ Both beep methods failed:', fallbackError);
     }
   }
 };
