@@ -22,6 +22,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 // PERFORMANCE: Hero image hosted on Cloudinary for optimization
 // TODO: Replace with your Cloudinary URL after uploading the optimized image
 // Recommended: Upload as WebP format, quality 85, max width 1920px
@@ -42,6 +43,7 @@ import { measurePerformance, logPerformanceMetrics } from "@/utils/performance";
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth(); // Add user authentication
   const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart, updateSpecialInstructions } = useCart();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -219,18 +221,24 @@ export default function CustomerMenu() {
     if (!menuItems) return [];
     
     const filtered = menuItems.filter(
-      (item) =>
+      (item) => {
+        // Hide delivery items from customers (show only for staff/cashiers)
+        if (item.category === "Delivery" && user?.role === 'customer') {
+          return false;
+        }
+        
         // Show all items (including unavailable) - they will show as "sold out"
-        (selectedCategory === "All" || item.category === selectedCategory) &&
-        (searchQuery === "" ||
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        return (selectedCategory === "All" || item.category === selectedCategory) &&
+          (searchQuery === "" ||
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
     );
 
     // Sort: Priority items first (only when viewing "All" categories)
     // To disable this sorting, comment out the next line and uncomment the line after
     return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
     // return filtered; // Uncomment this to disable priority sorting
-  }, [menuItems, selectedCategory, searchQuery]);
+  }, [menuItems, selectedCategory, searchQuery, user?.role]);
 
   // Infinite scroll for pagination (reduces initial payload)
   const {
