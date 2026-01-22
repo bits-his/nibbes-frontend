@@ -457,7 +457,7 @@ function Router() {
       <Route
         path="/completed-orders"
         component={() => (
-          <ProtectedRoute requiredPermissions={["order_management"]}>
+          <ProtectedRoute requiredPermissions={["archived_orders"]}>
             <CompletedOrders />
           </ProtectedRoute>
         )}
@@ -515,7 +515,7 @@ function Router() {
       <Route
         path="/emcard"
         component={() => (
-          <ProtectedRoute requiredPermissions={["menu_management"]}>
+          <ProtectedRoute requiredPermissions={["em_card"]}>
             <EMcard />
           </ProtectedRoute>
         )}
@@ -524,7 +524,7 @@ function Router() {
       <Route
         path="/pending-payments"
         component={() => (
-          <ProtectedRoute requiredPermissions={["order_management"]}>
+          <ProtectedRoute requiredPermissions={["pending_payments"]}>
             <PendingPayments />
           </ProtectedRoute>
         )}
@@ -606,7 +606,7 @@ function Router() {
       <Route
         path="/store-management"
         component={() => (
-          <ProtectedRoute requiredPermissions={["store_management"]}>
+          <ProtectedRoute requiredPermissions={["main_kitchen"]}>
             <StoreManagement />
           </ProtectedRoute>
         )}
@@ -615,7 +615,7 @@ function Router() {
       <Route
         path="/kitchen-requests"
         component={() => (
-          <ProtectedRoute requiredPermissions={["kitchen_display", "sales_inventory"]}>
+          <ProtectedRoute requiredPermissions={["kitchen_requests"]}>
             <KitchenRequests />
           </ProtectedRoute>
         )}
@@ -624,7 +624,7 @@ function Router() {
       <Route
         path="/transactions"
         component={() => (
-          <ProtectedRoute requiredPermissions={["store_management", "sales_inventory"]}>
+          <ProtectedRoute requiredPermissions={["store_management"]}>
             <Transactions />
           </ProtectedRoute>
         )}
