@@ -544,7 +544,7 @@ export default function Checkout() {
       const response = await apiRequest("POST", "/api/orders", {
         ...orderData,
         paymentStatus: "pending",
-        paymentMethod: "card",
+        paymentMethod: "online", // Use "online" for customer online orders
         transactionRef: txnRef, // Send transaction reference to backend
       })
       

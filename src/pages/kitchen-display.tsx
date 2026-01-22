@@ -74,8 +74,11 @@ export default function KitchenDisplay() {
       const from = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
       const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
       
-      const response = await apiRequest('GET', `/api/orders?from=${from}&to=${to}&status=cancelled`);
-      const data = await response.json();
+      const response = await apiRequest('GET', `/api/orders?from=${from}&to=${to}`);
+      const allOrders = await response.json();
+      
+      // Filter only canceled orders
+      const data = allOrders.filter((order: any) => order.status === 'cancelled');
       
       // Normalize canceled orders same as active orders
       const normalizedData = data.map((order: any) => {
