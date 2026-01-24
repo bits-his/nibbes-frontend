@@ -2056,18 +2056,28 @@ export default function Checkout() {
                           )}
                         </div>
                       )}
-                      {/* Service Charges - From preloaded context */}
-                      {serviceChargeRate > 0 && (
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>Service charge ({serviceChargeRate}%)</span>
-                          <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      {/* Service Charges - Show all active charges individually */}
+                      {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
+                        <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
+                          <span>{charge.description} ({charge.amount}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
-                      )}
-                      {vatRate > 0 && (
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>VAT ({vatRate}%)</span>
-                          <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
+                      )) : (
+                        // Fallback to old method if serviceCharges is empty
+                        <>
+                          {serviceChargeRate > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Service charge ({serviceChargeRate}%)</span>
+                              <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          {vatRate > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>VAT ({vatRate}%)</span>
+                              <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
                         <span className="font-semibold text-foreground">Total</span>
@@ -2149,6 +2159,7 @@ export default function Checkout() {
                     </div>
                   )}
                   {/* Service Charges - Show all active charges individually */}
+                  {console.log('🔍 Customer checkout - serviceCharges:', serviceCharges, 'length:', serviceCharges?.length, 'vatRate:', vatRate, 'serviceChargeRate:', serviceChargeRate)}
                   {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
                     <div key={charge.id} className="flex justify-between">
                       <span>{charge.description} ({charge.amount}%)</span>
@@ -2157,6 +2168,7 @@ export default function Checkout() {
                   )) : (
                     // Fallback to old method if serviceCharges is empty
                     <>
+                      {console.log('⚠️ Using fallback method - serviceCharges is empty')}
                       {serviceChargeRate > 0 && (
                         <div className="flex justify-between">
                           <span>Service charge ({serviceChargeRate}%)</span>
