@@ -2146,7 +2146,6 @@ export default function Checkout() {
                     </div>
                   )}
                   {/* Service Charges - Show all active charges individually */}
-                  {console.log('Service charges in checkout:', serviceCharges)}
                   {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
                     <div key={charge.id} className="flex justify-between">
                       <span>{charge.description} ({charge.amount}%)</span>

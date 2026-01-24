@@ -64,7 +64,7 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
 
   const fetchCharges = async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen');
       const response = await fetch(`${backendUrl}/api/service-charges/active`);
       
       if (!response.ok) throw new Error('Failed to fetch charges');
