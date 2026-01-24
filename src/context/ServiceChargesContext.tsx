@@ -34,8 +34,11 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const updateChargesFromData = (charges: ServiceCharge[]) => {
+    console.log('📊 Updating charges from data:', charges);
+    
     // Store all active charges
     const activeCharges = charges.filter(c => c.status === 'active');
+    console.log('✅ Active charges:', activeCharges);
     setServiceCharges(activeCharges);
     
     // Find service charge and VAT for backward compatibility
@@ -46,16 +49,19 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       c.description.toLowerCase().includes('vat') && c.type === 'percentage'
     );
 
-    const newServiceCharge = serviceCharge?.amount || DEFAULT_CHARGES.serviceCharge;
-    const newVat = vat?.amount || DEFAULT_CHARGES.vat;
+    const newServiceCharge = Number(serviceCharge?.amount) || DEFAULT_CHARGES.serviceCharge;
+    const newVat = Number(vat?.amount) || DEFAULT_CHARGES.vat;
 
     setServiceChargeRate(newServiceCharge);
     setVatRate(newVat);
+
+    console.log('💰 Service charge rate:', newServiceCharge, 'VAT rate:', newVat);
 
     // Update cache
     const newCharges = {
       serviceCharge: newServiceCharge,
       vat: newVat,
+      allCharges: activeCharges, // Store all charges in cache too
       timestamp: Date.now(),
       version: CACHE_VERSION
     };
@@ -64,12 +70,18 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
 
   const fetchCharges = async () => {
     try {
+      console.log('🔄 Fetching service charges...');
       const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen');
+      console.log('🌐 Backend URL:', backendUrl);
       const response = await fetch(`${backendUrl}/api/service-charges/active`);
       
-      if (!response.ok) throw new Error('Failed to fetch charges');
+      if (!response.ok) {
+        console.error('❌ Response not OK:', response.status, response.statusText);
+        throw new Error('Failed to fetch charges');
+      }
       
       const charges: ServiceCharge[] = await response.json();
+      console.log('📦 Fetched charges:', charges);
       
       updateChargesFromData(charges);
       
@@ -79,15 +91,18 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       return {
         serviceCharge: serviceChargeItem?.amount || DEFAULT_CHARGES.serviceCharge,
         vat: vatItem?.amount || DEFAULT_CHARGES.vat,
+        allCharges: charges.filter(c => c.status === 'active'),
         timestamp: Date.now(),
         version: CACHE_VERSION
       };
     } catch (error) {
-      console.error('Error fetching service charges:', error);
+      console.error('❌ Error fetching service charges:', error);
       // Use defaults on error
+      setServiceCharges([]); // Clear charges on error
       return {
         serviceCharge: DEFAULT_CHARGES.serviceCharge,
         vat: DEFAULT_CHARGES.vat,
+        allCharges: [],
         timestamp: Date.now(),
         version: CACHE_VERSION
       };
@@ -108,7 +123,11 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
         if (cachedData.version === CACHE_VERSION && age < CACHE_DURATION) {
           setServiceChargeRate(cachedData.serviceCharge);
           setVatRate(cachedData.vat);
+          if (cachedData.allCharges) {
+            setServiceCharges(cachedData.allCharges);
+          }
           setIsLoading(false);
+          console.log('📋 Using cached service charges');
           return;
         }
       } catch (e) {
