@@ -25,7 +25,7 @@ const DEFAULT_CHARGES = {
 
 const CACHE_KEY = 'service_charges_cache';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const CACHE_VERSION = 'v2'; // Increment to invalidate old cache
+const CACHE_VERSION = 'v3'; // Increment to invalidate old cache
 
 export function ServiceChargesProvider({ children }: { children: ReactNode }) {
   const [serviceChargeRate, setServiceChargeRate] = useState(DEFAULT_CHARGES.serviceCharge);
@@ -136,12 +136,19 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
     }
 
     // Cache expired, wrong version, or doesn't exist - fetch fresh data
+    console.log('🔄 Cache expired or invalid, fetching fresh data...');
     await fetchCharges();
+    setIsLoading(false);
     setIsLoading(false);
   };
 
   const refreshCharges = async () => {
+    console.log('🔄 Manual refresh of service charges...');
+    setIsLoading(true);
+    // Clear cache first
+    localStorage.removeItem(CACHE_KEY);
     await fetchCharges();
+    setIsLoading(false);
   };
 
   useEffect(() => {

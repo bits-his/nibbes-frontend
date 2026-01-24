@@ -115,6 +115,9 @@ export default function Checkout() {
   // Get service charges from context (preloaded on app start)
   const { serviceChargeRate, vatRate, serviceCharges } = useServiceCharges()
   
+  // Debug log
+  console.log('🔍 Checkout serviceCharges:', serviceCharges, 'length:', serviceCharges?.length)
+  
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
 
