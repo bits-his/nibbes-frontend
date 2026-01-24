@@ -1667,7 +1667,8 @@ export default function Checkout() {
             <div className="grid gap-8 lg:grid-cols-3">
               {/* Left column - Form sections */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Contact Information Card */}
+                {/* Contact Information Card - Commented out since customer already provided details */}
+                {/* 
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <CardTitle className="text-lg">1. Contact Information</CardTitle>
@@ -1715,11 +1716,12 @@ export default function Checkout() {
                     />
                   </CardContent>
                 </Card>
+                */}
 
                 {/* Order Type Selection Card */}
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <CardTitle className="text-lg">2. Delivery Method</CardTitle>
+                    <CardTitle className="text-lg">1. Delivery Method</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="flex gap-3 sm:gap-4">
