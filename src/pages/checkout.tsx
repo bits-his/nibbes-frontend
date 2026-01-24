@@ -113,7 +113,7 @@ export default function Checkout() {
   const [paymentSplits, setPaymentSplits] = useState<Array<{ method: string; amount: number }>>([{ method: 'cash', amount: 0 }])
   
   // Get service charges from context (preloaded on app start)
-  const { serviceChargeRate, vatRate } = useServiceCharges()
+  const { serviceChargeRate, vatRate, serviceCharges } = useServiceCharges()
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
@@ -497,10 +497,12 @@ export default function Checkout() {
     
     const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
     
-    // Apply service charges using preloaded rates
-    const serviceChargeAmount = baseAmount * (serviceChargeRate / 100)
-    const vatAmount = baseAmount * (vatRate / 100)
-    const totalWithCharges = baseAmount + serviceChargeAmount + vatAmount
+    // Apply all service charges
+    const totalCharges = serviceCharges.reduce((total, charge) => {
+      return total + (baseAmount * (Number(charge.amount) / 100))
+    }, 0)
+    
+    const totalWithCharges = baseAmount + totalCharges
     
     return totalWithCharges
   }
@@ -1537,18 +1539,13 @@ export default function Checkout() {
                           <span>Subtotal</span>
                           <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
-                        {serviceChargeRate > 0 && (
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Service charge ({serviceChargeRate}%)</span>
-                            <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        {/* Show all service charges individually for walk-in */}
+                        {serviceCharges.map((charge) => (
+                          <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
+                            <span>{charge.description} ({charge.amount}%)</span>
+                            <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
-                        )}
-                        {vatRate > 0 && (
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>VAT ({vatRate}%)</span>
-                            <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        )}
+                        ))}
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
                           <span>Total</span>
                           <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -1561,18 +1558,13 @@ export default function Checkout() {
                           <span>Subtotal</span>
                           <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
-                        {serviceChargeRate > 0 && (
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Service charge ({serviceChargeRate}%)</span>
-                            <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        {/* Show all service charges individually for regular checkout */}
+                        {serviceCharges.map((charge) => (
+                          <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
+                            <span>{charge.description} ({charge.amount}%)</span>
+                            <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
-                        )}
-                        {vatRate > 0 && (
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>VAT ({vatRate}%)</span>
-                            <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        )}
+                        ))}
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
                           <span>Total</span>
                           <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -2147,19 +2139,13 @@ export default function Checkout() {
                       )}
                     </div>
                   )}
-                  {/* Service Charges - From preloaded context */}
-                  {serviceChargeRate > 0 && (
-                    <div className="flex justify-between">
-                      <span>Service charge ({serviceChargeRate}%)</span>
-                      <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString()}</span>
+                  {/* Service Charges - Show all active charges individually */}
+                  {serviceCharges.map((charge) => (
+                    <div key={charge.id} className="flex justify-between">
+                      <span>{charge.description} ({charge.amount}%)</span>
+                      <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString()}</span>
                     </div>
-                  )}
-                  {vatRate > 0 && (
-                    <div className="flex justify-between">
-                      <span>VAT ({vatRate}%)</span>
-                      <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString()}</span>
-                    </div>
-                  )}
+                  ))}
                   <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Total</span>
                     <span>₦{calculateTotal().toLocaleString()}</span>

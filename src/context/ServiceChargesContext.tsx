@@ -11,6 +11,7 @@ interface ServiceCharge {
 interface ServiceChargesContextType {
   serviceChargeRate: number;
   vatRate: number;
+  serviceCharges: ServiceCharge[]; // Add all service charges
   isLoading: boolean;
   refreshCharges: () => Promise<void>;
 }
@@ -29,10 +30,15 @@ const CACHE_VERSION = 'v2'; // Increment to invalidate old cache
 export function ServiceChargesProvider({ children }: { children: ReactNode }) {
   const [serviceChargeRate, setServiceChargeRate] = useState(DEFAULT_CHARGES.serviceCharge);
   const [vatRate, setVatRate] = useState(DEFAULT_CHARGES.vat);
+  const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([]); // Add state for all charges
   const [isLoading, setIsLoading] = useState(true);
 
   const updateChargesFromData = (charges: ServiceCharge[]) => {
-    // Find service charge and VAT
+    // Store all active charges
+    const activeCharges = charges.filter(c => c.status === 'active');
+    setServiceCharges(activeCharges);
+    
+    // Find service charge and VAT for backward compatibility
     const serviceCharge = charges.find(c => 
       c.description.toLowerCase().includes('service') && c.type === 'percentage'
     );
@@ -140,7 +146,7 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ServiceChargesContext.Provider value={{ serviceChargeRate, vatRate, isLoading, refreshCharges }}>
+    <ServiceChargesContext.Provider value={{ serviceChargeRate, vatRate, serviceCharges, isLoading, refreshCharges }}>
       {children}
     </ServiceChargesContext.Provider>
   );
