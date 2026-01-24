@@ -115,9 +115,6 @@ export default function Checkout() {
   // Get service charges from context (preloaded on app start)
   const { serviceChargeRate, vatRate, serviceCharges } = useServiceCharges()
   
-  // Debug log
-  console.log('🔍 Checkout serviceCharges:', serviceCharges, 'length:', serviceCharges?.length)
-  
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
 
@@ -2161,7 +2158,6 @@ export default function Checkout() {
                     </div>
                   )}
                   {/* Service Charges - Show all active charges individually */}
-                  {console.log('🔍 Customer checkout - serviceCharges:', serviceCharges, 'length:', serviceCharges?.length, 'vatRate:', vatRate, 'serviceChargeRate:', serviceChargeRate)}
                   {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
                     <div key={charge.id} className="flex justify-between">
                       <span>{charge.description} ({charge.amount}%)</span>
@@ -2170,7 +2166,6 @@ export default function Checkout() {
                   )) : (
                     // Fallback to old method if serviceCharges is empty
                     <>
-                      {console.log('⚠️ Using fallback method - serviceCharges is empty')}
                       {serviceChargeRate > 0 && (
                         <div className="flex justify-between">
                           <span>Service charge ({serviceChargeRate}%)</span>
