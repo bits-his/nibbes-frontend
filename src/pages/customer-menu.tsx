@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { startTransition } from "react";
-import { getGuestSession } from "@/lib/guestSession";
+import { getGuestSession, saveGuestSession } from "@/lib/guestSession";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
@@ -76,7 +76,12 @@ export default function CustomerMenu() {
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showGuestDataModal, setShowGuestDataModal] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [isCreatingGuestSession, setIsCreatingGuestSession] = useState(false);
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
@@ -562,6 +567,14 @@ export default function CustomerMenu() {
       return;
     }
 
+    // Check if user is logged in or has guest session
+    const guestSession = getGuestSession();
+    if (!user && !guestSession) {
+      // Show guest data capture modal first
+      setShowGuestDataModal(true);
+      return;
+    }
+
     // Store location info in localStorage if available
     if (locationData) {
       localStorage.setItem("location", JSON.stringify(locationData));
@@ -569,13 +582,97 @@ export default function CustomerMenu() {
     // Store orderType
     localStorage.setItem("orderType", orderType);
 
-    // Open confirmation modal instead of navigating to checkout
+    // Open confirmation modal
     setShowConfirmModal(true);
+  };
+
+  // Handle guest data submission
+  const handleGuestDataSubmit = async () => {
+    if (!guestName.trim() || !guestPhone.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide your name and phone number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingGuestSession(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/guest/session", {
+        guestName: guestName.trim(),
+        guestPhone: guestPhone.trim(),
+        guestEmail: guestEmail.trim() || undefined,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create guest session");
+      }
+
+      const data = await response.json();
+
+      // Save guest session
+      saveGuestSession({
+        guestId: data.guestId,
+        guestName: data.guestName,
+        guestPhone: data.guestPhone,
+        guestEmail: data.guestEmail,
+        createdAt: new Date().toISOString(),
+        expiresAt: data.expiresAt,
+      });
+
+      // Close guest data modal and open confirmation modal
+      setShowGuestDataModal(false);
+      setShowConfirmModal(true);
+
+      toast({
+        title: "Guest Session Created",
+        description: "You can now proceed with your order.",
+      });
+    } catch (error: any) {
+      console.error("Error creating guest session:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create guest session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingGuestSession(false);
+    }
   };
 
   // Handle Interswitch payment directly from cart
   const handleConfirmOrder = async () => {
     if (isProcessingPayment) return;
+
+    // Validate that we have customer data
+    const guestSession = getGuestSession();
+    if (!user && !guestSession) {
+      toast({
+        title: "Guest Information Required",
+        description: "Please provide your information to continue.",
+        variant: "destructive",
+      });
+      setShowConfirmModal(false);
+      setShowGuestDataModal(true);
+      return;
+    }
+
+    const customerName = user?.username || guestSession?.guestName;
+    const customerPhone = user?.phone || guestSession?.guestPhone;
+
+    if (!customerName || !customerPhone) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide your name and phone number.",
+        variant: "destructive",
+      });
+      setShowConfirmModal(false);
+      setShowGuestDataModal(true);
+      return;
+    }
 
     setIsProcessingPayment(true);
 
@@ -585,12 +682,11 @@ export default function CustomerMenu() {
         description: "Please wait...",
       });
 
-      const guestSession = getGuestSession();
       const txnRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const orderData = {
-        customerName: user?.username || guestSession?.guestName || "",
-        customerPhone: user?.phone || guestSession?.guestPhone || "",
+        customerName,
+        customerPhone,
         orderType: "online",
         paymentMethod: "online",
         paymentStatus: "pending",
@@ -1461,6 +1557,87 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
+      {/* Guest Data Capture Modal */}
+      <Dialog open={showGuestDataModal} onOpenChange={setShowGuestDataModal}>
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Guest Information</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Please provide your details to complete your order
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Full Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Enter your full name"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                className="w-full"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Phone Number <span className="text-destructive">*</span>
+              </label>
+              <Input
+                type="tel"
+                placeholder="08012345678"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                className="w-full"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                We'll use this to send you order updates
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Email Address <span className="text-xs text-muted-foreground">(Optional)</span>
+              </label>
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowGuestDataModal(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGuestDataSubmit}
+              disabled={isCreatingGuestSession || !guestName.trim() || !guestPhone.trim()}
+              className="w-full sm:w-auto bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
+            >
+              {isCreatingGuestSession ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Creating Session...
+                </span>
+              ) : (
+                "Continue"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Order Confirmation Modal */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
         <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">

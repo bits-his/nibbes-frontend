@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList, Volume2 } from "lucide-react";
+import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList, Volume2, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,10 +22,18 @@ export default function DocketPage() {
   const { toast } = useToast();
   const guestSession = getGuestSession();
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState("");
+  const [isLookingUp, setIsLookingUp] = useState(false);
 
   // Get user-specific or guest-specific active orders
   const { data: orders, isLoading, refetch } = useQuery<OrderWithItems[]>({
-    queryKey: user ? ["/api/orders/active/customer"] : ["/api/guest/orders", guestSession?.guestId],
+    queryKey: user 
+      ? ["/api/orders/active/customer"] 
+      : guestSession 
+        ? ["/api/guest/orders", guestSession.guestId]
+        : lookupPhone
+          ? ["/api/guest/orders", "phone", lookupPhone]
+          : [],
     queryFn: async () => {
       if (user) {
         // Authenticated user - fetch their orders
@@ -35,12 +44,33 @@ export default function DocketPage() {
         const response = await apiRequest('GET', `/api/guest/orders?guestId=${guestSession.guestId}`);
         const data = await response.json();
         return data.orders || [];
+      } else if (lookupPhone) {
+        // Lookup orders by phone number
+        const response = await apiRequest('GET', `/api/guest/orders?phone=${encodeURIComponent(lookupPhone)}`);
+        const data = await response.json();
+        return data.orders || [];
       }
       return [];
     },
-    enabled: !!(user || guestSession), // Only run query if user or guest session exists
+    enabled: !!(user || guestSession || lookupPhone), // Run query if user, guest session, or phone lookup exists
     // Remove all polling options since we're using WebSockets for real-time updates
   });
+
+  // Handle phone number lookup
+  const handlePhoneLookup = () => {
+    if (!lookupPhone.trim()) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter your phone number to view your orders.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Phone number will trigger the query automatically via queryKey
+    setIsLookingUp(true);
+    refetch().finally(() => setIsLookingUp(false));
+  };
 
   // Filter orders to only show paid orders
   const activeOrders = orders?.filter(order => {
@@ -81,11 +111,13 @@ export default function DocketPage() {
       // Use WebSocket data directly - no HTTP refetch needed!
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         if (data.order) {
-          // IMPORTANT: Only process orders that belong to the current user/guest
+          // IMPORTANT: Only process orders that belong to the current user/guest/phone lookup
           const orderBelongsToUser = user && (data.order.userId === user.id || data.order.customerEmail === user.email);
           const orderBelongsToGuest = guestSession && data.order.guestId === guestSession.guestId;
+          const orderBelongsToPhone = lookupPhone && data.order.customerPhone && 
+            data.order.customerPhone.replace(/\D/g, '') === lookupPhone.replace(/\D/g, '');
           
-          if (!orderBelongsToUser && !orderBelongsToGuest) {
+          if (!orderBelongsToUser && !orderBelongsToGuest && !orderBelongsToPhone) {
             // This order doesn't belong to the current user - ignore it
             return;
           }
@@ -213,13 +245,68 @@ export default function DocketPage() {
                 return old;
               }
             );
+          } else if (lookupPhone) {
+            // Guest orders by phone number
+            queryClient.setQueryData(
+              ["/api/guest/orders", "phone", lookupPhone],
+              (old: { orders: OrderWithItems[] } = { orders: [] }) => {
+                const normalizedOrder = normalizeOrder(data.order);
+                
+                // Filter to only show paid orders
+                if (normalizedOrder.paymentStatus !== 'paid') {
+                  return { orders: old.orders.filter(o => o.id !== normalizedOrder.id) };
+                }
+                
+                if (data.type === "new_order") {
+                  const exists = old.orders.some(o => o.id === normalizedOrder.id);
+                  if (!exists) {
+                    return {
+                      orders: [normalizedOrder, ...old.orders].sort((a, b) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                    };
+                  }
+                } else {
+                  const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old.orders];
+                    updated[index] = normalizedOrder;
+                    return {
+                      orders: updated.sort((a, b) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                    };
+                  } else if (normalizedOrder.paymentStatus === 'paid') {
+                    return {
+                      orders: [normalizedOrder, ...old.orders].sort((a, b) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                    };
+                  }
+                }
+                
+                // Check if order became ready and play notification sound
+                if (data.type === "order_status_change" && normalizedOrder.status === 'ready' && audioEnabled) {
+                  playOrderReadyBeep();
+                  toast({
+                    title: "🔔 Order Ready!",
+                    description: `Your order #${normalizedOrder.orderNumber} is ready for pickup!`,
+                    duration: 5000,
+                  });
+                }
+                
+                return old;
+              }
+            );
           }
         }
       } else if (data.type === "order_ready_notification") {
-        // Check if this notification is for the current user/guest
+        // Check if this notification is for the current user/guest/phone lookup
         const isForCurrentUser = 
           (user && data.customerEmail === user.email) ||
-          (guestSession && data.guestId === guestSession.guestId);
+          (guestSession && data.guestId === guestSession.guestId) ||
+          (lookupPhone && data.customerPhone && 
+            data.customerPhone.replace(/\D/g, '') === lookupPhone.replace(/\D/g, ''));
         
         if (isForCurrentUser) {
           // Show browser notification
@@ -284,6 +371,20 @@ export default function DocketPage() {
                   return old;
                 }
               );
+            } else if (lookupPhone) {
+              queryClient.setQueryData(
+                ["/api/guest/orders", "phone", lookupPhone],
+                (old: { orders: OrderWithItems[] } = { orders: [] }) => {
+                  const normalizedOrder = normalizeOrder(data.order);
+                  const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
+                  if (index >= 0) {
+                    const updated = [...old.orders];
+                    updated[index] = normalizedOrder;
+                    return { orders: updated };
+                  }
+                  return old;
+                }
+              );
             }
           }
         }
@@ -335,7 +436,7 @@ export default function DocketPage() {
         socket.close();
       }
     };
-  }, [user, guestSession]);
+  }, [user, guestSession, lookupPhone]);
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -454,6 +555,48 @@ const getStatusCardColor = (status: string) => {
               </Card>
             ))}
           </div>
+        ) : !user && !guestSession && !lookupPhone ? (
+          // Show phone lookup form for guests without session
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                Find Your Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Enter your phone number to view your orders
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="tel"
+                  placeholder="08012345678"
+                  value={lookupPhone}
+                  onChange={(e) => setLookupPhone(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handlePhoneLookup();
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handlePhoneLookup}
+                  disabled={isLookingUp || !lookupPhone.trim()}
+                >
+                  {isLookingUp ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4 mr-2" />
+                      Find
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : orders && orders.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {orders.map((order) => (
