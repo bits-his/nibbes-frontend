@@ -56,9 +56,14 @@ export function OptimizedImage({
   const imageHeight = height || (aspectRatio === 'square' ? 400 : 1080);
 
   // Get quality based on network status
+  const effectiveType = (networkStatus.effectiveType as 'slow-2g' | '2g' | '3g' | '4g' | 'unknown') || 'unknown';
+  const connection = (navigator as any).connection || 
+                     (navigator as any).mozConnection || 
+                     (navigator as any).webkitConnection;
+  const saveData = connection?.saveData || false;
   const quality = getQualityForNetwork(
-    networkStatus.effectiveType,
-    networkStatus.saveData
+    effectiveType,
+    saveData
   );
 
   useEffect(() => {

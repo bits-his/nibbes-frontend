@@ -48,7 +48,7 @@ export default function StaffOrders() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [expandedCartItem, setExpandedCartItem] = useState<number | null>(null); // Track which cart item is expanded
+  const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null); // Track which cart item is expanded
   
   // Network status for adaptive loading
   const networkStatus = useNetworkStatus();
