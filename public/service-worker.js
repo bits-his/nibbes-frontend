@@ -69,100 +69,19 @@ self.addEventListener('activate', (event) => {
 });
 
 // ============================================================================
-// FETCH: Network-first for HTML, cache-first for assets, stale-while-revalidate for API
+// FETCH: Network-first for HTML, cache-first for assets
 // ============================================================================
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip cross-origin requests (except for images from Cloudinary/CDN)
-  const isCloudinaryImage = url.hostname.includes('cloudinary.com') || 
-                            url.hostname.includes('res.cloudinary.com');
-  
-  if (url.origin !== location.origin && !isCloudinaryImage) {
+  // Skip cross-origin requests
+  if (url.origin !== location.origin) {
     return;
   }
 
-  // -------------------------------------------------------------------------
-  // Strategy 3: STALE-WHILE-REVALIDATE for Menu API (performance optimization)
-  // -------------------------------------------------------------------------
-  if (url.pathname === '/api/menu/all' || url.pathname.includes('/api/menu/')) {
-    event.respondWith(
-      caches.open(RUNTIME_CACHE).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          // Fetch fresh data in background
-          const fetchPromise = fetch(request)
-            .then((networkResponse) => {
-              // Cache successful responses
-              if (networkResponse && networkResponse.status === 200) {
-                const responseToCache = networkResponse.clone();
-                cache.put(request, responseToCache);
-              }
-              return networkResponse;
-            })
-            .catch(() => {
-              // Network failed, return cached if available
-              return cachedResponse || new Response(
-                JSON.stringify({ error: 'Network unavailable' }),
-                { status: 503, headers: { 'Content-Type': 'application/json' } }
-              );
-            });
-
-          // Return cached version immediately if available, otherwise wait for network
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
-    return;
-  }
-
-  // Skip WebSocket connections
-  if (url.pathname.startsWith('/ws')) {
-    return;
-  }
-
-  // -------------------------------------------------------------------------
-  // Strategy 4: CACHE-FIRST for images (including Cloudinary)
-  // -------------------------------------------------------------------------
-  if (isCloudinaryImage || 
-      request.destination === 'image' || 
-      url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i)) {
-    event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) {
-          // Return cached image immediately
-          // Fetch fresh version in background for next time
-          fetch(request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone();
-              caches.open(RUNTIME_CACHE).then((cache) => {
-                cache.put(request, responseToCache);
-              });
-            }
-          }).catch(() => {
-            // Network failed, that's ok - we have cache
-          });
-          return cachedResponse;
-        }
-        
-        // Not in cache, fetch from network
-        return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Network failed and no cache - return placeholder
-          return new Response(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e5e7eb"/></svg>',
-            { headers: { 'Content-Type': 'image/svg+xml' } }
-          );
-        });
-      })
-    );
+  // Skip API requests and WebSocket connections
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
     return;
   }
 
