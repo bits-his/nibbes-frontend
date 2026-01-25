@@ -14,6 +14,8 @@ import {
   Store,
   CreditCard,
   ShoppingCart,
+  AlertCircle,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,11 +84,18 @@ const menuItems: MenuItem[] = [
     permissions: ["order_management"],
   },
   {
+    title: "Pending Payments",
+    url: "/pending-payments",
+    icon: AlertCircle,
+    roles: ["admin"],
+    permissions: ["pending_payments"],
+  },
+  {
     title: "Archived Orders",
     url: "/completed-orders",
     icon: ClipboardList,
     roles: ["admin"],
-    permissions: ["order_management"],
+    permissions: ["archived_orders"],
   },
   {
     title: "Menu Management",
@@ -107,21 +116,21 @@ const menuItems: MenuItem[] = [
     url: "/store-management",
     icon: Store,
     roles: ["admin", "kitchen"],
-    permissions: ["store_management"],
+    permissions: ["main_kitchen"],
   },
   {
     title: "Transactions",
     url: "/transactions",
     icon: CreditCard,
     roles: ["admin"],
-    permissions: ["store_management", "sales_inventory"],
+    permissions: ["store_management"],
   },
   {
     title: "Kitchen Requests",
     url: "/kitchen-requests",
     icon: ShoppingCart,
     roles: ["admin", "kitchen"],
-    permissions: ["kitchen_display", "sales_inventory"],
+    permissions: ["kitchen_requests"],
   },
   {
     title: "Analytics & Reports",
@@ -145,6 +154,13 @@ const menuItems: MenuItem[] = [
     permissions: ["customer_insights"],
   },
   {
+    title: "Cashier Analytics",
+    url: "/cashier-analytics",
+    icon: BarChart3,
+    roles: ["C - Suite", "admin"],
+    permissions: ["cashier_analytics"],
+  },
+  {
     title: "QR Code",
     url: "/qr-code",
     icon: ClipboardList,
@@ -156,7 +172,7 @@ const menuItems: MenuItem[] = [
     url: "/emcard",
     icon: CreditCard,
     roles: ["admin"], 
-    permissions: ["menu_management"],
+    permissions: ["em_card"],
   },
   {
     title: "User Management",
@@ -164,6 +180,12 @@ const menuItems: MenuItem[] = [
     icon: Users,
     roles: ["admin"],
     permissions: ["user_management"],
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
+    roles: ["admin"],
   },
   {
     title: "Profile",

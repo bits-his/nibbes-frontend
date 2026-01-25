@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Minus, X, ChefHat, AlertCircle } from "lucide-react";
+import { Plus, Minus, X, ChefHat, AlertCircle, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -14,6 +14,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem, CartItem } from "@shared/schema";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
 
 // Service Charge interface
 interface ServiceCharge {
@@ -38,6 +41,9 @@ export default function StaffOrders() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   
+  // Network status for adaptive loading
+  const networkStatus = useNetworkStatus();
+  
   // Service charges state
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
   const [loadingCharges, setLoadingCharges] = useState(true)
@@ -53,34 +59,101 @@ export default function StaffOrders() {
     },
   });
 
+  // PERFORMANCE: Fetch menu items with caching (reduces network payload)
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
-  // Fetch categories from API with refetch on mount and focus
+  // Fetch categories from API
   const { data: categoriesData } = useQuery<string[]>({
     queryKey: ["/api/menu/categories"],
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    staleTime: 0, // Always consider data stale
+    staleTime: 10 * 60 * 1000, // Cache categories for 10 minutes
   });
 
-  // Add "All" to the beginning of categories
-  const categories = ["All", ...(categoriesData || [])];
+  // Add "All" to the beginning of categories (memoized)
+  const categories = useMemo(() => {
+    return ["All", ...(categoriesData || [])];
+  }, [categoriesData]);
 
-  const filteredItems = menuItems?.filter(
-    (item) => {
-      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-      const matchesSearch = searchQuery === "" || 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Helper function to sort items by specific item priority
+  const sortByItemPriority = (items: any[]) => {
+    // Define item priority order (lower number = appears first)
+    // Using lowercase for case-insensitive matching
+    const itemPriority: { [key: string]: number } = {
+      'beef philadelphia': 1,
+      'chicken philadelphia': 2,
+      'beef loaded fries': 3,
+      'chicken loaded fries': 4,
+      'beef shawarma': 5,
+      'chicken shawarma': 6,
+      'beef burger': 7,
+      'chicken burger': 8,
+      'oriental rice, charcoal grilled chicken and coleslaw': 9,
+      'signature rice, charcoal grilled chicken and coleslaw': 10,
+      'smokey jollof rice, charcoal grilled chicken and coleslaw': 11,
+      'creamy wings': 12, // "Wings & fries" = "Creamy Wings" in database
+      'beef kofta wrap': 13,
+      'chicken kofta wrap': 14,
+      'meat pie': 15,
+      'french fries and ketchup': 16,
+      // Everything else gets priority 999 (appears last)
+    };
+    
+    return [...items].sort((a, b) => {
+      const aName = a.name.toLowerCase().trim();
+      const bName = b.name.toLowerCase().trim();
+      const aPriority = itemPriority[aName] || 999;
+      const bPriority = itemPriority[bName] || 999;
       
-      // Show all items, including SOLD OUT ones
-      return matchesCategory && matchesSearch;
-    }
-  );
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority; // Sort by priority
+      }
+      
+      // If same priority, keep original order
+      return 0;
+    });
+  };
+
+  // Filter items (memoized to prevent unnecessary recalculations)
+  const filteredItems = useMemo(() => {
+    if (!menuItems) return [];
+    
+    const filtered = menuItems.filter(
+      (item) => {
+        const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+        const matchesSearch = searchQuery === "" || 
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        // Show all items, including SOLD OUT ones
+        return matchesCategory && matchesSearch;
+      }
+    );
+
+    // Sort: Priority items first (only when viewing "All" categories)
+    return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
+  }, [menuItems, selectedCategory, searchQuery]);
+
+  // PERFORMANCE: Infinite scroll for pagination (reduces initial payload from 68MB to manageable chunks)
+  const {
+    visibleItems,
+    hasMore,
+    isLoading: isLoadingMore,
+    loadMore,
+    reset: resetPagination,
+    sentinelRef,
+  } = useInfiniteScroll(filteredItems, {
+    itemsPerLoad: networkStatus.isSlow ? 8 : 16, // Load fewer items on slow networks
+    threshold: 300,
+    enabled: true,
+  });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [selectedCategory, searchQuery, resetPagination]);
 
   const addToCart = (menuItem: MenuItem) => {
     // Check if kitchen is closed
@@ -381,6 +454,9 @@ export default function StaffOrders() {
         // Refresh menu data and categories when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
+      } else if (data.type === "service-charges-updated") {
+        // Trigger service charges refresh by dispatching custom event
+        window.dispatchEvent(new CustomEvent('service-charges-updated', { detail: data.charges }));
       }
     };
 
@@ -413,7 +489,17 @@ export default function StaffOrders() {
           </div>
         </div>
       )}
-      
+
+      {/* Network Status Indicator (subtle) */}
+      {networkStatus.isSlow && (
+        <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 py-1 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-xs text-orange-700 dark:text-orange-300">
+            <Wifi className="w-3 h-3" />
+            <span>Slow network detected - Optimizing for faster loading</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row h-auto md:h-screen overflow-hidden">
         {/* Menu Section - Full width on mobile, flex-1 on desktop */}
         <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">
@@ -461,8 +547,9 @@ export default function StaffOrders() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                {filteredItems?.map((item) => {
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  {visibleItems.map((item) => {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
                   const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
                   
@@ -482,19 +569,19 @@ export default function StaffOrders() {
                       data-testid={`card-menu-item-${item.id}`}
                     >
                       <div className="aspect-video overflow-hidden relative">
-                        <img
-                          src={item.imageUrl}
+                        <ImageWithSkeleton
+                          src={item.imageUrl || ''}
                           alt={item.name}
-                          className="w-full h-full object-cover"
+                          containerClassName="w-full h-full"
                         />
                         {isInCart && (
-                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1">
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1 z-10">
                             <Plus className="w-3 h-3 md:w-4 md:h-4" />
                           </div>
                         )}
                         {/* SOLD OUT Overlay */}
                         {isOutOfStock && (
-                          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
                             <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
                               SOLD OUT
                             </span>
@@ -502,7 +589,7 @@ export default function StaffOrders() {
                         )}
                         {/* Low Stock Badge */}
                         {!isOutOfStock && isLowStock && (
-                          <div className="absolute top-2 left-2">
+                          <div className="absolute top-2 left-2 z-10">
                             <Badge variant="destructive" className="text-xs font-semibold shadow-md">
                               Only {item.stockBalance} left!
                             </Badge>
@@ -527,11 +614,67 @@ export default function StaffOrders() {
                         ) : (
                           <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
                         )}
+                        
+                        {/* Quantity Controls - Show only if item is in cart */}
+                        {isInCart && cartItem && (
+                          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateQuantity(item.id, -1);
+                              }}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="font-semibold text-base min-w-[2rem] text-center">
+                              {cartItem.quantity}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateQuantity(item.id, 1);
+                              }}
+                              disabled={!canAddMore}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+                
+                {/* Infinite Scroll Sentinel and Load More */}
+                {hasMore && (
+                  <>
+                    <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+                    {isLoadingMore && (
+                      <div className="flex justify-center py-4">
+                        <div className="text-sm text-muted-foreground">Loading more items...</div>
+                      </div>
+                    )}
+                    {!isLoadingMore && (
+                      <div className="flex justify-center py-4">
+                        <Button
+                          variant="outline"
+                          onClick={loadMore}
+                          className="w-full max-w-xs"
+                        >
+                          Load More Items
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -572,6 +715,7 @@ export default function StaffOrders() {
                       <FormControl>
                         <Input
                           type="tel"
+                          id="customer-phone"
                           placeholder="08012345678"
                           {...field}
                           data-testid="input-customer-phone"

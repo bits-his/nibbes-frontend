@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +38,7 @@ import { insertMenuItemSchema, menuItemFormSchema } from "@shared/schema";
 import { z } from "zod";
 import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
-import { log } from "console";
+import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
 
 type MenuFormValues = z.infer<typeof menuItemFormSchema>;
 
@@ -51,7 +53,12 @@ export default function MenuManagement() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Network status for adaptive loading
+  const networkStatus = useNetworkStatus();
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -145,9 +152,45 @@ export default function MenuManagement() {
     },
   });
 
+  // PERFORMANCE: Fetch menu items with caching (reduces network payload)
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
+
+  // Filter items (memoized to prevent unnecessary recalculations)
+  const filteredItems = useMemo(() => {
+    if (!menuItems) return [];
+    return menuItems.filter(
+      (item) => {
+        const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+        const matchesSearch = searchQuery === "" || 
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+      }
+    );
+  }, [menuItems, selectedCategory, searchQuery]);
+
+  // PERFORMANCE: Infinite scroll for pagination (reduces initial payload)
+  const {
+    visibleItems,
+    hasMore,
+    isLoading: isLoadingMore,
+    loadMore,
+    reset: resetPagination,
+    sentinelRef,
+  } = useInfiniteScroll(filteredItems, {
+    itemsPerLoad: networkStatus.isSlow ? 6 : 12, // Load fewer items on slow networks
+    threshold: 300,
+    enabled: true,
+  });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [selectedCategory, searchQuery, resetPagination]);
 
   const createMutation = useMutation({
     mutationFn: async (data: MenuFormValues) => {
@@ -262,42 +305,48 @@ export default function MenuManagement() {
     setImageFile(file);
     setIsUploading(true);
     
-    // Upload image directly to Cloudinary immediately on selection
+    // Upload image to CDN via backend
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("upload_preset", "nibbes_kitchen_unsigned"); // Using unsigned preset
 
-      // Upload to Cloudinary
-      const response = await fetch("https://api.cloudinary.com/v1_1/dv0gb0cy2/image/upload", {
+      // Upload to CDN via backend endpoint
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+      const response = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
         method: "POST",
+        headers: {
+          // Authorization header will be added by axios interceptor if using axios
+          // For fetch, you may need to add it manually
+          ...(localStorage.getItem('token') && {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }),
+        },
         body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to upload image to Cloudinary");
+        throw new Error(errorData.error || errorData.message || "Failed to upload image to CDN");
       }
 
       const result = await response.json();
-      const cloudinaryUrl = result.secure_url; // Get the secure URL from Cloudinary response
+      const cdnUrl = result.url; // Get the CDN URL from response
       
-      // alert(JSON.stringify(cloudinaryUrl));
       // Update the form's imageUrl field
-      form.setValue("imageUrl", cloudinaryUrl);
+      form.setValue("imageUrl", cdnUrl);
       
       // Create a preview URL for the selected image
-      setImagePreviewUrl(cloudinaryUrl);
+      setImagePreviewUrl(cdnUrl);
       
       toast({
         title: "Success",
-        description: "Image uploaded to Cloudinary successfully.",
+        description: "Image uploaded to CDN successfully.",
       });
-    } catch (error) {
-      console.error("Error uploading image to Cloudinary:", error);
+    } catch (error: any) {
+      console.error("Error uploading image to CDN:", error);
       toast({
         title: "Error",
-        description: "Failed to upload image to Cloudinary. Please try again.",
+        description: error.message || "Failed to upload image to CDN. Please try again.",
         variant: "destructive",
       });
       // Clear the form's imageUrl if upload failed
@@ -451,22 +500,23 @@ export default function MenuManagement() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {menuItems?.map((item) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {visibleItems.map((item) => (
               <Card
                 key={item.id}
                 className="overflow-hidden"
                 data-testid={`card-menu-item-${item.id}`}
               >
                 <div className="aspect-square overflow-hidden relative">
-                  <img
-                    src={item.imageUrl}
+                  <ImageWithSkeleton
+                    src={item.imageUrl || ''}
                     alt={item.name}
-                    className="w-full h-full object-cover"
+                    containerClassName="w-full h-full"
                   />
                   {/* Show SOLD OUT badge if stockBalance is 0 */}
                   {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 && (
-                    <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
                       <Badge variant="default" className="text-base font-bold bg-primary text-white">
                         SOLD OUT
                       </Badge>
@@ -474,7 +524,7 @@ export default function MenuManagement() {
                   )}
                   {/* Show Unavailable badge if item is manually set unavailable */}
                   {!item.available && item.stockBalance !== 0 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
                       <Badge variant="secondary" className="text-base">
                         Unavailable
                       </Badge>
@@ -559,8 +609,32 @@ export default function MenuManagement() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+            
+            {/* Infinite Scroll Sentinel and Load More */}
+            {hasMore && (
+              <>
+                <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+                {isLoadingMore && (
+                  <div className="flex justify-center py-4">
+                    <div className="text-sm text-muted-foreground">Loading more items...</div>
+                  </div>
+                )}
+                {!isLoadingMore && (
+                  <div className="flex justify-center py-4">
+                    <Button
+                      variant="outline"
+                      onClick={loadMore}
+                      className="w-full max-w-xs"
+                    >
+                      Load More Items
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
 

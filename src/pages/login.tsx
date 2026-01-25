@@ -64,16 +64,38 @@ export default function Login() {
           setLocation("/")
       }
     } catch (err: any) {
+      console.error('Login error:', err);
+      
       try {
+        // Try to parse error response
         const errorMatch = err.message.match(/\d+:\s*({.*})/)
         if (errorMatch && errorMatch[1]) {
           const errorData = JSON.parse(errorMatch[1])
-          setError(errorData.error || "Login failed")
+          
+          // Display specific error message based on error type
+          if (errorData.errorType === 'USER_NOT_FOUND') {
+            setError(errorData.error || 'No account found with this email address')
+          } else if (errorData.errorType === 'INVALID_PASSWORD') {
+            setError(errorData.error || 'Incorrect password')
+          } else if (errorData.errorType === 'MISSING_FIELDS') {
+            setError('Please enter both email and password')
+          } else if (errorData.errorType === 'SERVER_ERROR') {
+            setError('Server error. Please try again in a few moments.')
+          } else {
+            setError(errorData.error || 'Login failed. Please try again.')
+          }
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          setError('Connection error. Please check your internet and try again.')
         } else {
-          setError("Invalid credentials. Please try again.")
+          setError(err.message || 'Login failed. Please try again.')
         }
       } catch (parseError) {
-        setError(err.message || "Login failed")
+        // Fallback for unparseable errors
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          setError('Connection error. Please check your internet and try again.')
+        } else {
+          setError('Login failed. Please check your credentials and try again.')
+        }
       }
     } finally {
       setLoading(false)

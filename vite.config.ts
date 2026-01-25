@@ -27,18 +27,100 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname),
+  optimizeDeps: {
+    include: ['recharts'],
+    exclude: [],
+    esbuildOptions: {
+      // Fix circular dependency issues with recharts
+      keepNames: true,
+      // Prevent circular dependency errors
+      legalComments: 'none',
+    },
+  },
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist"), // ✅ fixed here
+    // PERFORMANCE: Optimize build output
+    commonjsOptions: {
+      include: [/recharts/, /node_modules/],
+      transformMixedEsModules: true,
+      // Fix recharts circular dependency
+      requireReturnsDefault: 'auto',
+    },
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
     manifest: true,
+    // PERFORMANCE: Enable compression
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500, // Warn if chunk > 500KB (reduced for better optimization)
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Optimize bundle size by splitting vendor code
-          'react-vendor': ['react', 'react-dom', 'wouter'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select'],
+        manualChunks: (id) => {
+          // React core libraries (critical - load first)
+          if (id.includes('react') || id.includes('react-dom') || id.includes('wouter')) {
+            return 'react-vendor';
+          }
+          
+          // Radix UI components (large library - lazy load)
+          if (id.includes('@radix-ui')) {
+            return 'ui-vendor';
+          }
+          
+          // IMPORTANT: Don't split recharts - keep it in main bundle to avoid circular deps
+          // Recharts has internal circular dependencies that break when code-split
+          // Returning undefined means it stays in the main bundle
+          if (id.includes('recharts') || id.includes('d3-')) {
+            return undefined; // Keep in main bundle to avoid circular dependency issues
+          }
+          
+          // PDF/Print libraries (lazy load - only used for printing)
+          if (id.includes('@react-pdf') || id.includes('jspdf')) {
+            return 'pdf-vendor';
+          }
+          
+          // Form libraries (lazy load - only used in forms)
+          if (id.includes('react-hook-form') || id.includes('@hookform')) {
+            return 'forms-vendor';
+          }
+          
+          // Date utilities (lazy load)
+          if (id.includes('date-fns')) {
+            return 'date-vendor';
+          }
+          
+          // Large utility libraries (lazy load)
+          if (id.includes('framer-motion') || id.includes('lucide-react')) {
+            return 'utils-vendor';
+          }
+          
+          // Query/state management (lazy load)
+          if (id.includes('@tanstack/react-query')) {
+            return 'query-vendor';
+          }
+          
+          // QR Code libraries (lazy load - only used in QR page)
+          if (id.includes('qrcode') || id.includes('qrcode.react')) {
+            return 'qrcode-vendor';
+          }
         },
+        hoistTransitiveImports: true,
+        // PERFORMANCE: Optimize chunk names
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
+      external: [],
+    },
+    // SECURITY: Disable source maps in production for security and performance
+    sourcemap: false, // Disable source maps in production (Lighthouse best practice)
+    // PERFORMANCE: Use esbuild for faster minification with aggressive settings
+    minify: 'esbuild', // Faster than terser
+    target: 'es2020', // Modern browsers only
+    cssCodeSplit: true, // Split CSS for better caching
+    cssMinify: true, // Minify CSS
+    // PERFORMANCE: Aggressive tree-shaking and dead code elimination
+    treeshake: {
+      moduleSideEffects: false,
+      propertyReadSideEffects: false,
+      tryCatchDeoptimization: false,
     },
   },
   server: {

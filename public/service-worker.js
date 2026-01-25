@@ -1,7 +1,7 @@
-// Nibbles Service Worker - Version 2.0.0
-// OPTIMIZED FOR RELIABLE UPDATES
+// Nibbles Service Worker - Version 3.0.2
+// OPTIMIZED FOR OFFLINE SUPPORT AND PERFORMANCE
 
-const VERSION = '2.0.0';
+const VERSION = '3.0.2';
 const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
 const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 
@@ -13,7 +13,7 @@ const PRECACHE_URLS = [
   '/manifest.json',
   '/nibbles.jpg',
   '/offline.html'
-];
+];  
 
 // ============================================================================
 // INSTALL: Cache essential assets and activate immediately
@@ -80,8 +80,80 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API requests and WebSocket connections
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
+  // -------------------------------------------------------------------------
+  // Strategy 3: NETWORK-FIRST for Menu API (always fresh data)
+  // -------------------------------------------------------------------------
+  if (url.pathname === '/api/menu/all' || url.pathname.includes('/api/menu/')) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          // Don't cache menu API - always fetch fresh to get latest image URLs
+          return networkResponse;
+        })
+        .catch(() => {
+          // Network failed, try cache as fallback
+          return caches.match(request).then((cachedResponse) => {
+            return cachedResponse || new Response(
+              JSON.stringify({ error: 'Network unavailable' }),
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            );
+          });
+        })
+    );
+    return;
+  }
+
+          // Return cached version immediately if available, otherwise wait for network
+    return;
+  }
+
+  // Skip WebSocket connections
+  if (url.pathname.startsWith('/ws')) {
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Strategy 4: CACHE-FIRST for images (including Cloudinary)
+  // -------------------------------------------------------------------------
+  if (isCloudinaryImage || 
+      request.destination === 'image' || 
+      url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i)) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          // Return cached image immediately
+          // Fetch fresh version in background for next time
+          fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone();
+              caches.open(RUNTIME_CACHE).then((cache) => {
+                cache.put(request, responseToCache);
+              });
+            }
+          }).catch(() => {
+            // Network failed, that's ok - we have cache
+          });
+          return cachedResponse;
+        }
+        
+        // Not in cache, fetch from network
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        }).catch(() => {
+          // Network failed and no cache - return placeholder
+          return new Response(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e5e7eb"/></svg>',
+            { headers: { 'Content-Type': 'image/svg+xml' } }
+          );
+        });
+      })
+    );
     return;
   }
 
@@ -111,32 +183,32 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 2: CACHE FIRST for static assets (images, fonts, etc.)
-  // But use stale-while-revalidate pattern
+  // Strategy 2: CACHE FIRST for static assets (images, fonts, CSS, JS)
+  // Use stale-while-revalidate pattern for better performance
   // -------------------------------------------------------------------------
   event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
+    caches.open(RUNTIME_CACHE).then((cache) => {
+      return cache.match(request).then((cachedResponse) => {
         // Fetch from network in background to update cache
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
-            // Cache successful responses
-            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            // Cache successful responses (images, fonts, etc.)
+            if (networkResponse && networkResponse.status === 200) {
               const responseToCache = networkResponse.clone();
-              caches.open(RUNTIME_CACHE).then((cache) => {
-                cache.put(request, responseToCache);
-              });
+              cache.put(request, responseToCache);
             }
             return networkResponse;
           })
           .catch(() => {
-            // Network failed, that's ok if we have cache
+            // Network failed - that's ok if we have cache
             return null;
           });
 
-        // Return cached version immediately if available, otherwise wait for network
+        // Return cached version immediately if available (stale-while-revalidate)
+        // Otherwise wait for network
         return cachedResponse || fetchPromise;
-      })
+      });
+    })
   );
 });
 

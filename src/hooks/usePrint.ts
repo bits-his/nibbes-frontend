@@ -53,11 +53,8 @@ export const usePrint = () => {
     const printWindow = window.open('', '_blank', 'width=300,height=600')
     
     if (!printWindow) {
-      // TODO: Show toast notification instead of alert
-      // User will notice if print window doesn't open
-      // alert('Please allow popups for printing')
       console.error('Print window blocked. Please allow popups for printing.')
-      return
+      return false
     }
 
     // Format date and time
@@ -398,9 +395,17 @@ export const usePrint = () => {
           </div>
         </div>
         ${receiptType === 'receipt' ? `
-        <div class="dashed-separator"></div>  
-
+        <!-- <div class="dashed-separator"></div> -->  
+<!-- <div class="notes-section"> -->
         <!-- Individual Item Notes Sections -->
+          <div class="footer">
+          <div class="footer-thanks">Thank you for your order!</div>
+          <div class="footer-name">nibblesfastfood.com</div>
+          <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
+        </div>
+
+        <div class="dashed-separator"></div>
+
         <div class="notes-section">
           ${items.map((item: any, index: number) => {
             const itemName = item.name || item.menuItemName || 'Unknown Item'
@@ -418,21 +423,23 @@ export const usePrint = () => {
                 <div class="item-note-content">${specialInstructions}</div>
                 <div class="item-note-order-number">${orderNumber}</div>
               </div>
-              ${index < items.length - 1 ? '<div class="dashed-separator"></div>' : ''}
+              ${index < items.length - 1 ? '' : ''}
             `
           }).join('')}
         </div>
         ` : ''}
 
         <!-- Footer -->
+       
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
+          <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
         </div>
 
         <!-- Print Actions (hidden when printing) -->
         <div class="print-actions">
-          <button onclick="window.print()">Print Again</button>
+         <!-- <button onclick="window.print()">Print Again</button> -->
           <button onclick="window.close()">Close Window</button>
         </div>
         <script>
@@ -472,6 +479,8 @@ export const usePrint = () => {
     } else {
       printWindow.addEventListener('load', printAfterLoad, { once: true })
     }
+    
+    return true
   }, [serviceCharges])
   
   return { printInvoice }

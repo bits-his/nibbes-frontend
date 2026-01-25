@@ -18,8 +18,10 @@ import { z } from "zod"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 import type { CartItem } from "@shared/schema"
 import { useAuth } from "@/hooks/useAuth"
+import { useSettings } from "@/context/SettingsContext"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
+import { useServiceCharges } from "@/context/ServiceChargesContext"
 import { usePrint } from "@/hooks/usePrint"
 
 // Service Charge interface
@@ -40,7 +42,7 @@ declare global {
 
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
-  customerPhone: z.string().optional(),
+  customerPhone: z.string().min(1, "Phone number is required"),
   orderType: z.enum(["delivery", "pickup"], {
     required_error: "Please select an order type",
   }),
@@ -85,6 +87,7 @@ export default function Checkout() {
   const [, setLocation] = useLocation()
   const { toast} = useToast()
   const { user, loading } = useAuth()
+  const { settings } = useSettings()
   const { cart: cartFromContext, clearCart } = useCart() // Get cart from context
   const { printInvoice } = usePrint()
   
@@ -109,9 +112,8 @@ export default function Checkout() {
   const [multiPaymentEnabled, setMultiPaymentEnabled] = useState(false)
   const [paymentSplits, setPaymentSplits] = useState<Array<{ method: string; amount: number }>>([{ method: 'cash', amount: 0 }])
   
-  // Service charges state
-  const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([])
-  const [loadingCharges, setLoadingCharges] = useState(true)
+  // Get service charges from context (preloaded on app start)
+  const { serviceChargeRate, vatRate, serviceCharges } = useServiceCharges()
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true })
@@ -127,7 +129,7 @@ export default function Checkout() {
     // },
     {
       id: 'card',
-      name: 'Credit/Debit Card',
+      name: 'Card/Transfer',
       description: 'Pay securely with Interswitch',
       icon: CreditCard,
       type: 'card',
@@ -178,29 +180,6 @@ export default function Checkout() {
     const txnRef = `NIB-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     setTransactionRef(txnRef)
   }, [])
-  
-  // Fetch active service charges
-  useEffect(() => {
-    const fetchServiceCharges = async () => {
-      try {
-        setLoadingCharges(true)
-        const response = await apiRequest("GET", "/api/service-charges/active")
-        if (response.ok) {
-          const charges = await response.json()
-          setServiceCharges(charges)
-          console.log('✅ Service charges loaded:', charges)
-        }
-      } catch (error) {
-        console.error('❌ Error fetching service charges:', error)
-        // Don't show error to user, just use empty array
-        setServiceCharges([])
-      } finally {
-        setLoadingCharges(false)
-      }
-    }
-    
-    fetchServiceCharges()
-  }, [])
 
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || "wss://server.brainstorm.ng/nibbleskitchen/ws"
@@ -237,7 +216,7 @@ export default function Checkout() {
     defaultValues: {
       customerName: user?.username || "",
       customerPhone: "",
-      orderType: "pickup", // Default to pickup - delivery button commented out temporarily
+      orderType: "pickup", // Default to pickup
     },
   })
 
@@ -293,6 +272,7 @@ export default function Checkout() {
 
     if (user) {
       form.setValue("customerName", user.username || user.email)
+      form.setValue("customerPhone", user.phone || "")
     } else if (guestSession) {
       form.setValue("customerName", guestSession.guestName)
       form.setValue("customerPhone", guestSession.guestPhone)
@@ -517,22 +497,21 @@ export default function Checkout() {
     
     const baseAmount = subtotal + deliveryFee // Add delivery fee to subtotal
     
-    // Apply service charges only if there are items
-    let totalWithCharges = baseAmount
-    if (hasItems) {
-      serviceCharges.forEach(charge => {
-        const chargeAmount = Number(charge.amount) || 0
-        if (charge.type === 'percentage') {
-          totalWithCharges += (baseAmount * (chargeAmount / 100))
-        } else {
-          totalWithCharges += chargeAmount
-        }
-      })
+    // Apply all service charges if available, otherwise use legacy rates
+    let totalCharges = 0
+    if (serviceCharges.length > 0) {
+      totalCharges = serviceCharges.reduce((total, charge) => {
+        return total + (baseAmount * (Number(charge.amount) / 100))
+      }, 0)
+    } else {
+      // Fallback to legacy calculation
+      totalCharges = (baseAmount * (serviceChargeRate / 100)) + (baseAmount * (vatRate / 100))
     }
+    
+    const totalWithCharges = baseAmount + totalCharges
     
     return totalWithCharges
   }
-  
   // Helper function to calculate individual service charge amounts
   const calculateServiceChargeAmount = (charge: ServiceCharge) => {
     // Don't calculate if there are no items
@@ -573,7 +552,7 @@ export default function Checkout() {
       const response = await apiRequest("POST", "/api/orders", {
         ...orderData,
         paymentStatus: "pending",
-        paymentMethod: "card",
+        paymentMethod: "transfer", // Use "transfer" since that's what's available for online orders
         transactionRef: txnRef, // Send transaction reference to backend
       })
       
@@ -661,88 +640,88 @@ export default function Checkout() {
         // LIVE MODE (ACTIVE)
         mode: "LIVE",
         
-        // Payment channels - Enable all payment options
-        // Remove or comment out to show all available options
-        // payment_channels: ["card", "bank", "ussd", "qr"], 
+        // Payment channels - Only show Card and Bank Transfer
+        // Available options: "card", "bank", "ussd", "qr", "wallet", "opay", "quickteller", "googlepay"
+        payment_channels: ["card", "bank"], 
         
         // Callback when payment is completed
         onComplete: async function(response: any) {
-          console.log('Payment completed:', response)
-          console.log('Response code:', response.resp || response.responseCode)
+          console.log('🔔 Payment completed:', response)
+          console.log('📝 Response description:', response.desc)
+          console.log('📝 Transaction ref:', txnRef)
+          console.log('📝 Amount (kobo):', amount)
           
-          // Clear cart on any response using context method
-          clearCart()
-          
-          // Check payment response
-          // Interswitch success codes: "00" or "10" (pending)
-          const respCode = response.resp || response.responseCode
-          const paymentStatus = respCode === "00" ? "success" : respCode === "10" ? "pending" : "failed"
-          
-          // Call backend payment callback to update paymentStatus
-          // This ensures the order paymentStatus is updated even if Interswitch webhook fails
-          try {
-            const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                txnref: txnRef,
-                resp: respCode,
-                amount: amount
+          // Verify payment with Interswitch API (like reference implementation)
+          if (response.desc === "Approved by Financial Institution") {
+            try {
+              // Verify transaction with Interswitch
+              const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`
+              console.log('🔍 Verifying with Interswitch:', verifyUrl)
+              
+              const verifyResponse = await fetch(verifyUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
               })
-            })
-            
-            if (callbackResponse.ok) {
-              console.log('✅ Payment callback processed successfully')
-            } else {
-              console.error('⚠️ Payment callback failed:', await callbackResponse.text())
+              const verifyData = await verifyResponse.json()
+              console.log('✅ Interswitch verification response:', verifyData)
+              
+              if (verifyData.ResponseCode === "00") {
+                // Payment verified - update backend with retry
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'
+                let callbackSuccess = false
+                
+                for (let attempt = 1; attempt <= 3 && !callbackSuccess; attempt++) {
+                  try {
+                    console.log(`📤 Calling backend callback (attempt ${attempt}/3)...`)
+                    const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        txnref: txnRef,
+                        resp: "00",
+                        amount: amount,
+                        orderId: createdOrder.id,
+                        interswitchResponse: verifyData
+                      })
+                    })
+                    const callbackData = await callbackRes.json()
+                    console.log('✅ Backend callback response:', callbackData)
+                    callbackSuccess = true
+                  } catch (err) {
+                    console.error(`❌ Backend callback attempt ${attempt} failed:`, err)
+                    if (attempt < 3) await new Promise(r => setTimeout(r, 1000))
+                  }
+                }
+                
+                clearCart()
+                toast({
+                  title: "Payment Successful! 🎉",
+                  description: `Order #${createdOrder.orderNumber} has been paid.`,
+                })
+                startTransition(() => {
+                  setTimeout(() => setLocation("/docket"), 1500)
+                })
+              } else {
+                console.error('❌ Interswitch verification failed:', verifyData)
+                toast({
+                  title: "Payment Verification Failed",
+                  description: verifyData.ResponseDescription || "Could not verify payment.",
+                  variant: "destructive",
+                })
+              }
+            } catch (err) {
+              console.error('❌ Verification error:', err)
+              toast({
+                title: "Verification Error", 
+                description: "Payment may have succeeded. Please check your orders.",
+                variant: "destructive",
+              })
             }
-          } catch (callbackError) {
-            console.error('⚠️ Error calling payment callback:', callbackError)
-            // Don't fail the payment flow if callback fails - webhook should handle it
-          }
-          
-          if (respCode === "00") {
-            // Payment successful
-            toast({
-              title: "Payment Successful! 🎉",
-              description: `Order #${createdOrder.orderNumber} has been paid and sent to kitchen.`,
-            })
-            
-            // Clear cart using context method
-            clearCart()
-            
-            // Redirect to docket (works for both authenticated users and guests)
-            startTransition(() => {
-              setTimeout(() => {
-                setLocation("/docket")
-              }, 1500)
-            })
-          } else if (respCode === "10") {
-            // Payment pending (e.g., bank transfer initiated)
-            toast({
-              title: "Payment Pending",
-              description: "Your payment is being processed. You'll be notified when confirmed.",
-            })
-            
-            startTransition(() => {
-              setTimeout(() => {
-                setLocation("/docket")
-              }, 1500)
-            })
           } else {
-            // Payment failed or other status
-            console.error('Payment failed with response:', response)
             toast({
               title: "Payment Failed",
-              description: "Payment could not be completed. Redirecting to home page...",
+              description: response.desc || "Payment was not approved.",
               variant: "destructive",
-            })
-            
-            // Redirect to home
-            startTransition(() => {
-              setTimeout(() => {
-                setLocation("/")
-              }, 2000)
             })
           }
         },
@@ -831,19 +810,14 @@ export default function Checkout() {
     onSuccess: (data: any) => {
       toast({
         title: "Order Placed!",
-        description: `Your order #${data.orderNumber} has been received and placed.`,
+        description: `Your order #${data.orderNumber} has been received.`,
       })
       clearCart() // Use clearCart from context
       form.reset()
       
-      // If payment method is card, redirect to payment
-      if (selectedPaymentMethod === 'card' && data.paymentUrl) {
-        window.location.href = data.paymentUrl
-      } else {
-        setTimeout(() => {
-          setLocation("/docket")
-        }, 1500)
-      }
+      // Redirect immediately to docket - don't wait for payment verification
+      // Payment verification will happen in background
+      setLocation("/docket")
     },
     onError: () => {
       toast({
@@ -903,6 +877,7 @@ export default function Checkout() {
           // Include delivery pricing information
           geoPricingId: geoPricingId,
           deliveryFee: deliveryFee,
+          deliveryRoute: deliveryRoute ? `${deliveryRoute.from} → ${deliveryRoute.to}` : null,
         }),
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
@@ -914,7 +889,12 @@ export default function Checkout() {
 
     // If card payment, initiate Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
-      handleCardPayment(orderData)
+      // For online orders, set payment method as "online" instead of "card"
+      const onlineOrderData = {
+        ...orderData,
+        paymentMethod: "online"
+      }
+      handleCardPayment(onlineOrderData)
     } else {
       // For cash/transfer, create order directly
       createOrderMutation.mutate(orderData)
@@ -922,16 +902,40 @@ export default function Checkout() {
     }
   }
 
+  const [completedOrder, setCompletedOrder] = useState<any>(null)
+
   const createWalkInOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const response = await apiRequest("POST", "/api/orders", orderData)
-      return await response.json()
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      try {
+        const response = await apiRequest("POST", "/api/orders", orderData, controller.signal)
+        clearTimeout(timeoutId)
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Server error: ${response.status}`)
+        }
+        
+        return await response.json()
+      } catch (error: any) {
+        clearTimeout(timeoutId)
+        if (error.name === 'AbortError') {
+          throw new Error('Request timeout - please check your connection and try again')
+        }
+        throw error
+      }
     },
     onSuccess: (data: any) => {
-      toast({
-        title: "Order Created & Payment Recorded!",
-        description: `Order #${data.orderNumber} has been created and sent to kitchen.`,
-      })
+      console.log('✅ Walk-in order created successfully:', data)
+      
+      // Calculate breakdown for display
+      const itemsSubtotal = walkInOrder?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
+      const baseAmount = itemsSubtotal + deliveryFee
+      const serviceChargeAmount = baseAmount * (serviceChargeRate / 100)
+      const vatAmount = baseAmount * (vatRate / 100)
+      const totalWithCharges = baseAmount + serviceChargeAmount + vatAmount
       
       // Prepare order data for printing
       const orderDataForPrint = {
@@ -940,32 +944,47 @@ export default function Checkout() {
         customerName: walkInOrder?.customerName || data.customerName || 'N/A',
         orderType: 'walk-in',
         items: walkInOrder?.items || data.items || [],
-        total: parseFloat(data.totalAmount || walkInOrder?.total || 0),
+        subtotal: itemsSubtotal,
+        deliveryFee: deliveryFee,
+        serviceCharge: serviceChargeAmount,
+        serviceChargeRate: serviceChargeRate,
+        vat: vatAmount,
+        vatRate: vatRate,
+        total: parseFloat(data.totalAmount || totalWithCharges),
         paymentMethod: data.paymentMethod || 'N/A',
         paymentStatus: data.paymentStatus || 'paid',
-        tendered: parseFloat(data.totalAmount || walkInOrder?.total || 0)
+        tendered: parseFloat(data.totalAmount || totalWithCharges)
       }
       
-      // 🖨️ Show print preview immediately for walk-in orders
-      console.log('🖨️ Showing print preview for walk-in order #' + data.orderNumber)
+      // Store completed order for print confirmation screen
+      setCompletedOrder(orderDataForPrint)
       
-      // Show print preview immediately with walk-in receipt type (no card list)
-      printInvoice(orderDataForPrint, 'walk-in')
+      // Try to open print window immediately
+      const printOpened = printInvoice(orderDataForPrint, 'walk-in')
       
-      // Clear walk-in order and redirect after a short delay to allow print window to open
-      setTimeout(() => {
-        setWalkInOrder(null)
-        localStorage.removeItem("pendingWalkInOrder")
-        // Redirect to staff page to avoid blank page
-        setLocation("/staff")
-      }, 500)
+      if (!printOpened) {
+        toast({
+          title: "Print Window Blocked",
+          description: "Please allow popups to print receipts, or use the Print Receipt button below.",
+          variant: "destructive",
+        })
+      }
+      
+      toast({
+        title: "Order Created Successfully!",
+        description: `Order #${data.orderNumber} has been sent to kitchen.`,
+      })
       
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('❌ Walk-in order creation failed:', error)
+      
+      const errorMessage = error?.message || 'Unknown error occurred'
+      
       toast({
-        title: "Error",
-        description: "Failed to create order. Please try again.",
+        title: "Order Creation Failed",
+        description: errorMessage,
         variant: "destructive",
       })
     },
@@ -1009,6 +1028,12 @@ export default function Checkout() {
   }
 
   const handleWalkInPayment = async () => {
+    // Prevent double submission
+    if (createWalkInOrderMutation.isPending || isProcessingPayment) {
+      console.log('⚠️ Payment already in progress, ignoring duplicate submission')
+      return
+    }
+
     // Check if kitchen is closed
     if (!kitchenStatus.isOpen) {
       toast({
@@ -1018,6 +1043,8 @@ export default function Checkout() {
       })
       return
     }
+
+    console.log('💳 Starting payment process...', { method: selectedPaymentMethod, multiPayment: multiPaymentEnabled })
 
     // For card payments, use Interswitch inline checkout
     if (selectedPaymentMethod === 'card') {
@@ -1089,52 +1116,25 @@ export default function Checkout() {
           merchant_name: "Nibbles Kitchen",
           logo_url: window.location.origin + "/nibbles.jpg",
           
+          // Payment channels - Only show Card and Bank Transfer
+          // Available options: "card", "bank", "ussd", "qr", "wallet", "opay", "quickteller", "googlepay"
+          payment_channels: ["card", "bank"],
+          
           onComplete: async function (response: any) {
             console.log("Walk-in payment completed:", response)
-            console.log("Response code:", response.responseCode)
-            
             const respCode = response.responseCode || response.resp
             
-            // Call backend payment callback to update paymentStatus
-            // This ensures the order paymentStatus is updated even if Interswitch webhook fails
-            try {
-              const callbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}/api/payment/callback`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  txnref: transactionRef,
-                  resp: respCode,
-                  amount: amountInKobo
-                })
-              })
-              
-              if (callbackResponse.ok) {
-                console.log('✅ Payment callback processed successfully')
-              } else {
-                console.error('⚠️ Payment callback failed:', await callbackResponse.text())
-              }
-            } catch (callbackError) {
-              console.error('⚠️ Error calling payment callback:', callbackError)
-              // Don't fail the payment flow if callback fails - webhook should handle it
-            }
-            
             if (respCode === '00') {
-              // Payment successful
               toast({
                 title: "Payment Successful!",
                 description: `Order #${createdOrder.orderNumber} has been paid.`,
               })
-              
-              // Clear walk-in order and redirect
               localStorage.removeItem("pendingWalkInOrder")
-              startTransition(() => {
-                setLocation("/docket")
-              })
+              startTransition(() => setLocation("/docket"))
             } else {
-              // Payment failed
               toast({
                 title: "Payment Failed",
-                description: response.responseDescription || "Payment was not successful. Please try again.",
+                description: response.desc || "Payment was not successful.",
                 variant: "destructive",
               })
             }
@@ -1232,6 +1232,100 @@ export default function Checkout() {
       window.removeEventListener('keydown', handleKeyPress);
     };
   }, [walkInOrder, createWalkInOrderMutation.isPending, isProcessingPayment]);
+
+  // Show completion screen after successful order
+  if (completedOrder) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <Card className="border-green-500 shadow-lg">
+            <CardHeader className="bg-green-50 border-b border-green-200">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-green-900">Order Created Successfully!</CardTitle>
+                  <p className="text-sm text-green-700">Order #{completedOrder.orderNumber}</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="text-center space-y-4">
+                <p className="text-lg">The order has been sent to the kitchen.</p>
+                <div className="flex flex-col gap-3">
+                  <Button
+                    size="lg"
+                    onClick={() => {
+                      printInvoice(completedOrder, 'walk-in')
+                    }}
+                    className="w-full"
+                  >
+                    🖨️ Print Receipt
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => {
+                      setCompletedOrder(null)
+                      setWalkInOrder(null)
+                      localStorage.removeItem("pendingWalkInOrder")
+                      setLocation("/staff")
+                    }}
+                    className="w-full"
+                  >
+                    Continue Without Printing
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-2">Order Summary</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Customer:</span>
+                    <span className="font-medium">{completedOrder.customerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Payment Method:</span>
+                    <span className="font-medium">{completedOrder.paymentMethod}</span>
+                  </div>
+                  <div className="border-t my-2 pt-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>₦{(completedOrder.subtotal || 0).toLocaleString()}</span>
+                    </div>
+                    {completedOrder.deliveryFee > 0 && (
+                      <div className="flex justify-between">
+                        <span>Delivery Fee:</span>
+                        <span>₦{completedOrder.deliveryFee.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {completedOrder.serviceCharge > 0 && (
+                      <div className="flex justify-between">
+                        <span>Service Charge ({completedOrder.serviceChargeRate}%):</span>
+                        <span>₦{completedOrder.serviceCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    {completedOrder.vat > 0 && (
+                      <div className="flex justify-between">
+                        <span>VAT ({completedOrder.vatRate}%):</span>
+                        <span>₦{completedOrder.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between font-bold text-base border-t pt-2">
+                    <span>Total:</span>
+                    <span>₦{completedOrder.total.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   // Handle walk-in order payment
   if (walkInOrder) {
@@ -1443,7 +1537,7 @@ export default function Checkout() {
               <div className="border-t pt-6">
                 {!multiPaymentEnabled && (
                   <div className="space-y-3 mb-6">
-                    {/* Service Charges - Dynamic from API */}
+                    {/* Service Charges - From preloaded context */}
                     {walkInOrder && walkInOrder.items?.length > 0 ? (
                       // Walk-in order: show breakdown with service charges
                       <>
@@ -1451,13 +1545,11 @@ export default function Checkout() {
                           <span>Subtotal</span>
                           <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
+                        {/* Show all service charges individually for walk-in */}
                         {serviceCharges.map((charge) => (
                           <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                            <span>
-                              {charge.description}
-                              {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                            </span>
-                            <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span>{charge.description} ({charge.amount}%)</span>
+                            <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                         ))}
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
@@ -1472,13 +1564,11 @@ export default function Checkout() {
                           <span>Subtotal</span>
                           <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
+                        {/* Show all service charges individually for regular checkout */}
                         {serviceCharges.map((charge) => (
                           <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                            <span>
-                              {charge.description}
-                              {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                            </span>
-                            <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span>{charge.description} ({charge.amount}%)</span>
+                            <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                         ))}
                         <div className="flex justify-between text-2xl font-bold border-t pt-3">
@@ -1490,12 +1580,34 @@ export default function Checkout() {
                   </div>
                 )}
 
+                {createWalkInOrderMutation.isError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>Payment failed. Please try again.</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => createWalkInOrderMutation.reset()}
+                      >
+                        Dismiss
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <Button
                   onClick={handleWalkInPayment}
-                  disabled={createWalkInOrderMutation.isPending}
-                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary"
+                  disabled={createWalkInOrderMutation.isPending || isProcessingPayment}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary disabled:opacity-50"
                 >
-                  {createWalkInOrderMutation.isPending ? "Creating Order..." : "Confirm Payment"}
+                  {createWalkInOrderMutation.isPending || isProcessingPayment ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Processing Payment...
+                    </span>
+                  ) : (
+                    "Confirm Payment"
+                  )}
                 </Button>
               </div>
             </CardContent>
@@ -1552,7 +1664,8 @@ export default function Checkout() {
             <div className="grid gap-8 lg:grid-cols-3">
               {/* Left column - Form sections */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Contact Information Card */}
+                {/* Contact Information Card - Commented out since customer already provided details */}
+                {/* 
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <CardTitle className="text-lg">1. Contact Information</CardTitle>
@@ -1582,7 +1695,9 @@ export default function Checkout() {
                       name="customerPhone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold">Phone Number</FormLabel>
+                          <FormLabel className="text-base font-semibold">
+                            Phone Number <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="tel"
@@ -1598,22 +1713,22 @@ export default function Checkout() {
                     />
                   </CardContent>
                 </Card>
+                */}
 
                 {/* Order Type Selection Card */}
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <CardTitle className="text-lg">2. Delivery Method</CardTitle>
+                    <CardTitle className="text-lg">1. Delivery Method</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <div className="flex justify-center">
-                      {/* Delivery button temporarily commented out - will be re-enabled when delivery people are available */}
-                      {["pickup", "delivery"].map((type) => {
+                    <div className="flex gap-3 sm:gap-4">
+                      {(settings.deliveryEnabled ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
                             key={type}
                             type="button"
-                            className={`w-full p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+                            className={`flex-1 p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
                               ${
                                 isActive
                                   ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
@@ -1630,30 +1745,6 @@ export default function Checkout() {
                           </button>
                         )
                       })}
-                      {/* Only show pickup option for now - centered */}
-                      {/* {["pickup"].map((type) => {
-                        const isActive = form.watch("orderType") === type
-                        return (
-                          <button
-                            key={type}
-                            type="button"
-                            className={`w-full max-w-xs p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
-                              ${
-                                isActive
-                                  ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
-                                  : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
-                              }`}
-                            onClick={() => {
-                              form.setValue("orderType", type as "delivery" | "pickup")
-                            }}
-                          >
-                            <div className="font-semibold text-base capitalize">{type}</div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {type === "pickup" ? "At our location" : "To your location"}
-                            </div>
-                          </button>
-                        )
-                      })} */}
                     </div>
                     <FormMessage />
                   </CardContent>
@@ -1964,16 +2055,29 @@ export default function Checkout() {
                           )}
                         </div>
                       )}
-                      {/* Service Charges - Dynamic from API */}
-                      {serviceCharges.length > 0 && serviceCharges.map((charge) => (
+                      {/* Service Charges - Show all active charges individually */}
+                      {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
                         <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                          <span>
-                            {charge.description} 
-                            {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                          </span>
-                          <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span>{charge.description} ({charge.amount}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
-                      ))}
+                      )) : (
+                        // Fallback to old method if serviceCharges is empty
+                        <>
+                          {serviceChargeRate > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Service charge ({serviceChargeRate}%)</span>
+                              <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          {vatRate > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>VAT ({vatRate}%)</span>
+                              <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
                       <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
                         <span className="font-semibold text-foreground">Total</span>
                         <span className="text-2xl font-bold " data-testid="text-total">
@@ -1983,22 +2087,21 @@ export default function Checkout() {
                     </div>
 
                     {/* CTA Button */}
-                    <Button
-                      type="submit"
-                      size="lg"
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
-                      disabled={createOrderMutation.isPending || isProcessingPayment}
-                      data-testid="button-place-order"
-                    >
-                      {createOrderMutation.isPending || isProcessingPayment ? (
-                        <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                          Processing
-                        </span>
-                      ) : (
-                        "Complete Order"
-                      )}
-                    </Button>
+                    <div className="w-full">
+                      <Button
+                        type="submit"
+                        size="lg"
+                        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
+                        disabled={createOrderMutation.isPending || isProcessingPayment || isCalculatingDelivery}
+                        data-testid="button-place-order"
+                      >
+                        {isCalculatingDelivery 
+                          ? "Calculating Delivery Fee..." 
+                          : createOrderMutation.isPending || isProcessingPayment 
+                            ? "Processing..." 
+                            : "Complete Order"}
+                      </Button>
+                    </div>
 
                     {/* Security note */}
                     <p className="text-xs text-muted-foreground text-center pt-2">
@@ -2054,16 +2157,29 @@ export default function Checkout() {
                       )}
                     </div>
                   )}
-                  {/* Service Charges - Dynamic from API */}
-                  {serviceCharges.length > 0 && serviceCharges.map((charge) => (
+                  {/* Service Charges - Show all active charges individually */}
+                  {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
                     <div key={charge.id} className="flex justify-between">
-                      <span>
-                        {charge.description}
-                        {charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}
-                      </span>
-                      <span>₦{calculateServiceChargeAmount(charge).toLocaleString()}</span>
+                      <span>{charge.description} ({charge.amount}%)</span>
+                      <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString()}</span>
                     </div>
-                  ))}
+                  )) : (
+                    // Fallback to old method if serviceCharges is empty
+                    <>
+                      {serviceChargeRate > 0 && (
+                        <div className="flex justify-between">
+                          <span>Service charge ({serviceChargeRate}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {vatRate > 0 && (
+                        <div className="flex justify-between">
+                          <span>VAT ({vatRate}%)</span>
+                          <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                   <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Total</span>
                     <span>₦{calculateTotal().toLocaleString()}</span>
@@ -2115,28 +2231,16 @@ export default function Checkout() {
             </div>
 
             <DialogFooter className="flex-col space-y-2">
-              <Button
-                onClick={handlePaymentConfirmation}
-                className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
-                disabled={isProcessingPayment || createOrderMutation.isPending || !kitchenStatus.isOpen}
-              >
-                {isProcessingPayment || createOrderMutation.isPending ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                    Processing...
-                  </>
-                ) : !kitchenStatus.isOpen ? (
-                  <>
-                    <ChefHat className="mr-2 h-4 w-4" />
-                    Kitchen Closed
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Confirm Order
-                  </>
-                )}
-              </Button>
+              <div className="w-full">
+                <Button
+                  className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
+                  onClick={handlePaymentConfirmation}
+                  disabled={createOrderMutation.isPending || isProcessingPayment}
+                >
+                  {isProcessingPayment ? "Processing..." : "Confirm Order"}
+                  <Check className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

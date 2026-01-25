@@ -42,6 +42,7 @@ export default function OrderManagement() {
   const { printInvoice } = usePrint();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [orderTypeFilter, setOrderTypeFilter] = useState("all"); // New: filter for online/walk-in
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
     from: new Date(new Date().setHours(0, 0, 0, 0)),  // Start of today
     to: new Date(new Date().setHours(23, 59, 59, 999))   // End of today
@@ -87,25 +88,20 @@ export default function OrderManagement() {
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters with proper date range (start of from date to end of to date)
+      // Always use date range - default to today if not set
+      const fromDate = dateRange.from ? new Date(dateRange.from) : new Date();
+      fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = dateRange.to ? new Date(dateRange.to) : new Date();
+      toDate.setHours(23, 59, 59, 999);
+
       const params = new URLSearchParams();
-      if (dateRange.from) {
-        // Set time to start of the day (00:00:00)
-        const fromDate = new Date(dateRange.from);
-        fromDate.setHours(0, 0, 0, 0);
-        params.append('from', fromDate.toISOString());
+      params.append('from', fromDate.toISOString());
+      params.append('to', toDate.toISOString());
 
-        // If no 'to' date is set, use the same date as 'from' (single day selection)
-        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
-        toDate.setHours(23, 59, 59, 999);
-        params.append('to', toDate.toISOString());
+      console.log(`📅 Frontend fetching orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
 
-        console.log(`📅 Frontend fetching orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
-      }
-
-      const queryString = params.toString();
-      const url = queryString ? `/api/orders?${queryString}` : '/api/orders';
-
+      const url = `/api/orders?${params.toString()}`;
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -119,23 +115,18 @@ export default function OrderManagement() {
   }>({
     queryKey: ["/api/orders/stats", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters with proper date range (start of from date to end of to date)
+      // Always use date range - default to today if not set
+      const fromDate = dateRange.from ? new Date(dateRange.from) : new Date();
+      fromDate.setHours(0, 0, 0, 0);
+      
+      const toDate = dateRange.to ? new Date(dateRange.to) : new Date();
+      toDate.setHours(23, 59, 59, 999);
+
       const params = new URLSearchParams();
-      if (dateRange.from) {
-        // Set time to start of the day (00:00:00)
-        const fromDate = new Date(dateRange.from);
-        fromDate.setHours(0, 0, 0, 0);
-        params.append('from', fromDate.toISOString());
+      params.append('from', fromDate.toISOString());
+      params.append('to', toDate.toISOString());
 
-        // If no 'to' date is set, use the same date as 'from' (single day selection)
-        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
-        toDate.setHours(23, 59, 59, 999);
-        params.append('to', toDate.toISOString());
-      }
-
-      const queryString = params.toString();
-      const url = queryString ? `/api/orders/stats?${queryString}` : '/api/orders/stats';
-
+      const url = `/api/orders/stats?${params.toString()}`;
       const response = await apiRequest("GET", url);
       return await response.json();
     },
@@ -221,6 +212,7 @@ export default function OrderManagement() {
       order.orderNumber.toString().includes(searchQuery) ||
       order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesOrderType = orderTypeFilter === "all" || order.orderType === orderTypeFilter;
     
     // Filter by date range if dates are selected
     const orderDate = new Date(order.createdAt);
@@ -240,7 +232,7 @@ export default function OrderManagement() {
       (!rangeStartOfDay || orderStartOfDay >= rangeStartOfDay) && 
       (!rangeEndOfDay || orderStartOfDay <= rangeEndOfDay);
 
-    return matchesSearch && matchesStatus && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesOrderType && matchesDateRange;
   });
 
 const getStatusBadge = (status: string) => {
@@ -271,7 +263,10 @@ const getStatusBadge = (status: string) => {
             <CardContent className="p-6">
               <div className="text-sm text-muted-foreground mb-1">Today's Orders</div>
               <div className="text-3xl font-bold" data-testid="stat-today-orders">
-                {stats?.todayOrders || 0}
+                {(() => {
+                  console.log('📊 Rendering stats:', stats);
+                  return stats?.todayOrders || 0;
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -279,7 +274,7 @@ const getStatusBadge = (status: string) => {
             <CardContent className="p-6">
               <div className="text-sm text-muted-foreground mb-1">Revenue</div>
               <div className="text-3xl font-bold" data-testid="stat-revenue">
-                ₦{(stats?.todayRevenue || 0).toLocaleString()}
+                ₦{Number(stats?.todayRevenue || 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -308,11 +303,15 @@ const getStatusBadge = (status: string) => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  type="search"
+                  id="search-orders"
+                  name="search-orders"
                   placeholder="Search by order number or customer name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                   data-testid="input-search"
+                  aria-label="Search orders"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -329,17 +328,32 @@ const getStatusBadge = (status: string) => {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Order Type Filter */}
+              <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+                <SelectTrigger className="w-full md:w-48" data-testid="select-order-type-filter">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="online">Online Orders</SelectItem>
+                  <SelectItem value="walk-in">Walk-in Orders</SelectItem>
+                </SelectContent>
+              </Select>
               
               {/* Date Range Filter */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     id="date-range"
+                    name="date-range"
                     variant="outline"
                     className={cn(
                       "w-full md:w-[280px] justify-start text-left font-normal",
                       !dateRange.from && "text-muted-foreground"
                     )}
+                    aria-label="Select date range for orders"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateRange.from && dateRange.to ? (
@@ -364,6 +378,7 @@ const getStatusBadge = (status: string) => {
                       variant="outline"
                       size="sm"
                       className="w-full"
+                      aria-label="Reset date range to today"
                       onClick={() => {
                         const today = new Date();
                         setDateRange({
@@ -459,6 +474,7 @@ const getStatusBadge = (status: string) => {
                               variant="ghost"
                               onClick={() => setSelectedOrder(order)}
                               data-testid={`button-view-${order.id}`}
+                              aria-label={`View order ${order.orderNumber} details`}
                               title="View order details"
                             >
                               <Eye className="w-4 h-4" />
@@ -469,6 +485,7 @@ const getStatusBadge = (status: string) => {
                                   size="icon"
                                   variant="ghost"
                                   data-testid={`button-print-${order.id}`}
+                                  aria-label={`Print options for order ${order.orderNumber}`}
                                   title="Print options"
                                 >
                                   <Printer className="w-4 h-4" />
@@ -535,6 +552,7 @@ const getStatusBadge = (status: string) => {
                     <Button
                       variant="outline"
                       className="flex items-center gap-2"
+                      aria-label="Print order"
                     >
                       <Printer className="w-4 h-4" />
                       Print

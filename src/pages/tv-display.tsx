@@ -64,15 +64,15 @@ export default function TVDisplay() {
   const [currentPage, setCurrentPage] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
   
-  // Pagination: 8 orders per page (4 columns x 2 rows)
-  const ordersPerPage = 8
+  // Pagination: 10 orders per page (5 columns x 2 rows)
+  const ordersPerPage = 10
   const totalPages = Math.ceil(readyOrders.length / ordersPerPage)
   const displayedOrders = readyOrders.slice(
     currentPage * ordersPerPage,
     (currentPage + 1) * ordersPerPage
   )
   
-  // Auto-scroll every 5 seconds if there are more than 8 orders
+  // Auto-scroll every 5 seconds if there are more than 10 orders
   useEffect(() => {
     if (readyOrders.length <= ordersPerPage) {
       setCurrentPage(0)
@@ -95,7 +95,7 @@ export default function TVDisplay() {
       setLoading(true)
       
       // Fetch orders without authentication from public TV Display endpoint
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050'
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen')
       const response = await fetch(`${backendUrl}/api/orders/tv-display/ready`, {
         method: 'GET',
         headers: {
@@ -333,8 +333,8 @@ export default function TVDisplay() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            {/* Grid container - 2 rows x 4 columns, fills available space */}
-            <div className="grid grid-cols-4 grid-rows-2 gap-3 md:gap-4 lg:gap-6 h-full">
+            {/* Grid container - 2 rows x 5 columns, fills available space */}
+            <div className="grid grid-cols-5 grid-rows-2 gap-2 md:gap-3 lg:gap-4 h-full">
               {displayedOrders.map((order) => (
                 <div
                   key={order.id}

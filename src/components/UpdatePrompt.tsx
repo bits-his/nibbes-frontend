@@ -38,11 +38,63 @@ export function UpdatePrompt() {
     return criticalPaths.some(path => location.startsWith(path));
   };
 
-  const handleUpdate = () => {
-    if (registration?.waiting) {
-      // Tell the waiting service worker to activate
+  const handleUpdate = async () => {
+    if (!registration?.waiting) {
+      console.warn('[UpdatePrompt] No waiting service worker found');
+      // Fallback: Force reload anyway
+      window.location.reload();
+      return;
+    }
+
+    try {
+      console.log('[UpdatePrompt] Clearing caches and updating...');
+      
+      // Step 1: Clear all caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => {
+            console.log(`[UpdatePrompt] Deleting cache: ${cacheName}`);
+            return caches.delete(cacheName);
+          })
+        );
+        console.log('[UpdatePrompt] All caches cleared');
+      }
+
+      // Step 2: Set up reload listener before sending message
+      let reloaded = false;
+      const handleControllerChange = () => {
+        if (!reloaded) {
+          reloaded = true;
+          console.log('[UpdatePrompt] Controller changed - reloading page');
+          // Remove listener to prevent multiple reloads
+          navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+          // Reload page - caches already cleared, so this will load fresh content
+          window.location.reload();
+        }
+      };
+
+      // Listen for controller change (service worker activated)
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+      // Step 3: Tell the waiting service worker to activate
+      console.log('[UpdatePrompt] Sending SKIP_WAITING message to service worker');
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      // The page will reload automatically via controllerchange event in main.tsx
+
+      // Step 4: Fallback timeout - reload after 2 seconds if controllerchange doesn't fire
+      setTimeout(() => {
+        if (!reloaded) {
+          console.log('[UpdatePrompt] Fallback: Reloading after timeout');
+          reloaded = true;
+          navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+          // Reload page
+          window.location.reload();
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('[UpdatePrompt] Error during update:', error);
+      // Fallback: Reload on error (caches already cleared)
+      window.location.reload();
     }
   };
 

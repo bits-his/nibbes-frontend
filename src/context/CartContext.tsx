@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
@@ -38,6 +38,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [cart, setCart] = useState<CartItem[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
+  const prevUserRef = useRef(user);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(user?.id);
 
   // Load cart from localStorage when user changes
@@ -82,23 +83,70 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     
     try {
-      await apiRequest('POST', '/api/cart/sync', { items: cartItems });
-    } catch (error) {
+      const response = await apiRequest('POST', '/api/cart/sync', { items: cartItems });
+      const data = await response.json();
+      
+      if (data.unavailableItems && data.unavailableItems.length > 0) {
+        // Show warning for unavailable items
+        toast({
+          title: 'Some items are unavailable',
+          description: `${data.unavailableItems.length} item(s) removed: ${data.unavailableItems.join(', ')}`,
+          variant: 'destructive',
+        });
+        
+        // Remove unavailable items from cart
+        setCart(prevCart => 
+          prevCart.filter(item => 
+            !data.unavailableItems.includes(item.menuItem.name)
+          )
+        );
+      } else if (data.success) {
+        // Success - silent or show success toast
+        console.log('✅ Cart synced successfully:', data.itemCount, 'items');
+      }
+    } catch (error: any) {
       console.error('Failed to sync cart with server', error);
+      
+      // Parse error for specific message
+      let errorMessage = 'Failed to sync your cart. Please try again.';
+      
+      try {
+        const errorMatch = error.message?.match(/\d+:\s*({.*})/);
+        if (errorMatch && errorMatch[1]) {
+          const errorData = JSON.parse(errorMatch[1]);
+          if (errorData.errorType === 'NOT_AUTHENTICATED') {
+            errorMessage = 'Please log in to sync your cart';
+          } else if (errorData.errorType === 'SERVER_ERROR') {
+            errorMessage = 'Server error. Your cart will sync when connection is restored.';
+          } else {
+            errorMessage = errorData.error || errorMessage;
+          }
+        } else if (error.message?.includes('Failed to fetch')) {
+          errorMessage = 'Connection error. Your cart will sync when you\'re back online.';
+        }
+      } catch (parseError) {
+        // Use default message
+      }
+      
       toast({
-        title: 'Error',
-        description: 'Failed to sync your cart. Some items may not be available.',
+        title: 'Cart Sync Error',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
   }, [user, toast]);
 
-  // When user logs in, sync the cart with the server
+  // When user logs in, sync the cart with the server (only once)
   useEffect(() => {
     if (user && cart.length > 0) {
-      syncCartWithServer(cart);
+      // Only sync once when user first logs in, not on every cart change
+      const hasUserChanged = user !== prevUserRef.current;
+      if (hasUserChanged) {
+        syncCartWithServer(cart);
+      }
+      prevUserRef.current = user;
     }
-  }, [user, cart, syncCartWithServer]);
+  }, [user, syncCartWithServer]); // Removed cart dependency
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'>) => {
     setCart(prevCart => {

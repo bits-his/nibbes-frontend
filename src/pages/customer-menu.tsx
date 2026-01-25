@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ShoppingCart,
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChefHat,
   AlertCircle,
+  Wifi,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,15 +22,28 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
-import heroImage from "@assets/generated_images/Nigerian_cuisine_hero_image_337661c0.png";
+import { useAuth } from "@/hooks/useAuth";
+// PERFORMANCE: Hero image hosted on Cloudinary for optimization
+// TODO: Replace with your Cloudinary URL after uploading the optimized image
+// Recommended: Upload as WebP format, quality 85, max width 1920px
+// PERFORMANCE: Hero image hosted on Cloudinary with automatic optimization
+// Cloudinary transformations: f_auto (WebP/AVIF), q_85 (quality), w_1920 (max width)
+const heroImage = import.meta.env.VITE_HERO_IMAGE_URL || "https://res.cloudinary.com/ddls0gpui/image/upload/v1768411975/WhatsApp_Image_2026-01-06_at_23.36.28_dyhvre.jpg";
 import { queryClient } from "@/lib/queryClient";
 import { SEO } from "@/components/SEO";
 import { useCart } from "@/context/CartContext";
 import { apiRequest } from "@/lib/queryClient";
+// PERFORMANCE: Removed unused imageCDN imports - using OptimizedImage component instead
+import { MenuItemCard } from "@/components/MenuItemCard";
+import { OptimizedImage } from "@/components/OptimizedImage";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { measurePerformance, logPerformanceMetrics } from "@/utils/performance";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth(); // Add user authentication
   const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart, updateSpecialInstructions } = useCart();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -44,39 +58,27 @@ export default function CustomerMenu() {
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
-
-  // Initialize and refresh menu data on component mount
+  
+  // Network status for adaptive loading
+  const networkStatus = useNetworkStatus();
+  
+  // Performance monitoring
   useEffect(() => {
-    // Force refresh the menu data when component mounts to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+    // Measure performance after page load
+    const timer = setTimeout(() => {
+      const metrics = measurePerformance();
+      logPerformanceMetrics(metrics);
+    }, 2000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Fetch kitchen status
+  // PERFORMANCE: WebSocket connection deferred - don't block initial render
   useEffect(() => {
-    const fetchKitchenStatus = async () => {
-      try {
-        const response = await apiRequest("GET", "/api/kitchen/status")
-        if (response.ok) {
-          const status = await response.json()
-          setKitchenStatus(status)
-        }
-      } catch (error) {
-        console.error('❌ Error fetching kitchen status:', error)
-        // Default to open if check fails
-        setKitchenStatus({ isOpen: true })
-      }
-    }
-    
-    fetchKitchenStatus()
-    // Poll kitchen status every 30 seconds
-    const interval = setInterval(fetchKitchenStatus, 30000)
-    return () => clearInterval(interval)
-  }, []);
-
-  // WebSocket connection for real-time menu updates
-  useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
-    const socket = new WebSocket(wsUrl);
+    // Defer WebSocket connection to avoid blocking FCP/LCP
+    // Use requestIdleCallback or setTimeout to connect after page is interactive
+    const connectWebSocket = () => {
+      const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+      const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
       console.log("Customer Menu WebSocket connected");
@@ -87,6 +89,13 @@ export default function CustomerMenu() {
       if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+      } else if (data.type === "kitchen-status") {
+        // Update kitchen status in real-time
+        setKitchenStatus(data.status);
+        console.log("Kitchen status updated:", data.status);
+      } else if (data.type === "service-charges-updated") {
+        // Trigger service charges refresh by dispatching custom event
+        window.dispatchEvent(new CustomEvent('service-charges-updated', { detail: data.charges }));
       } else if (
         data.type === "order_update" ||
         data.type === "new_order" ||
@@ -107,38 +116,161 @@ export default function CustomerMenu() {
       console.log("Customer Menu WebSocket disconnected");
     };
 
-    // Cleanup function to close the WebSocket connection
-    return () => {
-      socket.close();
+      // Cleanup function to close the WebSocket connection
+      return () => {
+        socket.close();
+      };
     };
+
+    // Defer WebSocket connection - connect after page is interactive
+    if ('requestIdleCallback' in window) {
+      const id = (window as any).requestIdleCallback(connectWebSocket, { timeout: 2000 });
+      return () => {
+        (window as any).cancelIdleCallback(id);
+      };
+    } else {
+      const timeoutId = setTimeout(connectWebSocket, 2000);
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    }
+  }, []); // Empty deps - WebSocket doesn't block rendering
+  
+  // Fetch kitchen status on mount and poll every 30 seconds
+  useEffect(() => {
+    const fetchKitchenStatus = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/kitchen/status");
+        if (response.ok) {
+          const status = await response.json();
+          console.log('🍳 Kitchen status fetched:', status);
+          setKitchenStatus(status);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching kitchen status:', error);
+        // Default to open if check fails
+        setKitchenStatus({ isOpen: true });
+      }
+    };
+    
+    fetchKitchenStatus();
+    // Poll kitchen status every 30 seconds
+    const interval = setInterval(fetchKitchenStatus, 30000);
+    return () => clearInterval(interval);
   }, []);
+  
   const [showQRCode, setShowQRCode] = useState(false);
 
+  // Fetch menu items with extended stale time for better caching
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
+    staleTime: 10 * 60 * 1000, // 10 minutes (increased from default 5 minutes)
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
-  // Extract unique categories from menu items
-  const categories = menuItems
-    ? ["All", ...Array.from(new Set(menuItems.map(item => item.category)))]
-    : ["All"];
-
-  console.log("Available categories:", categories); // Debug log
+  // Extract unique categories from menu items (memoized)
+  const categories = useMemo(() => {
+    if (!menuItems) return ["All"];
+    return ["All", ...Array.from(new Set(menuItems.map(item => item.category)))];
+  }, [menuItems]);
 
   // Use loading state from menu only
   const isLoading = menuLoading;
 
-  const filteredItems = menuItems?.filter(
-    (item) =>
-      // Show all items (including unavailable) - they will show as "sold out"
-      (selectedCategory === "All" || item.category === selectedCategory) &&
-      (searchQuery === "" ||
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Helper function to sort items by specific item priority
+  const sortByItemPriority = (items: any[]) => {
+    // Define item priority order (lower number = appears first)
+    // Using lowercase for case-insensitive matching
+    const itemPriority: { [key: string]: number } = {
+      'beef philadelphia': 1,
+      'chicken philadelphia': 2,
+      'beef loaded fries': 3,
+      'chicken loaded fries': 4,
+      'beef shawarma': 5,
+      'chicken shawarma': 6,
+      'beef burger': 7,
+      'chicken burger': 8,
+      'oriental rice, charcoal grilled chicken and coleslaw': 9,
+      'signature rice, charcoal grilled chicken and coleslaw': 10,
+      'smokey jollof rice, charcoal grilled chicken and coleslaw': 11,
+      'creamy wings': 12, // "Wings & fries" = "Creamy Wings" in database
+      'beef kofta wrap': 13,
+      'chicken kofta wrap': 14,
+      'meat pie': 15,
+      'french fries and ketchup': 16,
+      // Everything else gets priority 999 (appears last)
+    };
+    
+    return [...items].sort((a, b) => {
+      const aName = a.name.toLowerCase().trim();
+      const bName = b.name.toLowerCase().trim();
+      const aPriority = itemPriority[aName] || 999;
+      const bPriority = itemPriority[bName] || 999;
+      
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority; // Sort by priority
+      }
+      
+      // If same priority, keep original order
+      return 0;
+    });
+  };
 
-  const addToCart = (menuItem: MenuItem) => {
+  // Filter items (memoized to prevent unnecessary recalculations)
+  const filteredItems = useMemo(() => {
+    if (!menuItems) return [];
+    
+    const filtered = menuItems.filter(
+      (item) => {
+        // Hide delivery items from customers (show only for staff/cashiers)
+        // Check for various delivery category names
+        const isDeliveryItem = item.category?.toLowerCase().includes('delivery') || 
+                              item.name?.toLowerCase().includes('delivery');
+        
+        if (isDeliveryItem && (!user || user?.role === 'customer')) {
+          return false;
+        }
+        
+        // Show all items (including unavailable) - they will show as "sold out"
+        return (selectedCategory === "All" || item.category === selectedCategory) &&
+          (searchQuery === "" ||
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
+    );
+
+    // Sort: Priority items first (only when viewing "All" categories)
+    // To disable this sorting, comment out the next line and uncomment the line after
+    return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
+    // return filtered; // Uncomment this to disable priority sorting
+  }, [menuItems, selectedCategory, searchQuery, user?.role]);
+
+  // Infinite scroll for pagination (reduces initial payload)
+  const {
+    visibleItems,
+    hasMore,
+    isLoading: isLoadingMore,
+    loadMore,
+    reset: resetPagination,
+    sentinelRef,
+  } = useInfiniteScroll(filteredItems, {
+    itemsPerLoad: networkStatus.isSlow ? 6 : 12, // Load fewer items on slow networks
+    threshold: 300,
+    enabled: true,
+  });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [selectedCategory, searchQuery, resetPagination]);
+
+  // Memoize callbacks to prevent unnecessary re-renders
+  const addToCart = useCallback((menuItem: MenuItem) => {
+    // Debug: Log kitchen status
+    console.log('🔍 addToCart called - Kitchen status:', kitchenStatus);
+    
     // Check if kitchen is closed
     if (!kitchenStatus.isOpen) {
+      console.log('❌ Kitchen is closed - blocking add to cart');
       toast({
         title: "Kitchen is Closed",
         description: "The kitchen is currently closed. Please try again later.",
@@ -148,6 +280,8 @@ export default function CustomerMenu() {
       return;
     }
     
+    console.log('✅ Kitchen is open - allowing add to cart');
+
     // Prevent adding unavailable items to cart
     if (!menuItem.available) {
       toast({
@@ -158,7 +292,7 @@ export default function CustomerMenu() {
       });
       return;
     }
-    
+
     // Check stock balance
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined && menuItem.stockBalance <= 0) {
       toast({
@@ -169,7 +303,7 @@ export default function CustomerMenu() {
       });
       return;
     }
-    
+
     // Check if adding would exceed available stock
     const currentInCart = cart.find(item => String(item.menuItem.id) === String(menuItem.id))?.quantity || 0;
     if (menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
@@ -183,20 +317,20 @@ export default function CustomerMenu() {
         return;
       }
     }
-    
+
     addToCartContext({ menuItem: menuItem as any });
     toast({
       title: "Added to Cart",
       description: `${menuItem.name} has been added to your cart.`,
       duration: 1000,
     });
-  };
+  }, [kitchenStatus.isOpen, cart, menuItems, toast, addToCartContext]);
 
-  const updateQuantity = (menuItemId: string, delta: number) => {
+  const updateQuantity = useCallback((menuItemId: string, delta: number) => {
     const item = cart.find(item => item.menuItem.id === menuItemId);
     if (item) {
       const newQuantity = item.quantity + delta;
-      
+
       // If decreasing, allow it
       if (delta < 0) {
         if (newQuantity <= 0) {
@@ -206,9 +340,11 @@ export default function CustomerMenu() {
         }
         return;
       }
-      
+
       // If increasing, check stock availability
-      const menuItem = menuItems?.find(m => String(m.id) === String(menuItemId));
+      const menuItem = menuItems && Array.isArray(menuItems)
+        ? menuItems.find((m: MenuItem) => String(m.id) === String(menuItemId))
+        : undefined;
       if (menuItem && menuItem.stockBalance !== null && menuItem.stockBalance !== undefined) {
         if (newQuantity > menuItem.stockBalance) {
           toast({
@@ -220,14 +356,14 @@ export default function CustomerMenu() {
           return;
         }
       }
-      
+
       updateQuantityContext(menuItemId, newQuantity);
     }
-  };
+  }, [cart, menuItems, toast, updateQuantityContext, removeFromCart]);
 
-  const updateInstructions = (menuItemId: string, instructions: string) => {
+  const updateInstructions = useCallback((menuItemId: string, instructions: string) => {
     updateSpecialInstructions(menuItemId, instructions);
-  };
+  }, [updateSpecialInstructions]);
 
   const subtotal = cart.reduce(
     (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,
@@ -326,20 +462,30 @@ export default function CustomerMenu() {
         title="Home - Order Authentic Nigerian Cuisine Online"
         description="Browse our menu of delicious Nigerian dishes. Order jollof rice, suya, pounded yam, egusi soup, pepper soup, fried rice and more. Fast online ordering with pickup service. Fresh meals prepared daily."
         keywords="Nigerian food menu, order jollof rice online, suya delivery, Nigerian restaurant menu, African food online, pounded yam, egusi soup, order Nigerian food, online food ordering"
-        ogUrl="https://nibbleskitchen.netlify.app/"
-        canonicalUrl="https://nibbleskitchen.netlify.app/"
+        ogUrl="https://nibblesfastfood.com/"
+        canonicalUrl="https://nibblesfastfood.com/"
       />
-      <div className="min-h-screen bg-background">
+      <main className="min-h-screen bg-background" role="main" aria-label="Menu page">
         {/* Kitchen Closed Banner - Very Prominent */}
         {!kitchenStatus.isOpen && (
-          <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80">
+          <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80" role="alert" aria-live="polite">
             <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
-              <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+              <AlertCircle className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" aria-hidden="true" />
               <div className="text-center">
                 <h2 className="text-lg md:text-2xl font-bold mb-1">⚠️ KITCHEN IS CLOSED</h2>
                 <p className="text-sm md:text-base">We are currently not accepting orders. Please check back later.</p>
               </div>
-              <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" />
+              <ChefHat className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 animate-pulse" aria-hidden="true" />
+            </div>
+          </div>
+        )}
+        
+        {/* Network Status Indicator (subtle) */}
+        {networkStatus.isSlow && (
+          <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 py-1 px-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-xs text-orange-700 dark:text-orange-300">
+              <Wifi className="w-3 h-3" />
+              <span>Slow network detected - Optimizing for faster loading</span>
             </div>
           </div>
         )}
@@ -347,11 +493,15 @@ export default function CustomerMenu() {
         {/* Hero Section */}
       <section className="relative h-[40vh] xs:h-[45vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          <img
+          {/* PERFORMANCE: Hero image from Cloudinary - automatically optimized via OptimizedImage */}
+          <OptimizedImage
             src={heroImage}
-            alt="Nibbles"
+            alt="Nibbles Kitchen - Authentic Nigerian Cuisine"
+            aspectRatio="auto"
+            priority={true} // Load hero image immediately (critical for LCP)
+            width={1920}
+            height={1080}
             className="w-full h-full object-cover object-center"
-            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
@@ -360,7 +510,7 @@ export default function CustomerMenu() {
           <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
             {/* Main Tagline */}
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
-              <span className="block mb-2">Made right. Priced right.</span>
+              <span className="block mb-2">The place you eat Everyday</span>
             </h1>
             
             {/* Secondary Tagline */}
@@ -386,19 +536,23 @@ export default function CustomerMenu() {
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  type="text"
+                  type="search"
+                  id="search-menu-desktop"
+                  name="search-menu"
                   placeholder="Search menu items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 text-sm py-2 sm:py-3"
                   data-testid="input-search"
+                  aria-label="Search menu items"
+                  autoComplete="off"
                 />
               </div>
             </div>
 
             <div className="flex-1 overflow-x-auto min-w-0">
               <div className="flex gap-1 sm:gap-2">
-                {(categories || ["All"]).map((category: string) => (
+                {categories.map((category: string) => (
                   <Badge
                     key={category}
                     variant={
@@ -409,6 +563,16 @@ export default function CustomerMenu() {
                     data-testid={`filter-${category
                       .toLowerCase()
                       .replace(" ", "-")}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Filter by ${category} category`}
+                    aria-pressed={selectedCategory === category}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedCategory(category);
+                      }
+                    }}
                   >
                     {category}
                   </Badge>
@@ -423,6 +587,7 @@ export default function CustomerMenu() {
                 className="relative shrink-0"
                 onClick={() => setCartOpen(true)}
                 data-testid="button-cart"
+                aria-label={`Shopping cart${cart.length > 0 ? ` with ${cart.length} item${cart.length !== 1 ? 's' : ''}` : ''}`}
               >
                 <ShoppingCart className="w-4 h-4" />
                 {cart.length > 0 && (
@@ -440,12 +605,16 @@ export default function CustomerMenu() {
             <div className="relative w-full">
               <Search className="absolute left-2.5 sm:left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
               <Input
-                type="text"
+                type="search"
+                id="search-menu-mobile"
+                name="search-menu-mobile"
                 placeholder="Search menu items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-7 sm:pl-8 text-xs py-1.5"
                 data-testid="input-search-mobile"
+                aria-label="Search menu items"
+                autoComplete="off"
               />
             </div>
 
@@ -453,7 +622,7 @@ export default function CustomerMenu() {
               {/* Scrollable Category Buttons */}
               <div className="flex-1 overflow-x-auto -mx-3 px-3 mr-[1px]">
                 <div className="flex gap-1.5 sm:gap-2 w-max">
-                  {(categories || ["All"]).map((category: string) => (
+                  {categories.map((category: string) => (
                     <Badge
                       key={category}
                       variant={
@@ -464,6 +633,16 @@ export default function CustomerMenu() {
                       data-testid={`filter-mobile-${category
                         .toLowerCase()
                         .replace(" ", "-")}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Filter by ${category} category`}
+                      aria-pressed={selectedCategory === category}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedCategory(category);
+                        }
+                      }}
                     >
                       {category}
                     </Badge>
@@ -496,135 +675,80 @@ export default function CustomerMenu() {
         <h2 className="font-serif text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold mb-3 sm:mb-4">Our Menu</h2>
         {isLoading ? (
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="aspect-square bg-muted animate-pulse" />
-                <CardContent className="p-2.5 sm:p-3.5">
-                  <div className="h-3.5 sm:h-4 bg-muted rounded animate-pulse mb-1.5 sm:mb-2" />
-                  <div className="h-2.5 sm:h-3 bg-muted rounded animate-pulse mb-2.5 sm:mb-3" />
-                  <div className="h-5 sm:h-6 bg-muted rounded animate-pulse" />
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+              <Card key={i} className="overflow-hidden animate-pulse">
+                <div className="aspect-square bg-gradient-to-br from-muted to-muted/50" />
+                <CardContent className="p-2.5 sm:p-3.5 space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4" />
+                  <div className="h-3 bg-muted/70 rounded w-full" />
+                  <div className="h-3 bg-muted/70 rounded w-2/3" />
+                  <div className="h-6 bg-muted rounded w-1/2 mt-2" />
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {filteredItems?.map((item) => {
-              const isInCart = cart.some(
-                (cartItem) => String(cartItem.menuItem.id) === String(item.id)
-              );
-              const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
-              
-              // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
-              const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
-                ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
-                : !item.available;        // Stock not tracked: use manual available setting
-              
-              const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
-                                 (cartItem ? cartItem.quantity < item.stockBalance : true);
-              return (
-                <Card
-                  key={item.id}
-                  className={`overflow-hidden hover-elevate transition-all ${
-                    isInCart ? "ring-2 ring-primary" : ""
-                  }`}
-                  data-testid={`card-menu-item-${item.id}`}
+          <>
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+              {visibleItems.map((item) => {
+                const isInCart = cart.some(
+                  (cartItem) => String(cartItem.menuItem.id) === String(item.id)
+                );
+                const cartItem = cart.find((cartItem) => String(cartItem.menuItem.id) === String(item.id));
+                
+                // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
+                const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
+                  ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
+                  : !item.available;        // Stock not tracked: use manual available setting
+                
+                const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
+                                   (cartItem ? cartItem.quantity < item.stockBalance : true);
+                
+                return (
+                  <MenuItemCard
+                    key={item.id}
+                    item={item}
+                    isInCart={isInCart}
+                    cartQuantity={cartItem?.quantity}
+                    isOutOfStock={isOutOfStock}
+                    canAddMore={canAddMore}
+                    onAddToCart={addToCart}
+                    onUpdateQuantity={updateQuantity}
+                  />
+                );
+              })}
+            </div>
+            
+            {/* Infinite Scroll Load More Button (fallback if intersection observer fails) */}
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="min-w-[120px]"
                 >
-                  <div className="aspect-square overflow-hidden relative">
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-60' : ''}`}
-                    />
-                    {/* SOLD OUT Overlay - Using stockBalance */}
-                    {isOutOfStock && (
-                      <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
-                        <Badge variant="default" className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg">
-                          SOLD OUT
-                        </Badge>
-                      </div>
-                    )}
-                    {/* Low Stock Badge */}
-                    {!isOutOfStock && item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3 && (
-                      <div className="absolute top-2 left-2 bg-orange-500 text-white rounded-md px-2 py-1 text-xs font-semibold shadow-md">
-                        Only {item.stockBalance} left!
-                      </div>
-                    )}
-                    {isInCart && !isOutOfStock && (
-                      <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold">
-                        {cartItem?.quantity}
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
-                    <div>
-                      <h3 className="text-sm font-semibold mb-0.5 sm:mb-1">
-                        {item.name}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                        {item.description}
-                      </p>
-                    </div>
-                    
-                    {/* Stock Balance Info for Customer */}
-                    {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 5 && (
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className={`font-medium ${
-                          item.stockBalance <= 2 ? 'text-red-600' : 'text-orange-600'
-                        }`}>
-                          ⚡ Only {item.stockBalance} portion{item.stockBalance !== 1 ? 's' : ''} left
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold">
-                        ₦{parseFloat(item.price).toLocaleString()}
-                      </span>
-                      {isInCart ? (
-                        <div className="flex items-center gap-1 border rounded-lg">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => item.id && updateQuantity(String(item.id), -1)}
-                            data-testid={`button-minus-${item.id}`}
-                            className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
-                          >
-                            <Minus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
-                          </Button>
-                          <span className="font-semibold min-w-[14px] sm:min-w-[16px] text-center text-xs">
-                            {cartItem?.quantity}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => item.id && updateQuantity(String(item.id), 1)}
-                            disabled={isOutOfStock || !canAddMore}
-                            data-testid={`button-plus-${item.id}`}
-                            className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
-                            title={!canAddMore ? `Maximum ${item.stockBalance} portions available` : ''}
-                          >
-                            <Plus className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => addToCart(item)}
-                          disabled={isOutOfStock}
-                          data-testid={`button-add-${item.id}`}
-                          className="text-xs px-2 py-1.5"
-                        >
-                          <Plus className="w-2.5 h-2.5 mr-1" />
-                          {!isOutOfStock ? 'Add' : 'SOLD OUT'}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                  {isLoadingMore ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Loading...
+                    </>
+                  ) : (
+                    `Load More (${filteredItems.length - visibleItems.length} remaining)`
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* Infinite Scroll Sentinel (for automatic loading) */}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="h-1 w-full"
+                aria-hidden="true"
+              />
+            )}
+          </>
         )}
       </section>
 
@@ -635,115 +759,180 @@ export default function CustomerMenu() {
             className="flex-1 bg-black/50 backdrop-blur-sm"
             onClick={() => setCartOpen(false)}
           />
-          <div className="w-full max-w-[95vw] md:max-w-md bg-background border-l flex flex-col">
-            <div className="p-3 sm:p-4 border-b flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Your Cart</h2>
+          <div className="w-full sm:w-[90vw] sm:max-w-md md:w-96 bg-background border-l flex flex-col shadow-2xl">
+            {/* Cart Header */}
+            <div className="p-3 sm:p-5 border-b bg-gradient-to-r from-accent/10 to-primary/5 flex items-center justify-between sticky top-0 bg-background z-10">
+              <div>
+                <h2 className="text-lg sm:text-2xl font-semibold sm:font-bold text-foreground">Your Cart</h2>
+                {cart.length > 0 && (
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                    {cart.length} {cart.length === 1 ? 'item' : 'items'}
+                  </p>
+                )}
+              </div>
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => setCartOpen(false)}
                 data-testid="button-close-cart"
+                className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                aria-label="Close cart"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+            {/* Cart Items */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 sm:space-y-4">
               {cart.length === 0 ? (
-                <div className="text-center py-12">
-                  <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Your cart is empty</p>
+                <div className="text-center py-16 sm:py-20">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                    <ShoppingCart className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground" />
+                  </div>
+                  <p className="text-base sm:text-lg font-medium text-foreground mb-2">Your cart is empty</p>
+                  <p className="text-sm text-muted-foreground">Add items from the menu to get started</p>
                 </div>
               ) : (
                 cart.map((item) => (
                   <Card
                     key={item.menuItem.id}
                     data-testid={`cart-item-${item.menuItem.id}`}
+                    className="border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                   >
-                    <CardContent className="p-2.5 sm:p-3 space-y-2">
-                      <div className="flex gap-2">
-                        <img
-                          src={item.menuItem.imageUrl}
-                          alt={item.menuItem.name}
-                          className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg object-cover"
+                    <CardContent className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+                      {/* Item Image and Info */}
+                      <div className="flex gap-2 sm:gap-4">
+                        <OptimizedImage
+                          src={item.menuItem.imageUrl || ''}
+                          alt={item.menuItem.name || 'Menu item'}
+                          width={120}
+                          height={120}
+                          aspectRatio="square"
+                          priority={false}
+                          className="w-16 h-16 sm:w-24 sm:h-24 rounded-lg object-cover flex-shrink-0 border border-border/30"
+                          style={{ aspectRatio: '1 / 1' }}
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm truncate">
+                          <h4 className="font-medium sm:font-semibold text-sm sm:text-lg text-foreground line-clamp-2 mb-0.5 sm:mb-1">
                             {item.menuItem.name}
                           </h4>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs sm:text-base font-semibold sm:font-bold text-[#4EB5A4]">
                             ₦{parseFloat(item.menuItem.price).toLocaleString()}
                           </p>
                         </div>
+                        {/* Remove Button - Top Right - More Prominent */}
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
                           data-testid={`button-remove-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8"
+                          className="h-8 w-8 sm:h-10 sm:w-10 hover:bg-destructive hover:text-destructive-foreground transition-colors flex-shrink-0 border border-destructive/20 hover:border-destructive"
+                          aria-label={`Remove ${item.menuItem.name} from cart`}
                         >
-                          <X className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                          <X className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" />
                         </Button>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      {/* Quantity Controls - Below Image and Name */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs sm:text-sm font-medium text-muted-foreground">Quantity</span>
+                        <div className="flex items-center gap-1.5 sm:gap-2 bg-muted/50 rounded-lg p-0.5 sm:p-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
+                            data-testid={`button-decrease-${item.menuItem.id}`}
+                            className="h-7 w-7 sm:h-10 sm:w-10 hover:bg-background hover:text-destructive transition-colors"
+                            aria-label={`Decrease quantity of ${item.menuItem.name}`}
+                          >
+                            <Minus className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                          </Button>
+                          <span
+                            className="w-8 sm:w-12 text-center font-semibold sm:font-bold text-sm sm:text-lg text-foreground"
+                            data-testid={`quantity-${item.menuItem.id}`}
+                          >
+                            {item.quantity}
+                          </span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
+                            data-testid={`button-increase-${item.menuItem.id}`}
+                            className="h-7 w-7 sm:h-10 sm:w-10 hover:bg-background hover:text-[#4EB5A4] transition-colors"
+                            aria-label={`Increase quantity of ${item.menuItem.name}`}
+                          >
+                            <Plus className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Remove Button - Also Below for Easy Access */}
+                      <div className="pt-1">
                         <Button
-                          size="icon"
                           variant="outline"
-                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
-                          data-testid={`button-decrease-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
+                          size="sm"
+                          onClick={() => item.menuItem.id && removeFromCart(item.menuItem.id)}
+                          data-testid={`button-remove-bottom-${item.menuItem.id}`}
+                          className="w-full h-9 text-xs sm:text-sm border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                          aria-label={`Remove ${item.menuItem.name} from cart`}
                         >
-                          <Minus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                          <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+                          Remove Item
                         </Button>
-                        <span
-                          className="w-7 sm:w-8 text-center font-medium text-sm"
-                          data-testid={`quantity-${item.menuItem.id}`}
-                        >
-                          {item.quantity}
+                      </div>
+
+                      {/* Special Instructions */}
+                      <div className="pt-2 border-t border-border/30">
+                        <Textarea
+                          id={`instructions-${item.menuItem.id}`}
+                          name={`instructions-${item.menuItem.id}`}
+                          placeholder="Add special instructions (optional)"
+                          value={item.specialInstructions || ""}
+                          onChange={(e) =>
+                            item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
+                          }
+                          className="text-xs sm:text-sm resize-none min-h-[50px] sm:min-h-[60px] focus:ring-2 focus:ring-[#4EB5A4]/20"
+                          rows={2}
+                          data-testid={`input-instructions-${item.menuItem.id}`}
+                        />
+                      </div>
+                      
+                      {/* Item Total */}
+                      <div className="flex justify-between items-center pt-2 border-t border-border/30">
+                        <span className="text-xs sm:text-sm text-muted-foreground">Item Total</span>
+                        <span className="font-semibold sm:font-bold text-sm sm:text-lg text-foreground">
+                          ₦{(parseFloat(item.menuItem.price) * item.quantity).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
-                          data-testid={`button-increase-${item.menuItem.id}`}
-                          className="h-7 sm:h-8 w-7 sm:w-8 p-1"
-                        >
-                          <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                        </Button>
                       </div>
-
-                      <Textarea
-                        placeholder="Special instructions (optional)"
-                        value={item.specialInstructions || ""}
-                        onChange={(e) =>
-                          item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
-                        }
-                        className="text-xs py-1.5"
-                        rows={2}
-                        data-testid={`input-instructions-${item.menuItem.id}`}
-                      />
                     </CardContent>
                   </Card>
                 ))
               )}
             </div>
 
+            {/* Cart Footer */}
             {cart.length > 0 && (
-              <div className="p-3 sm:p-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-sm sm:text-base">Subtotal</span>
-                  <span className="font-bold text-sm sm:text-base" data-testid="text-subtotal">
-                    ₦
-                    {subtotal.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
+              <div className="p-3 sm:p-5 border-t bg-muted/30 space-y-3 sm:space-y-4 sticky bottom-0 bg-background">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm sm:text-lg font-semibold text-foreground">Subtotal</span>
+                    <span className="font-bold text-base sm:text-xl text-[#4EB5A4]" data-testid="text-subtotal">
+                      ₦{subtotal.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Delivery fee and charges calculated at checkout
+                  </p>
                 </div>
                 <Button
-                  size="sm"
-                  className="w-full text-xs sm:text-sm py-2"
+                  size="lg"
+                  className="w-full h-11 sm:h-14 text-sm sm:text-lg font-semibold bg-gradient-to-r from-[#4EB5A4] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all"
                   onClick={handleCheckout}
                   data-testid="button-checkout"
                 >
@@ -801,7 +990,7 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
-      </div>
+      </main>
     </>
   );
 }

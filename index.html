@@ -2,12 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary Meta Tags -->
-    <title>Nibbles Fast Food, Fast. Premium. Affordable.</title>
-    <meta name="title" content="Nibbles Fast Food, Fast. Premium. Affordable." />
-    <meta name="description" content="Nibbles Fast Food, Fast. Premium. Affordable." />
+    <title>Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine | Order Online</title>
+    <meta name="title" content="Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine" />
+    <meta name="description" content="Order delicious Nigerian fast food online from Nibbles Kitchen. Fast delivery, premium quality, affordable prices. Jollof rice, suya, grilled chicken, and more." />
+    <!-- Canonical URL will be set dynamically by SEO component per page -->
     <meta name="keywords" content="Nibbles Fast Food, Fast. Premium. Affordable." />
     <meta name="author" content="Nibbles Fast Food, Fast. Premium. Affordable." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
@@ -26,10 +27,8 @@
     <meta name="theme-color" content="#50BAA8" />
     <meta name="msapplication-TileColor" content="#50BAA8" />
     
-    <!-- Interswitch Inline Payment Script (Sandbox for Testing) -->
-    <script src="https://newwebpay.interswitchng.com/inline-checkout.js"></script>
-    <!-- For Production, use: https://newwebpay.interswitchng.com/inline-checkout.js -->
-    <!-- For Sandbox/Test, the same URL works but set mode: "TEST" in JavaScript -->
+    <!-- PERFORMANCE: Defer Interswitch script - load after page content -->
+    <script src="https://newwebpay.interswitchng.com/inline-checkout.js" defer></script>
     <meta name="msapplication-TileImage" content="/pwa-icons/icon-144x144.png" />
 
     <!-- iOS Meta Tags -->
@@ -43,24 +42,24 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://nibblesfastfood.com" />
+    <meta property="og:url" content="https://nibblesfastfood.com/" />
     <meta property="og:site_name" content="Nibbles Kitchen" />
-    <meta property="og:title" content="Nibbles Fast Food, Fast. Premium. Affordable." />
-    <meta property="og:description" content="Nibbles Fast Food, Fast. Premium. Affordable." />
+    <meta property="og:title" content="Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine" />
+    <meta property="og:description" content="Order delicious Nigerian fast food online from Nibbles Kitchen. Fast delivery, premium quality, affordable prices. Jollof rice, suya, grilled chicken, and more." />
     <meta property="og:image" content="https://nibblesfastfood.com/pwa-icons/icon-512x512.png" />
     <meta property="og:image:secure_url" content="https://nibblesfastfood.com/pwa-icons/icon-512x512.png" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
-    <meta property="og:image:alt" content="Nibbles Fast Food, Fast. Premium. Affordable." />
+    <meta property="og:image:alt" content="Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine" />
     <meta property="og:locale" content="en_US" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://nibblesfastfood.com" />
-    <meta name="twitter:title" content="Nibbles Fast Food, Fast. Premium. Affordable." />
-    <meta name="twitter:description" content="Nibbles Fast Food, Fast. Premium. Affordable." />
+    <meta name="twitter:url" content="https://nibblesfastfood.com/" />
+    <meta name="twitter:title" content="Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine" />
+    <meta name="twitter:description" content="Order delicious Nigerian fast food online from Nibbles Kitchen. Fast delivery, premium quality, affordable prices." />
     <meta name="twitter:image" content="https://nibblesfastfood.com/pwa-icons/icon-512x512.png" />
-    <meta name="twitter:image:alt" content="Nibbles Fast Food, Fast. Premium. Affordable." />
+    <meta name="twitter:image:alt" content="Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine" />
 
     <!-- Additional SEO -->
     <meta name="geo.region" content="US" />
@@ -68,9 +67,14 @@
     <meta name="language" content="en" />
     <meta name="distribution" content="global" />
     <meta name="rating" content="general" />
+    <!-- CRITICAL: Preconnect to font domains for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Inria+Serif:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet">
+    <!-- PERFORMANCE: Preload hero image for LCP optimization -->
+    <link rel="preload" as="image" href="https://res.cloudinary.com/ddls0gpui/image/upload/f_auto,q_85,w_1920/v1767873324/Nigerian_cuisine_hero_image_337661c0_nptd96.jpg" fetchpriority="high">
+    <!-- PERFORMANCE: Load only essential fonts, defer non-critical fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap"></noscript>
   </head>
   <body>
     <div id="root"></div>

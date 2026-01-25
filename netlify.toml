@@ -1,6 +1,6 @@
 [build]
   publish = "dist"
-  command = "npm run build"
+  command = "rm -rf node_modules package-lock.json && npm install && npm run build"
 
 [[redirects]]
   from = "/*"
@@ -11,3 +11,9 @@
   command = "npm run dev"
   port = 3000
   targetPort = 5173
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Embedder-Policy = "unsafe-none"
+    Cross-Origin-Opener-Policy = "unsafe-none"

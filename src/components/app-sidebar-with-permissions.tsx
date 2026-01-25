@@ -51,111 +51,140 @@ const menuItems: MenuItem[] = [
     url: "/",
     icon: Home,
     roles: ["admin", "customer", "kitchen"],
-    permissions: ["create_orders"],
+    permissions: ["customer_menu"],
   },
   { 
-    title: "Docket Display", 
+    title: "My Orders", 
     url: "/docket", 
     icon: Users, 
     roles: ["customer", "admin"],
-    permissions: ["create_orders"],
+    permissions: ["docket_display"],
   },
   {
     title: "Kitchen Display",
     url: "/kitchen",
     icon: ChefHat,
     roles: ["kitchen", "admin"],
-    permissions: ["manage_orders"],
+    permissions: ["kitchen_display"],
   },
   {
     title: "Walk-in Orders",
     url: "/staff",
     icon: Users,
     roles: ["admin", "kitchen"],
-    permissions: ["create_orders", "manage_orders"],
+    permissions: ["walk_in_orders"],
   },
   {
     title: "Order Management",
     url: "/orders",
     icon: LayoutDashboard,
-    roles: ["admin"],
-    permissions: ["manage_orders"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["order_management"],
+  },
+  {
+    title: "Pending Payments",
+    url: "/pending-payments",
+    icon: CreditCard,
+    roles: ["C - Suite", "admin"],
+    permissions: ["pending_payments"],
+  },
+  {
+    title: "Archived Orders",
+    url: "/archived-orders",
+    icon: ClipboardList,
+    roles: ["C - Suite", "admin"],
+    permissions: ["archived_orders"],
   },
   {
     title: "Menu Management",
     url: "/menu",
     icon: UtensilsCrossed,
     roles: ["admin", "kitchen"],
-    permissions: ["manage_menu"],
+    permissions: ["menu_management"],
   },
   { 
-    title: "User Management", 
-    url: "/users", 
-    icon: Users, 
-    roles: ["admin"],
-    permissions: ["manage_users"],
-  },
-  { 
-    title: "Sales Inventory", 
+    title: "Store Inventory", 
     url: "/inventory", 
     icon: Package, 
-    roles: ["admin", "kitchen"],
-    permissions: ["manage_inventory"],
+    roles: ["C - Suite", "admin", "kitchen"],
+    permissions: ["sales_inventory"],
   },
   { 
-    title: "Store Management", 
+    title: "Main Kitchen", 
     url: "/store-management", 
     icon: Store, 
-    roles: ["admin", "kitchen"],
-    permissions: ["manage_store"],
+    roles: ["C - Suite", "admin", "kitchen"],
+    permissions: ["main_kitchen"],
   },
   { 
     title: "Transactions", 
     url: "/transactions", 
     icon: CreditCard, 
-    roles: ["admin"],
-    permissions: ["manage_store", "manage_inventory"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["store_management"],
+  },
+  { 
+    title: "Kitchen Requests", 
+    url: "/kitchen-requests", 
+    icon: ClipboardList, 
+    roles: ["C - Suite", "admin", "kitchen"],
+    permissions: ["kitchen_requests"],
   },
   { 
     title: "Analytics & Reports", 
     url: "/dashboard/analytics", 
     icon: BarChart3, 
-    roles: ["admin"],
-    permissions: ["view_analytics"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["analytics_reports"],
   },
   { 
     title: "Customer Analytics", 
     url: "/customer-analytics", 
     icon: BarChart3, 
-    roles: ["admin"],
-    permissions: ["view_analytics"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["customer_analytics"],
   },
   { 
     title: "Customer Insights", 
     url: "/dashboard/customers", 
     icon: BarChart3, 
-    roles: ["admin"],
-    permissions: ["view_analytics"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["customer_insights"],
+  },
+  { 
+    title: "Cashier Analytics", 
+    url: "/cashier-analytics", 
+    icon: BarChart3, 
+    roles: ["C - Suite", "admin"],
+    permissions: ["cashier_analytics"],
   },
   { 
     title: "QR Code", 
     url: "/qr-code", 
     icon: ClipboardList, 
-    roles: ["admin"],
-    permissions: ["create_orders"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["qr_code"],
   },
   { 
     title: "EM Card", 
     url: "/emcard", 
     icon: CreditCard, 
-    roles: ["admin"],
-    permissions: ["manage_menu"],
+    roles: ["C - Suite", "admin"],
+    permissions: ["em_card"],
+  },
+  { 
+    title: "User Management", 
+    url: "/users", 
+    icon: Users, 
+    roles: ["C - Suite", "admin"],
+    permissions: ["user_management"],
   },
   { 
     title: "Profile", 
     url: "/profile", 
     icon: User, 
-    roles: ["admin", "kitchen", "customer"] 
+    roles: ["admin", "kitchen", "customer"],
+    permissions: ["profile"],
   },
 ];
 
@@ -197,8 +226,8 @@ export function AppSidebar() {
       return menuItems.filter((item) => item.roles.includes("customer"));
     }
 
-    // Admin sees everything
-    if (user.role === "admin") {
+    // Admin sees everything (case-insensitive check)
+    if (user.role.toLowerCase() === "admin") {
       return menuItems;
     }
 
@@ -220,6 +249,15 @@ export function AppSidebar() {
   };
 
   const availableMenuItems = getMenuItems(user, userPermissions);
+
+  console.log('🔍 Sidebar Debug:', {
+    user,
+    userRole: user?.role,
+    userPermissions,
+    totalMenuItems: menuItems.length,
+    availableMenuItems: availableMenuItems.length,
+    cashierAnalyticsItem: menuItems.find(item => item.title === "Cashier Analytics")
+  });
 
   const handleLogout = () => {
     logout();

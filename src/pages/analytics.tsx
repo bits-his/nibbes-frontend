@@ -5,6 +5,7 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { 
   Table, 
   TableBody, 
@@ -31,9 +32,9 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { TrendingUp, Users, DollarSign, ShoppingCart } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, ShoppingCart, Calendar } from 'lucide-react';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen');
 
 interface DashboardData {
   todayOrders: number;
@@ -52,21 +53,42 @@ export default function AnalyticsDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState('30');
+  const [dateRange, setDateRange] = useState('1');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
-  }, [dateRange]);
+  }, [dateRange, startDate, endDate]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const to = new Date().toISOString().split('T')[0];
-      const from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0];
+      let from, to;
+      
+      if (startDate && endDate) {
+        from = startDate;
+        to = endDate;
+      } else if (dateRange) {
+        const today = new Date().toISOString().split('T')[0];
+        if (dateRange === '1') {
+          // For "Today", use same date for from and to
+          from = today;
+          to = today;
+        } else {
+          to = today;
+          from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0];
+        }
+      } else {
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetching analytics:', { from, to });
 
       const response = await fetch(
         `${BACKEND_URL}/api/analytics/dashboard?from=${from}&to=${to}`,
@@ -81,9 +103,9 @@ export default function AnalyticsDashboard() {
         throw new Error('Failed to fetch dashboard data');
       }
 
-      const data = await response.json();
-      console.log('Dashboard data:', data);
-      setDashboardData(data);
+      const result = await response.json();
+      console.log('Dashboard response:', result);
+      setDashboardData(result.data || result);
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data. Please try again later.');
@@ -127,25 +149,49 @@ export default function AnalyticsDashboard() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics & Reports</h1>
-          <p className="text-gray-600 mt-1">Track your business performance</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Analytics & Reports</h1>
+            <p className="text-gray-600 mt-1">Track your business performance</p>
+          </div>
+          <Button onClick={fetchDashboardData}>
+            Export Report
+          </Button>
         </div>
-        <div className="flex items-center gap-4">
-          <Select value={dateRange} onValueChange={setDateRange}>
+        
+        {/* Date Filters */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <Select value={dateRange} onValueChange={(val) => { setDateRange(val); setStartDate(''); setEndDate(''); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="1">Today</SelectItem>
               <SelectItem value="7">Last 7 days</SelectItem>
               <SelectItem value="30">Last 30 days</SelectItem>
               <SelectItem value="90">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={fetchDashboardData}>
-            Export Report
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <Input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => { setStartDate(e.target.value); setDateRange(''); }}
+              className="w-[150px]"
+              placeholder="Start date"
+            />
+            <span className="text-gray-500">to</span>
+            <Input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => { setEndDate(e.target.value); setDateRange(''); }}
+              className="w-[150px]"
+              placeholder="End date"
+            />
+          </div>
         </div>
       </div>
 
@@ -154,20 +200,20 @@ export default function AnalyticsDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Revenue Today
+              Revenue
             </CardTitle>
             <DollarSign className="w-4 h-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₦{parseFloat(dashboardData.revenueToday).toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Today's earnings</p>
+            <p className="text-xs text-gray-500 mt-1">Total earnings</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Orders Today
+              Orders
             </CardTitle>
             <ShoppingCart className="w-4 h-4 text-blue-500" />
           </CardHeader>

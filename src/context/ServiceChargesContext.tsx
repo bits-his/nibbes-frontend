@@ -1,0 +1,187 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+interface ServiceCharge {
+  id: string;
+  description: string;
+  type: 'fixed' | 'percentage';
+  amount: number;
+  status: 'active' | 'inactive';
+}
+
+interface ServiceChargesContextType {
+  serviceChargeRate: number;
+  vatRate: number;
+  serviceCharges: ServiceCharge[]; // Add all service charges
+  isLoading: boolean;
+  refreshCharges: () => Promise<void>;
+}
+
+const ServiceChargesContext = createContext<ServiceChargesContextType | undefined>(undefined);
+
+const DEFAULT_CHARGES = {
+  serviceCharge: 0,  // 0% - No service charge
+  vat: 0             // 0% - No VAT
+};
+
+const CACHE_KEY = 'service_charges_cache';
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_VERSION = 'v3'; // Increment to invalidate old cache
+
+export function ServiceChargesProvider({ children }: { children: ReactNode }) {
+  const [serviceChargeRate, setServiceChargeRate] = useState(DEFAULT_CHARGES.serviceCharge);
+  const [vatRate, setVatRate] = useState(DEFAULT_CHARGES.vat);
+  const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([]); // Add state for all charges
+  const [isLoading, setIsLoading] = useState(true);
+
+  const updateChargesFromData = (charges: ServiceCharge[]) => {
+    console.log('📊 Updating charges from data:', charges);
+    
+    // Store all active charges
+    const activeCharges = charges.filter(c => c.status === 'active');
+    console.log('✅ Active charges:', activeCharges);
+    setServiceCharges(activeCharges);
+    
+    // Find service charge and VAT for backward compatibility
+    const serviceCharge = charges.find(c => 
+      c.description.toLowerCase().includes('service') && c.type === 'percentage'
+    );
+    const vat = charges.find(c => 
+      c.description.toLowerCase().includes('vat') && c.type === 'percentage'
+    );
+
+    const newServiceCharge = Number(serviceCharge?.amount) || DEFAULT_CHARGES.serviceCharge;
+    const newVat = Number(vat?.amount) || DEFAULT_CHARGES.vat;
+
+    setServiceChargeRate(newServiceCharge);
+    setVatRate(newVat);
+
+    console.log('💰 Service charge rate:', newServiceCharge, 'VAT rate:', newVat);
+
+    // Update cache
+    const newCharges = {
+      serviceCharge: newServiceCharge,
+      vat: newVat,
+      allCharges: activeCharges, // Store all charges in cache too
+      timestamp: Date.now(),
+      version: CACHE_VERSION
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(newCharges));
+  };
+
+  const fetchCharges = async () => {
+    try {
+      console.log('🔄 Fetching service charges...');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen');
+      console.log('🌐 Backend URL:', backendUrl);
+      const response = await fetch(`${backendUrl}/api/service-charges/active`);
+      
+      if (!response.ok) {
+        console.error('❌ Response not OK:', response.status, response.statusText);
+        throw new Error('Failed to fetch charges');
+      }
+      
+      const charges: ServiceCharge[] = await response.json();
+      console.log('📦 Fetched charges:', charges);
+      
+      updateChargesFromData(charges);
+      
+      const serviceChargeItem = charges.find(c => c.description.toLowerCase().includes('service'));
+      const vatItem = charges.find(c => c.description.toLowerCase().includes('vat'));
+      
+      return {
+        serviceCharge: serviceChargeItem?.amount || DEFAULT_CHARGES.serviceCharge,
+        vat: vatItem?.amount || DEFAULT_CHARGES.vat,
+        allCharges: charges.filter(c => c.status === 'active'),
+        timestamp: Date.now(),
+        version: CACHE_VERSION
+      };
+    } catch (error) {
+      console.error('❌ Error fetching service charges:', error);
+      // Use defaults on error
+      setServiceCharges([]); // Clear charges on error
+      return {
+        serviceCharge: DEFAULT_CHARGES.serviceCharge,
+        vat: DEFAULT_CHARGES.vat,
+        allCharges: [],
+        timestamp: Date.now(),
+        version: CACHE_VERSION
+      };
+    }
+  };
+
+  const loadCharges = async () => {
+    setIsLoading(true);
+    
+    // Try to load from cache first
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        const age = Date.now() - cachedData.timestamp;
+        
+        // Check cache version and age
+        if (cachedData.version === CACHE_VERSION && age < CACHE_DURATION) {
+          setServiceChargeRate(cachedData.serviceCharge);
+          setVatRate(cachedData.vat);
+          if (cachedData.allCharges) {
+            setServiceCharges(cachedData.allCharges);
+          }
+          setIsLoading(false);
+          console.log('📋 Using cached service charges');
+          return;
+        }
+      } catch (e) {
+        console.error('Error parsing cached charges:', e);
+      }
+    }
+
+    // Cache expired, wrong version, or doesn't exist - fetch fresh data
+    console.log('🔄 Cache expired or invalid, fetching fresh data...');
+    await fetchCharges();
+    setIsLoading(false);
+    setIsLoading(false);
+  };
+
+  const refreshCharges = async () => {
+    console.log('🔄 Manual refresh of service charges...');
+    setIsLoading(true);
+    // Clear cache first
+    localStorage.removeItem(CACHE_KEY);
+    await fetchCharges();
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadCharges();
+  }, []);
+
+  // Listen for service charge updates from existing WebSocket connections
+  useEffect(() => {
+    const handleServiceChargesUpdate = (event: any) => {
+      console.log('📢 Service charges updated via custom event:', event.detail);
+      if (event.detail) {
+        updateChargesFromData(event.detail);
+      }
+    };
+
+    window.addEventListener('service-charges-updated', handleServiceChargesUpdate);
+
+    return () => {
+      window.removeEventListener('service-charges-updated', handleServiceChargesUpdate);
+    };
+  }, []);
+
+  return (
+    <ServiceChargesContext.Provider value={{ serviceChargeRate, vatRate, serviceCharges, isLoading, refreshCharges }}>
+      {children}
+    </ServiceChargesContext.Provider>
+  );
+}
+
+export function useServiceCharges() {
+  const context = useContext(ServiceChargesContext);
+  if (context === undefined) {
+    throw new Error('useServiceCharges must be used within a ServiceChargesProvider');
+  }
+  return context;
+}
