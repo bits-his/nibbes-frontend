@@ -45,20 +45,7 @@ export const MenuItemCard = memo<MenuItemCardProps>(
             width={400}
             height={400}
             priority={false} // Lazy load menu items
-            className={isOutOfStock ? 'opacity-60' : ''}
           />
-          
-          {/* SOLD OUT Overlay */}
-          {isOutOfStock && (
-            <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
-              <Badge
-                variant="default"
-                className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 shadow-lg"
-              >
-                SOLD OUT
-              </Badge>
-            </div>
-          )}
           
           {/* Low Stock Badge */}
           {!isOutOfStock &&

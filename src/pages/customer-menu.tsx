@@ -161,6 +161,16 @@ export default function CustomerMenu() {
   
   const [showQRCode, setShowQRCode] = useState(false);
 
+  // Check URL parameter to open cart when navigating from checkout
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('openCart') === 'true') {
+      setCartOpen(true);
+      // Clean up URL parameter without reloading page
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   // Fetch menu items with extended stale time for better caching
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
