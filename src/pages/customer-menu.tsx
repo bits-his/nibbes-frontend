@@ -12,6 +12,8 @@ import {
   ChefHat,
   AlertCircle,
   Wifi,
+  Check,
+  CreditCard,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,10 +23,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
+import { startTransition } from "react";
+import { getGuestSession } from "@/lib/guestSession";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
@@ -45,16 +51,21 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { measurePerformance, logPerformanceMetrics } from "@/utils/performance";
+import { useSettings } from "@/context/SettingsContext";
+import { useServiceCharges } from "@/context/ServiceChargesContext";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth(); // Add user authentication
   const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart, updateSpecialInstructions } = useCart();
+  const { settings } = useSettings();
+  const { serviceChargeRate, vatRate, serviceCharges } = useServiceCharges();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartOpen, setCartOpen] = useState(false);
   const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null); // Track which cart item is expanded
+  const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup"); // Delivery method selection
   const [locationData, setLocationData] = useState<{
     latitude: number;
     longitude: number;
@@ -62,6 +73,10 @@ export default function CustomerMenu() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
@@ -468,13 +483,306 @@ export default function CustomerMenu() {
     );
   };
 
+  // Load orderType from localStorage on mount
+  useEffect(() => {
+    const savedOrderType = localStorage.getItem("orderType");
+    if (savedOrderType === "delivery" || savedOrderType === "pickup") {
+      setOrderType(savedOrderType);
+    }
+  }, []);
+
+  // Calculate delivery fee when orderType is delivery and location is available
+  useEffect(() => {
+    const calculateDeliveryFee = async () => {
+      if (orderType !== "delivery" || !locationData?.address) {
+        setDeliveryFee(0);
+        return;
+      }
+
+      setIsCalculatingDelivery(true);
+      try {
+        const response = await apiRequest("POST", "/api/delivery/calculate-fee", {
+          deliveryLocation: locationData.address
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            setDeliveryFee(result.data.price);
+          } else {
+            setDeliveryFee(0);
+          }
+        } else {
+          setDeliveryFee(0);
+        }
+      } catch (error) {
+        console.error('Error calculating delivery fee:', error);
+        setDeliveryFee(0);
+      } finally {
+        setIsCalculatingDelivery(false);
+      }
+    };
+
+    calculateDeliveryFee();
+  }, [orderType, locationData]);
+
+  // Calculate total with charges
+  const calculateTotal = useMemo(() => {
+    if (cart.length === 0) return 0;
+    
+    const baseAmount = subtotal + deliveryFee;
+    
+    // Apply all service charges if available, otherwise use legacy rates
+    let totalCharges = 0;
+    if (serviceCharges.length > 0) {
+      totalCharges = serviceCharges.reduce((total, charge) => {
+        return total + (baseAmount * (Number(charge.amount) / 100));
+      }, 0);
+    } else {
+      // Fallback to legacy calculation
+      totalCharges = (baseAmount * (serviceChargeRate / 100)) + (baseAmount * (vatRate / 100));
+    }
+    
+    return baseAmount + totalCharges;
+  }, [subtotal, deliveryFee, serviceCharges, serviceChargeRate, vatRate]);
+
+  const handleOrderTypeChange = (type: "pickup" | "delivery") => {
+    setOrderType(type);
+    localStorage.setItem("orderType", type);
+  };
+
   const handleCheckout = () => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Store location info in localStorage if available
     if (locationData) {
       localStorage.setItem("location", JSON.stringify(locationData));
     }
+    // Store orderType
+    localStorage.setItem("orderType", orderType);
 
-    setLocation("/checkout");
+    // Open confirmation modal instead of navigating to checkout
+    setShowConfirmModal(true);
+  };
+
+  // Handle Interswitch payment directly from cart
+  const handleConfirmOrder = async () => {
+    if (isProcessingPayment) return;
+
+    setIsProcessingPayment(true);
+
+    try {
+      toast({
+        title: "Creating Order",
+        description: "Please wait...",
+      });
+
+      const guestSession = getGuestSession();
+      const txnRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const orderData = {
+        customerName: user?.username || guestSession?.guestName || "",
+        customerPhone: user?.phone || guestSession?.guestPhone || "",
+        orderType: "online",
+        paymentMethod: "online",
+        paymentStatus: "pending",
+        transactionRef: txnRef,
+        ...(locationData &&
+          orderType === "delivery" && {
+            location: {
+              latitude: locationData.latitude,
+              longitude: locationData.longitude,
+              address: locationData.address,
+            },
+            deliveryFee: deliveryFee,
+          }),
+        ...(guestSession && {
+          guestId: guestSession.guestId,
+          guestName: guestSession.guestName,
+          guestPhone: guestSession.guestPhone,
+          guestEmail: guestSession.guestEmail,
+        }),
+        items: cart.map((item) => ({
+          menuItemId: item.menuItem.id,
+          quantity: item.quantity,
+          price: item.menuItem.price,
+          specialInstructions: item.specialInstructions,
+        })),
+      };
+
+      const response = await apiRequest("POST", "/api/orders", orderData);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+
+      const createdOrder = await response.json();
+
+      if (!createdOrder || !createdOrder.id) {
+        throw new Error("Invalid order response - missing order ID");
+      }
+
+      setIsProcessingPayment(false);
+      setShowConfirmModal(false);
+
+      const amount = Math.round(calculateTotal * 100); // Amount in kobo
+
+      localStorage.setItem(
+        "pendingPaymentOrder",
+        JSON.stringify({
+          orderId: createdOrder.id,
+          orderNumber: createdOrder.orderNumber,
+          txnRef: txnRef,
+        })
+      );
+
+      // Check if Interswitch script is loaded
+      if (typeof (window as any).webpayCheckout === "undefined") {
+        toast({
+          title: "Payment System Unavailable",
+          description: "Redirecting to home page...",
+          variant: "destructive",
+        });
+        startTransition(() => {
+          setTimeout(() => {
+            setLocation("/");
+          }, 1500);
+        });
+        return;
+      }
+
+      // Interswitch Inline Checkout Configuration - LIVE MODE
+      const paymentConfig = {
+        merchant_code: "MX169500",
+        pay_item_id: "Default_Payable_MX169500",
+        txn_ref: txnRef,
+        amount: amount,
+        currency: 566, // NGN
+        site_redirect_url: window.location.origin + "/docket",
+        cust_id: createdOrder.id.toString(),
+        cust_name: orderData.customerName,
+        cust_email: guestSession?.guestEmail || user?.email || "customer@nibbleskitchen.com",
+        cust_phone: orderData.customerPhone || "",
+        merchant_name: "Nibbles Kitchen",
+        logo_url: window.location.origin + "/nibbles.jpg",
+        mode: "LIVE",
+        payment_channels: ["card", "bank"],
+        onComplete: async function (response: any) {
+          console.log("🔔 Payment completed:", response);
+          if (response.desc === "Approved by Financial Institution") {
+            try {
+              const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`;
+              const verifyResponse = await fetch(verifyUrl, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" },
+              });
+              const verifyData = await verifyResponse.json();
+
+              if (verifyData.ResponseCode === "00") {
+                const backendUrl =
+                  import.meta.env.VITE_BACKEND_URL ||
+                  "https://server.brainstorm.ng/nibbleskitchen";
+                let callbackSuccess = false;
+
+                for (let attempt = 1; attempt <= 3 && !callbackSuccess; attempt++) {
+                  try {
+                    const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        txnref: txnRef,
+                        resp: "00",
+                        amount: amount,
+                        orderId: createdOrder.id,
+                        interswitchResponse: verifyData,
+                      }),
+                    });
+                    const callbackData = await callbackRes.json();
+                    console.log("✅ Backend callback response:", callbackData);
+                    callbackSuccess = true;
+                  } catch (err) {
+                    console.error(`❌ Backend callback attempt ${attempt} failed:`, err);
+                    if (attempt < 3) await new Promise((r) => setTimeout(r, 1000));
+                  }
+                }
+
+                clearCart();
+                toast({
+                  title: "Payment Successful! 🎉",
+                  description: `Order #${createdOrder.orderNumber} has been paid.`,
+                });
+                startTransition(() => {
+                  setTimeout(() => setLocation("/docket"), 1500);
+                });
+              } else {
+                toast({
+                  title: "Payment Verification Failed",
+                  description: verifyData.ResponseDescription || "Could not verify payment.",
+                  variant: "destructive",
+                });
+              }
+            } catch (err) {
+              console.error("❌ Verification error:", err);
+              toast({
+                title: "Verification Error",
+                description: "Payment may have succeeded. Please check your orders.",
+                variant: "destructive",
+              });
+            }
+          } else {
+            toast({
+              title: "Payment Failed",
+              description: response.desc || "Payment was not approved.",
+              variant: "destructive",
+            });
+          }
+        },
+        onClose: function () {
+          console.log("Payment modal closed by user");
+          toast({
+            title: "Payment Cancelled",
+            description: "Redirecting to home page...",
+          });
+          startTransition(() => {
+            setTimeout(() => {
+              setLocation("/");
+            }, 1000);
+          });
+        },
+        onError: function (error: any) {
+          console.error("Payment error:", error);
+          toast({
+            title: "Payment Error",
+            description: "An error occurred. Redirecting to home page...",
+            variant: "destructive",
+          });
+          startTransition(() => {
+            setTimeout(() => {
+              setLocation("/");
+            }, 2000);
+          });
+        },
+      };
+
+      (window as any).webpayCheckout(paymentConfig);
+    } catch (error: any) {
+      console.error("Order creation error:", error);
+      toast({
+        title: "Order Failed",
+        description: error?.message || "Unable to create order. Please try again.",
+        variant: "destructive",
+      });
+      setIsProcessingPayment(false);
+    }
   };
 
   return (
@@ -865,27 +1173,124 @@ export default function CustomerMenu() {
             {/* Cart Footer */}
             {cart.length > 0 && (
               <div className="p-3 sm:p-5 border-t bg-muted/30 space-y-3 sm:space-y-4 sticky bottom-0 bg-background">
-                <div className="space-y-1.5 sm:space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm sm:text-lg font-semibold text-foreground">Subtotal</span>
-                    <span className="font-bold text-base sm:text-xl text-[#4EB5A4]" data-testid="text-subtotal">
+                {/* Delivery Method Selection */}
+                <div className="space-y-2">
+                  <p className="text-xs sm:text-sm font-semibold text-foreground">1. Delivery Method</p>
+                  <div className="flex gap-2 sm:gap-3">
+                    {(settings.deliveryEnabled ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
+                      const isActive = orderType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          className={`flex-1 p-2 sm:p-3 rounded-lg border-2 text-center transition-all font-semibold focus:outline-none text-xs sm:text-sm ${
+                            isActive
+                              ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
+                              : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
+                          }`}
+                          onClick={() => handleOrderTypeChange(type as "pickup" | "delivery")}
+                        >
+                          <div className="font-semibold capitalize">{type}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {type === "pickup" ? "At our location" : "To your location"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Charges Breakdown */}
+                <div className="space-y-1.5 sm:space-y-2 pt-2 border-t">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-semibold text-foreground">
                       ₦{subtotal.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Delivery fee and charges calculated at checkout
-                  </p>
+                  
+                  {orderType === "delivery" && (
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <span className="text-muted-foreground">Delivery Fee</span>
+                      <span className="font-semibold text-foreground">
+                        {isCalculatingDelivery ? (
+                          <span className="text-xs">Calculating...</span>
+                        ) : (
+                          `₦${deliveryFee.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Service Charges */}
+                  {serviceCharges.length > 0 ? (
+                    serviceCharges.map((charge) => (
+                      <div key={charge.id} className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">
+                          {charge.description} ({charge.amount}%)
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          ₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      {serviceChargeRate > 0 && (
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <span className="text-muted-foreground">
+                            Service charge ({serviceChargeRate}%)
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            ₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {vatRate > 0 && (
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <span className="text-muted-foreground">VAT ({vatRate}%)</span>
+                          <span className="font-semibold text-foreground">
+                            ₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-sm sm:text-lg font-bold text-foreground">Total</span>
+                    <span className="font-bold text-base sm:text-xl text-[#4EB5A4]" data-testid="text-total">
+                      ₦{calculateTotal.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
                 </div>
+
                 <Button
                   size="lg"
                   className="w-full h-11 sm:h-14 text-sm sm:text-lg font-semibold bg-gradient-to-r from-[#4EB5A4] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all"
                   onClick={handleCheckout}
+                  disabled={isCalculatingDelivery}
                   data-testid="button-checkout"
                 >
-                  Proceed to Checkout
+                  {isCalculatingDelivery ? "Calculating..." : "Proceed to Checkout"}
                 </Button>
               </div>
             )}
@@ -1099,6 +1504,124 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
+      {/* Order Confirmation Modal */}
+      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-base sm:text-lg break-words">
+              <Check className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-[#4EB5A4] flex-shrink-0" />
+              <span className="break-words">Confirm Your Order</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm break-words">
+              Please review your order details before proceeding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Order Summary */}
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
+              <h4 className="mb-2 font-medium text-sm sm:text-base">Order Summary</h4>
+              <div className="space-y-1 text-xs sm:text-sm">
+                <div className="flex justify-between gap-2">
+                  <span className="break-words min-w-0">Items ({cart.length})</span>
+                  <span className="whitespace-nowrap flex-shrink-0">₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                {orderType === "delivery" && deliveryFee > 0 && (
+                  <div className="flex justify-between gap-2">
+                    <span className="break-words min-w-0">Delivery Fee</span>
+                    <span className="whitespace-nowrap flex-shrink-0">₦{deliveryFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {/* Service Charges */}
+                {serviceCharges.length > 0 ? (
+                  serviceCharges.map((charge) => (
+                    <div key={charge.id} className="flex justify-between gap-2">
+                      <span className="break-words min-w-0">{charge.description} ({charge.amount}%)</span>
+                      <span className="whitespace-nowrap flex-shrink-0">
+                        ₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    {serviceChargeRate > 0 && (
+                      <div className="flex justify-between gap-2">
+                        <span className="break-words min-w-0">Service charge ({serviceChargeRate}%)</span>
+                        <span className="whitespace-nowrap flex-shrink-0">
+                          ₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    {vatRate > 0 && (
+                      <div className="flex justify-between gap-2">
+                        <span className="break-words min-w-0">VAT ({vatRate}%)</span>
+                        <span className="whitespace-nowrap flex-shrink-0">
+                          ₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between border-t pt-2 font-semibold gap-2">
+                  <span className="break-words min-w-0">Total</span>
+                  <span className="whitespace-nowrap flex-shrink-0">₦{calculateTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Location Information */}
+            {orderType === "pickup" ? (
+              <div className="rounded-lg bg-orange-50 p-3 sm:p-4">
+                <h4 className="mb-2 font-medium flex items-center text-sm sm:text-base">
+                  <MapPin className="h-4 w-4 mr-2 text-orange-600 flex-shrink-0" />
+                  <span className="break-words">Pickup Location</span>
+                </h4>
+                <p className="text-xs sm:text-sm text-gray-700 break-words">Lafiya Road Nasarawa GRA, Kano</p>
+                <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Kitchen</p>
+              </div>
+            ) : locationData ? (
+              <div className="rounded-lg bg-green-50 p-3 sm:p-4">
+                <h4 className="mb-2 font-medium flex items-center text-sm sm:text-base">
+                  <MapPin className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
+                  <span className="break-words">Delivery Location</span>
+                </h4>
+                <p className="text-xs sm:text-sm text-gray-700 break-words">{locationData.address}</p>
+              </div>
+            ) : null}
+
+            {/* Payment Method Info */}
+            <div className="rounded-lg bg-blue-50 p-3 sm:p-4">
+              <h4 className="mb-2 font-medium text-sm sm:text-base break-words">Payment Method</h4>
+              <div className="flex items-center space-x-2 min-w-0">
+                <CreditCard className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                <span className="text-xs sm:text-sm break-words min-w-0">Card/Transfer</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col space-y-2">
+            <div className="w-full">
+              <Button
+                className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700 text-sm sm:text-base"
+                onClick={handleConfirmOrder}
+                disabled={isProcessingPayment}
+              >
+                {isProcessingPayment ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </span>
+                ) : (
+                  <>
+                    Confirm Order
+                    <Check className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </main>
     </>
   );

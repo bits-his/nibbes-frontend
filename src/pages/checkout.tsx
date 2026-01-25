@@ -271,6 +271,12 @@ export default function Checkout() {
       }
     }
 
+    // Load orderType from localStorage (set in cart)
+    const savedOrderType = localStorage.getItem("orderType")
+    if (savedOrderType === "delivery" || savedOrderType === "pickup") {
+      form.setValue("orderType", savedOrderType)
+    }
+
     if (user) {
       form.setValue("customerName", user.username || user.email)
       form.setValue("customerPhone", user.phone || "")
