@@ -776,7 +776,7 @@ export default function StaffOrders() {
                         key={item.menuItem.id}
                         data-testid={`cart-item-${item.menuItem.id}`}
                         className="border-border/50 shadow-sm hover:shadow-md transition-all overflow-hidden cursor-pointer relative"
-                        onClick={() => setExpandedCartItem(item.menuItem.id)}
+                        onClick={() => item.menuItem.id !== undefined && setExpandedCartItem(item.menuItem.id)}
                       >
                         <CardContent className="p-0 relative">
                           {/* Top badges container */}
@@ -894,7 +894,7 @@ export default function StaffOrders() {
       <Dialog open={!!expandedCartItem} onOpenChange={(open) => !open && setExpandedCartItem(null)}>
         <DialogContent className="max-w-[90vw] sm:max-w-md p-0 gap-0 overflow-hidden">
           {expandedCartItem && (() => {
-            const item = cart.find(i => i.menuItem.id === expandedCartItem);
+            const item = cart.find(i => i.menuItem.id !== undefined && i.menuItem.id === expandedCartItem);
             if (!item) return null;
             
             const atMaxStock = item.menuItem.stockBalance !== null && 

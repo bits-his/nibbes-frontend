@@ -54,7 +54,7 @@ type CheckoutFormValues = z.infer<typeof checkoutFormSchema>
 interface PaymentMethod {
   id: string
   name: string
-  description: string
+  description?: string
   icon: any
   type: 'card' | 'cash' | 'pos' | 'transfer'
 }
@@ -156,21 +156,21 @@ export default function Checkout() {
     {
       id: 'cash',
       name: 'CASH',
-      // description: 'Customer pays with cash',
+      description: '',
       icon: Banknote,
       type: 'cash',
     },
     {
       id: 'pos',
       name: 'CARD',
-      // description: 'Pay with POS at counter',
+      description: '',
       icon: CreditCard,
       type: 'pos',
     },
     {
       id: 'transfer',
       name: 'TRANSFER',
-      // description: 'Customer paid via bank transfer',
+      description: '',
       icon: Smartphone,
       type: 'transfer',
     },
