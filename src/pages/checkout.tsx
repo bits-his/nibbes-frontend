@@ -805,6 +805,21 @@ export default function Checkout() {
   const createOrderMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/orders", data)
+      
+      // Check if response is an error (stock validation failure)
+      if (!response.ok) {
+        const errorData = await response.json()
+        // Check if it's a stock error
+        if (errorData.stockError) {
+          throw {
+            stockError: true,
+            message: errorData.error,
+            details: errorData.details || []
+          }
+        }
+        throw new Error(errorData.error || 'Failed to create order')
+      }
+      
       return await response.json()
     },
     onSuccess: (data: any) => {
@@ -819,10 +834,26 @@ export default function Checkout() {
       // Payment verification will happen in background
       setLocation("/docket")
     },
-    onError: () => {
+    onError: (error: any) => {
+      // Handle stock validation errors
+      if (error.stockError) {
+        const details = error.details || []
+        toast({
+          title: "Stock Unavailable",
+          description: details.length > 0 
+            ? details.join('\n') 
+            : "Some items in your cart are out of stock. Please review your cart.",
+          variant: "destructive",
+          duration: 6000,
+        })
+        // Redirect back to menu to update cart
+        setLocation("/?openCart=true")
+        return
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to place order. Please try again.",
+        description: error.message || "Failed to place order. Please try again.",
         variant: "destructive",
       })
     },
@@ -915,6 +946,14 @@ export default function Checkout() {
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
+          // Check if it's a stock error
+          if (errorData.stockError) {
+            throw {
+              stockError: true,
+              message: errorData.error,
+              details: errorData.details || []
+            }
+          }
           throw new Error(errorData.message || `Server error: ${response.status}`)
         }
         
@@ -981,6 +1020,21 @@ export default function Checkout() {
     },
     onError: (error: any) => {
       console.error('❌ Walk-in order creation failed:', error)
+      
+      // Handle stock validation errors
+      if (error.stockError) {
+        const details = error.details || []
+        toast({
+          title: "Stock Unavailable",
+          description: details.length > 0 
+            ? details.join(', ') 
+            : "Some items are out of stock. Please review the order.",
+          variant: "destructive",
+          duration: 6000,
+        })
+        // Staff should review and remove unavailable items from cart
+        return
+      }
       
       const errorMessage = error?.message || 'Unknown error occurred'
       

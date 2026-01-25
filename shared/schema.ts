@@ -12,6 +12,7 @@ export const menuItemSchema = z.object({
   quantity: z.number().optional(),
   stockBalance: z.number().nullable().optional(), // Stock balance from store entries
   itemCode: z.string().nullable().optional(), // Item code for tracking
+  menuId: z.string().nullable().optional(), // Auto-generated menu ID (e.g., FOOD-0001)
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -24,10 +25,11 @@ export const insertMenuItemSchema = z.object({
   imageUrl: z.string().optional(),
   available: z.boolean().default(true),
   quantity: z.number().optional(),
+  menuId: z.string().optional(), // Auto-generated, optional on insert
 });
 
-// Create an alias for the form schema
-export const menuItemFormSchema = insertMenuItemSchema;
+// Form schema excludes menuId to prevent accidental overwrites during editing
+export const menuItemFormSchema = insertMenuItemSchema.omit({ menuId: true });
 
 export type MenuItem = z.infer<typeof menuItemSchema>;
 

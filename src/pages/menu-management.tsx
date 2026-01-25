@@ -363,16 +363,6 @@ export default function MenuManagement() {
     // Debug log to see what values are being sent
     console.log('Form values:', JSON.stringify(values));
     console.log('Current imageUrl from form:', currentImageUrl);
-    
-    // Check if we have an image URL to submit
-    if (!currentImageUrl) {
-      toast({
-        title: "Error",
-        description: "Please select and upload an image.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     // Don't submit if still uploading
     if (isUploading) {
@@ -384,10 +374,20 @@ export default function MenuManagement() {
       return;
     }
 
+    // Validate image URL is present when creating new items
+    if (!editingItem && !currentImageUrl) {
+      toast({
+        title: "Image Required",
+        description: "Please upload an image for the menu item.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Create or update menu item with the image URL from Cloudinary
     let finalValues: any = {
       ...values,
-      imageUrl: currentImageUrl, // Use the current value from the form
+      imageUrl: currentImageUrl, // Use the uploaded image URL
     };
     
     // When editing, remove the quantity field as it's read-only and tracked via store entries
@@ -788,6 +788,9 @@ export default function MenuManagement() {
                     disabled={isUploading}
                   />
                 </FormControl>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload a high-quality image for the menu item. Recommended size: 800x800px or larger.
+                </p>
                 <FormMessage />
                 {(imagePreviewUrl || form.watch('imageUrl')) && (
                   <div className="mt-2 aspect-video rounded-lg overflow-hidden border">
