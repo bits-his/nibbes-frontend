@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
@@ -154,22 +155,22 @@ export default function Checkout() {
   const walkInPaymentMethods: PaymentMethod[] = [
     {
       id: 'cash',
-      name: 'Cash Payment',
-      description: 'Customer pays with cash',
+      name: 'CASH',
+      // description: 'Customer pays with cash',
       icon: Banknote,
       type: 'cash',
     },
     {
       id: 'pos',
-      name: 'POS Terminal',
-      description: 'Pay with POS at counter',
+      name: 'CARD',
+      // description: 'Pay with POS at counter',
       icon: CreditCard,
       type: 'pos',
     },
     {
       id: 'transfer',
-      name: 'Bank Transfer',
-      description: 'Customer paid via bank transfer',
+      name: 'TRANSFER',
+      // description: 'Customer paid via bank transfer',
       icon: Smartphone,
       type: 'transfer',
     },
@@ -1072,13 +1073,13 @@ export default function Checkout() {
   }
 
   const getRemainingAmount = () => {
-    const total = walkInOrder?.total || subtotal || 0
+    const total = calculateTotal() // Use calculateTotal to include all charges
     return total - getTotalPaid()
   }
 
   const isPaymentValid = () => {
     if (!multiPaymentEnabled) return true
-    const total = walkInOrder?.total || subtotal || 0
+    const total = calculateTotal() // Use calculateTotal to include all charges
     const paid = getTotalPaid()
     return Math.abs(total - paid) < 0.01 // Allow for floating point errors
   }
@@ -1233,7 +1234,7 @@ export default function Checkout() {
       if (multiPaymentEnabled && !isPaymentValid()) {
         toast({
           title: "Invalid Payment Amount",
-          description: `Total payment (₦${getTotalPaid().toLocaleString()}) must equal order total (₦${(walkInOrder.total || subtotal || 0).toLocaleString()})`,
+          description: `Total payment (₦${getTotalPaid().toLocaleString(undefined, { minimumFractionDigits: 2 })}) must equal order total (₦${calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })})`,
           variant: "destructive",
         })
         return
@@ -1249,6 +1250,7 @@ export default function Checkout() {
           : selectedPaymentMethod,
         paymentStatus: "paid",
         items: walkInOrder.items,
+        totalAmount: calculateTotal(), // Include total with all charges
         // Add payment splits info if multi-payment is enabled
         ...(multiPaymentEnabled && {
           paymentSplits: paymentSplits.map(split => ({
@@ -1460,30 +1462,37 @@ export default function Checkout() {
                 <div className="space-y-3">
                   {walkInPaymentMethods.map((method) => {
                     const IconComponent = method.icon
+                    const isSelected = selectedPaymentMethod === method.id
                     return (
-                      <button
+                      <div
                         key={method.id}
-                        type="button"
-                        className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                          selectedPaymentMethod === method.id
+                        className={`w-full p-4 rounded-lg border-2 transition-all ${
+                          isSelected
                             ? "border-[#4EB5A4] bg-[#4EB5A4]/10"
-                            : "border-border/50 hover:border-accent/50"
+                            : "border-border/50"
                         }`}
-                        onClick={() => setSelectedPaymentMethod(method.id)}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <IconComponent className="w-5 h-5 text-[#4EB5A4]" />
-                            <div>
+                          <div className="flex items-center gap-3 flex-1">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedPaymentMethod(method.id)
+                                }
+                              }}
+                              className="flex-shrink-0"
+                            />
+                            <IconComponent className="w-5 h-5 text-[#4EB5A4] flex-shrink-0" />
+                            <div className="flex-1">
                               <p className="font-semibold">{method.name}</p>
                               <p className="text-sm text-muted-foreground">
                                 {method.description}
                               </p>
                             </div>
                           </div>
-                          {selectedPaymentMethod === method.id && <Check className="w-5 h-5 text-[#4EB5A4]" />}
                         </div>
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -1563,15 +1572,49 @@ export default function Checkout() {
                     )
                   })}
 
+                  {/* Order breakdown with charges */}
+                  <div className="p-4 bg-muted/30 rounded-lg space-y-2 mb-4">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {/* Show all service charges individually */}
+                    {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
+                      <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
+                        <span>{charge.description} ({charge.amount}%)</span>
+                        <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )) : (
+                      <>
+                        {serviceChargeRate > 0 && (
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Service charge ({serviceChargeRate}%)</span>
+                            <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        {vatRate > 0 && (
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>VAT ({vatRate}%)</span>
+                            <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <div className="flex justify-between text-base font-bold border-t pt-2 mt-2">
+                      <span>Total</span>
+                      <span className="text-[#4EB5A4]">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+
                   {/* Payment summary */}
                   <div className="p-4 bg-muted/50 rounded-lg space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Total Paid:</span>
-                      <span className="font-semibold">₦{getTotalPaid().toLocaleString()}</span>
+                      <span className="font-semibold">₦{getTotalPaid().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Order Total:</span>
-                      <span className="font-semibold">₦{(walkInOrder.total || subtotal || 0).toLocaleString()}</span>
+                      <span className="font-semibold">₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between text-sm pt-2 border-t">
                       <span className="text-muted-foreground">Remaining:</span>
@@ -1580,7 +1623,7 @@ export default function Checkout() {
                         getRemainingAmount() < 0 ? 'text-red-500' : 
                         'text-green-500'
                       }`}>
-                        ₦{Math.abs(getRemainingAmount()).toLocaleString()}
+                        ₦{Math.abs(getRemainingAmount()).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         {getRemainingAmount() > 0 && ' (underpaid)'}
                         {getRemainingAmount() < 0 && ' (overpaid)'}
                         {getRemainingAmount() === 0 && ' ✓'}
