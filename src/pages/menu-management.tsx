@@ -175,7 +175,7 @@ export default function MenuManagement() {
 
   // PERFORMANCE: Infinite scroll for pagination (reduces initial payload)
   const {
-    visibleItems,
+    displayedItems: visibleItems,
     hasMore,
     isLoading: isLoadingMore,
     loadMore,
@@ -502,7 +502,7 @@ export default function MenuManagement() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {visibleItems.map((item) => (
+              {(visibleItems || []).map((item) => (
               <Card
                 key={item.id}
                 className="overflow-hidden"

@@ -36,10 +36,12 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { usePrint } from "@/hooks/usePrint";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function OrderManagement() {
   const { toast } = useToast();
   const { printInvoice } = usePrint();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState("all"); // New: filter for online/walk-in
@@ -60,6 +62,13 @@ export default function OrderManagement() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      
+      // Debug log for cancelled order notifications
+      if (data.type === "order_cancelled_notification") {
+        console.log('📢 Received order_cancelled_notification:', data);
+        console.log('Current user role:', user?.role);
+      }
+      
       if (
         data.type === "order_update" || 
         data.type === "new_order" || 
@@ -68,6 +77,27 @@ export default function OrderManagement() {
       ) {
         // Refresh orders data when there are changes
         queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      } else if (data.type === "order_cancelled_notification") {
+        // Show notification to staff roles only (not customers)
+        const userRole = user?.role || '';
+        const targetRoles = data.targetRoles || ['admin', 'staff', 'cashier', 'kitchen'];
+        
+        console.log(`Checking if role '${userRole}' is in targetRoles:`, targetRoles);
+        
+        if (userRole && targetRoles.includes(userRole)) {
+          console.log('✅ Showing cancellation notification to user');
+          toast({
+            title: "🚫 Order Cancelled",
+            description: data.message || `Order #${data.orderNumber} has been cancelled`,
+            duration: 5000,
+          });
+          
+          // Refresh orders list to show updated status
+          queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/stats"] });
+        } else {
+          console.log('❌ User role not authorized for cancellation notification');
+        }
       }
     };
 
@@ -83,7 +113,7 @@ export default function OrderManagement() {
     return () => {
       socket.close();
     };
-  }, []);
+  }, [user, toast]); // Add user to dependencies so WebSocket handler has access to current user role
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders", dateRange.from?.toDateString(), dateRange.to?.toDateString()],

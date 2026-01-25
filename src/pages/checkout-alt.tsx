@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { apiRequest } from "@/lib/queryClient"
+import { apiRequest, queryClient } from "@/lib/queryClient"
 import { useAuth } from "@/hooks/useAuth"
 import { getGuestSession } from "@/lib/guestSession"
 import { useCart } from "@/context/CartContext"
@@ -130,6 +130,10 @@ export default function CheckoutAlt() {
         "pendingPaymentOrder",
         JSON.stringify({ orderId: order.id, orderNumber: order.orderNumber, txnRef: transactionRef })
       )
+      
+      // Invalidate queries to refresh orders and menu items stock balances
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] })
     } catch (error) {
       toast({ title: "Order Failed", description: "Unable to create order.", variant: "destructive" })
     } finally {

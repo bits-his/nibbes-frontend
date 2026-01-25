@@ -105,6 +105,8 @@ export default function CustomerMenu() {
         queryClient.invalidateQueries({
           queryKey: ["/api/orders/active/customer"],
         });
+        // Also refresh menu items to update stock balances after orders
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       }
     };
 
@@ -246,7 +248,7 @@ export default function CustomerMenu() {
 
   // Infinite scroll for pagination (reduces initial payload)
   const {
-    visibleItems,
+    displayedItems: visibleItems,
     hasMore,
     isLoading: isLoadingMore,
     loadMore,
@@ -690,7 +692,7 @@ export default function CustomerMenu() {
         ) : (
           <>
             <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-              {visibleItems.map((item) => {
+              {(visibleItems || []).map((item) => {
                 const isInCart = cart.some(
                   (cartItem) => String(cartItem.menuItem.id) === String(item.id)
                 );

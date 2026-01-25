@@ -975,7 +975,9 @@ export default function Checkout() {
         description: `Order #${data.orderNumber} has been sent to kitchen.`,
       })
       
+      // Invalidate orders and menu items to refresh stock balances
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] })
     },
     onError: (error: any) => {
       console.error('❌ Walk-in order creation failed:', error)

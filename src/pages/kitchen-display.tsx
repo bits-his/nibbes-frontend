@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Clock, ChefHat, Search, Printer, Power } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,15 +10,37 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OrderWithItems } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { usePrint } from "@/hooks/usePrint";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
   const { printInvoice } = usePrint();
+  const { user } = useAuth();
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'active' | 'canceled'>('active');
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [canceledOrdersCount, setCanceledOrdersCount] = useState<number>(0);
+  
+  // Use refs to store latest values without causing WebSocket reconnection
+  const userRef = useRef(user);
+  const toastRef = useRef(toast);
+  const setCanceledOrdersCountRef = useRef(setCanceledOrdersCount);
+  
+  // Update refs when values change
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+  
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
+  
+  useEffect(() => {
+    setCanceledOrdersCountRef.current = setCanceledOrdersCount;
+  }, [setCanceledOrdersCount]);
+  
 
   // Fetch kitchen status
   const { data: kitchenStatusData, refetch: refetchKitchenStatus } = useQuery<{ isOpen: boolean; updatedAt?: string }>({
@@ -97,12 +119,23 @@ export default function KitchenDisplay() {
         return order;
       });
       
-      return normalizedData.sort((a: OrderWithItems, b: OrderWithItems) =>
+      const sorted = normalizedData.sort((a: OrderWithItems, b: OrderWithItems) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+      
+      // Update the count state whenever data changes
+      console.log('📊 [Kitchen Display] Cancelled orders fetched, count:', sorted.length);
+      return sorted;
     },
-    enabled: activeTab === 'canceled', // Only fetch when canceled tab is active
+    // Always fetch to show accurate count on tab badge
   });
+  
+  // Update count whenever canceledOrders changes
+  useEffect(() => {
+    const count = canceledOrders?.length || 0;
+    console.log('🔄 [Kitchen Display] Updating cancelled orders count state:', count);
+    setCanceledOrdersCount(count);
+  }, [canceledOrders]);
 
   // WebSocket connection for real-time updates with auto-reconnect
   useEffect(() => {
@@ -112,6 +145,7 @@ export default function KitchenDisplay() {
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
     const baseReconnectDelay = 1000; // Start with 1 second
+    let isUnmounting = false; // Track if component is unmounting to prevent reconnection
 
     const connect = () => {
       try {
@@ -124,12 +158,19 @@ export default function KitchenDisplay() {
 
         socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      
+      // Debug log for all order-related messages
+      if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
+        console.log(`📨 [Kitchen Display] Received ${data.type}:`, {
+          orderId: data.orderId || data.order?.id,
+          orderNumber: data.orderNumber || data.order?.orderNumber,
+          status: data.order?.status
+        });
+      }
+      
       if (data.type === "order_update" || data.type === "new_order" || data.type === "order_status_change") {
         // Use WebSocket data directly - no HTTP query needed for instant updates!
         if (data.order) {
-          // Refresh both active and canceled orders when status changes
-          queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/orders/canceled/today"] });
           // Normalize order structure to ensure orderItems are properly formatted
           const normalizeOrder = (order: any): OrderWithItems => {
             const normalized = { ...order };
@@ -214,6 +255,41 @@ export default function KitchenDisplay() {
                 
                 if (updatedOrder.status === "completed" || updatedOrder.status === "cancelled") {
                   // Remove completed/cancelled orders from active list
+                  
+                  // If cancelled, add to cancelled orders list
+                  if (updatedOrder.status === "cancelled") {
+                    console.log('🔄 [Kitchen Display] Order cancelled, updating cache:', updatedOrder.orderNumber);
+                    queryClient.setQueryData(
+                      ["/api/orders/canceled/today"],
+                      (oldCanceled: OrderWithItems[] = []) => {
+                        // Check if order already exists in cancelled list
+                        const exists = oldCanceled.some(o => o.id === updatedOrder.id);
+                        if (!exists) {
+                          const updated = [updatedOrder, ...oldCanceled];
+                          console.log('✅ Added to cancelled list. New count:', updated.length);
+                          // Update count state immediately using ref
+                          setCanceledOrdersCountRef.current(updated.length);
+                          return updated.sort((a, b) => 
+                            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                          );
+                        }
+                        console.log('ℹ️ Already in cancelled list. Count:', oldCanceled.length);
+                        return oldCanceled;
+                      }
+                    );
+                    
+                    // Force refetch to ensure count is accurate and to get updated data from server
+                    console.log('🔄 Forcing refetch of cancelled orders after cache update...');
+                    queryClient.refetchQueries({ 
+                      queryKey: ["/api/orders/canceled/today"]
+                    }).then(() => {
+                      const updatedCancelledData = queryClient.getQueryData<OrderWithItems[]>(["/api/orders/canceled/today"]);
+                      const newCount = updatedCancelledData?.length || 0;
+                      console.log('✅ Refetch complete. Setting count to:', newCount);
+                      setCanceledOrdersCountRef.current(newCount);
+                    });
+                  }
+                  
                   return old.filter(o => o.id !== updatedOrder.id);
                 } else {
                   // Update existing order with complete data
@@ -236,6 +312,18 @@ export default function KitchenDisplay() {
               return old;
             }
           );
+          
+          // ALWAYS refetch cancelled orders count after any order event
+          // This ensures the count is always up-to-date
+          console.log('🔄 [Kitchen Display] Refetching cancelled orders after order event...');
+          queryClient.refetchQueries({ 
+            queryKey: ["/api/orders/canceled/today"]
+          }).then(() => {
+            const cancelledData = queryClient.getQueryData<OrderWithItems[]>(["/api/orders/canceled/today"]);
+            const count = cancelledData?.length || 0;
+            console.log('✅ [Kitchen Display] Cancelled orders count updated to:', count);
+            setCanceledOrdersCountRef.current(count);
+          });
         } else {
           // Fallback: if order data not in WebSocket message, log warning
           // Don't invalidate query - keep existing data (WebSocket-only approach)
@@ -243,7 +331,7 @@ export default function KitchenDisplay() {
         }
 
         if (data.type === "new_order") {
-          toast({
+          toastRef.current({
             title: "New Order!",
             description: `Order #${data.orderNumber} has been placed.`,
           });
@@ -279,6 +367,57 @@ export default function KitchenDisplay() {
       } else if (data.type === "menu_item_update") {
         // Refresh menu data when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      } else if (data.type === "order_cancelled_notification") {
+        // Debug log
+        console.log('📢 [Kitchen Display] Received order_cancelled_notification:', data);
+        console.log('[Kitchen Display] Current user role:', userRef.current?.role);
+        
+        // Show notification to staff roles only (not customers)
+        const userRole = userRef.current?.role || '';
+        const targetRoles = data.targetRoles || ['admin', 'staff', 'cashier', 'kitchen'];
+        
+        console.log(`[Kitchen Display] Checking if role '${userRole}' is in targetRoles:`, targetRoles);
+        
+        if (userRole && targetRoles.includes(userRole)) {
+          console.log('✅ [Kitchen Display] Showing cancellation notification to user');
+          toastRef.current({
+            title: "🚫 Order Cancelled",
+            description: data.message || `Order #${data.orderNumber} has been cancelled`,
+            duration: 5000,
+          });
+          
+          // Optimistically update cancelled orders count
+          // Remove from active orders
+          queryClient.setQueryData(
+            ["/api/orders/active"],
+            (old: OrderWithItems[] = []) => {
+              return old.filter(o => o.id !== data.orderId);
+            }
+          );
+          
+          console.log('🔄 [Kitchen Display] Forcing refetch from cancellation notification...');
+          
+          // Force immediate refetch of both lists using refetchQueries
+          // This works even if the query is not currently active/mounted
+          queryClient.refetchQueries({ 
+            queryKey: ["/api/orders/active"]
+          }).then(() => {
+            console.log('✅ Active orders refetched');
+          });
+          
+          queryClient.refetchQueries({ 
+            queryKey: ["/api/orders/canceled/today"]
+          }).then(() => {
+            console.log('✅ Cancelled orders refetched');
+            const canceledData = queryClient.getQueryData<OrderWithItems[]>(["/api/orders/canceled/today"]);
+            const newCount = canceledData?.length || 0;
+            console.log('📊 Current cancelled orders count:', newCount);
+            // Update count state to force re-render using ref
+            setCanceledOrdersCountRef.current(newCount);
+          });
+        } else {
+          console.log('❌ [Kitchen Display] User role not authorized for cancellation notification');
+        }
       }
     };
 
@@ -289,18 +428,26 @@ export default function KitchenDisplay() {
         socket.onclose = () => {
           console.log("WebSocket disconnected");
           
+          // Don't reconnect if component is unmounting
+          if (isUnmounting) {
+            console.log("Component unmounting, skipping reconnection");
+            return;
+          }
+          
           // Auto-reconnect with exponential backoff
           if (reconnectAttempts < maxReconnectAttempts) {
             const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
             console.log(`Reconnecting in ${delay}ms... (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
             
             reconnectTimeout = setTimeout(() => {
-              reconnectAttempts++;
-              connect();
+              if (!isUnmounting) {
+                reconnectAttempts++;
+                connect();
+              }
             }, delay);
           } else {
             console.error("Max reconnection attempts reached. Please refresh the page.");
-            toast({
+            toastRef.current({
               title: "Connection Lost",
               description: "WebSocket connection failed. Please refresh the page to reconnect.",
               variant: "destructive",
@@ -318,6 +465,9 @@ export default function KitchenDisplay() {
     connect();
 
     return () => {
+      // Set flag to prevent reconnection on unmount
+      isUnmounting = true;
+      
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
@@ -325,7 +475,7 @@ export default function KitchenDisplay() {
         socket.close();
       }
     };
-  }, [toast]);
+  }, []); // Empty deps - WebSocket connects once and stays connected (using closures for handlers)
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
@@ -502,7 +652,7 @@ const getStatusBadge = (status: string) => {
                   onClick={() => setActiveTab('canceled')}
                   className="text-xs sm:text-sm"
                 >
-                  Canceled: {canceledOrders?.length || 0}
+                  Canceled: {canceledOrdersCount}
                 </Button>
               </div>
               <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />

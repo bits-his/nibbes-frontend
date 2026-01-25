@@ -17,6 +17,7 @@ import type { MenuItem, CartItem } from "@shared/schema";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
+import { useAuth } from "@/hooks/useAuth";
 
 // Service Charge interface
 interface ServiceCharge {
@@ -36,6 +37,7 @@ type OrderFormValues = z.infer<typeof orderFormSchema>;
 
 export default function StaffOrders() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -138,7 +140,7 @@ export default function StaffOrders() {
 
   // PERFORMANCE: Infinite scroll for pagination (reduces initial payload from 68MB to manageable chunks)
   const {
-    visibleItems,
+    displayedItems: visibleItems,
     hasMore,
     isLoading: isLoadingMore,
     loadMore,
@@ -450,6 +452,8 @@ export default function StaffOrders() {
       ) {
         // Refresh active orders when there are changes
         queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+        // Also refresh menu items to update stock balances after orders
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
       } else if (data.type === "menu_item_update") {
         // Refresh menu data and categories when items are updated
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
@@ -457,6 +461,31 @@ export default function StaffOrders() {
       } else if (data.type === "service-charges-updated") {
         // Trigger service charges refresh by dispatching custom event
         window.dispatchEvent(new CustomEvent('service-charges-updated', { detail: data.charges }));
+      } else if (data.type === "order_cancelled_notification") {
+        // Debug log
+        console.log('📢 [Staff Orders] Received order_cancelled_notification:', data);
+        console.log('[Staff Orders] Current user role:', user?.role);
+        
+        // Show notification to staff roles only (not customers)
+        const userRole = user?.role || '';
+        const targetRoles = data.targetRoles || ['admin', 'staff', 'cashier', 'kitchen'];
+        
+        console.log(`[Staff Orders] Checking if role '${userRole}' is in targetRoles:`, targetRoles);
+        
+        if (userRole && targetRoles.includes(userRole)) {
+          console.log('✅ [Staff Orders] Showing cancellation notification to user');
+          toast({
+            title: "🚫 Order Cancelled",
+            description: data.message || `Order #${data.orderNumber} has been cancelled`,
+            duration: 5000,
+          });
+          
+          // Refresh orders and menu items
+          queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+        } else {
+          console.log('❌ [Staff Orders] User role not authorized for cancellation notification');
+        }
       }
     };
 
@@ -472,7 +501,7 @@ export default function StaffOrders() {
     return () => {
       socket.close();
     };
-  }, []);
+  }, [user, toast]); // Add user to dependencies so WebSocket handler has access to current user role
 
   return (
     <div className="min-h-screen bg-background">
@@ -549,7 +578,7 @@ export default function StaffOrders() {
             ) : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                  {visibleItems.map((item) => {
+                  {(visibleItems || []).map((item) => {
                   const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
                   const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
                   
