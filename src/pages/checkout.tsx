@@ -60,20 +60,20 @@ interface PaymentMethod {
 
 function CartSummaryHeader({ itemCount, subtotal }: { itemCount: number; subtotal: number }) {
   return (
-    <div className="bg-gradient-to-r from-accent/10 to-primary/5 border border-accent/20 rounded-lg p-4 mb-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ChefHat className="w-5 h-5 " />
-          <div>
-            <p className="text-sm text-muted-foreground">Your Order</p>
-            <p className="font-semibold text-foreground">
+    <div className="bg-gradient-to-r from-accent/10 to-primary/5 border border-accent/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+      <div className="flex items-center justify-between gap-3 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <ChefHat className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm text-muted-foreground">Your Order</p>
+            <p className="font-semibold text-sm sm:text-base text-foreground break-words">
               {itemCount} {itemCount === 1 ? "item" : "items"}
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Subtotal</p>
-          <p className="text-lg font-bold ">
+        <div className="text-right flex-shrink-0">
+          <p className="text-xs sm:text-sm text-muted-foreground">Subtotal</p>
+          <p className="text-base sm:text-lg font-bold break-words">
             ₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </p>
         </div>
@@ -1625,23 +1625,23 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30 overflow-x-hidden">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         {/* Back button */}
         <Button
           variant="ghost"
           className="mb-8 text-muted-foreground hover:text-foreground"
-          onClick={() => setLocation("/")}
+          onClick={() => setLocation("/?openCart=true")}
           data-testid="button-back"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Menu
+          Back to Cart
         </Button>
 
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Complete Your Order</h1>
-          <p className="text-muted-foreground">Secure checkout • Fast delivery • Real-time tracking</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-2 break-words">Complete Your Order</h1>
+          <p className="text-sm sm:text-base text-muted-foreground break-words">Secure checkout • Fast delivery • Real-time tracking</p>
         </div>
 
         <CartSummaryHeader itemCount={cart.length} subtotal={subtotal} />
@@ -1663,9 +1663,9 @@ export default function Checkout() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-8 lg:grid-cols-3">
+            <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
               {/* Left column - Form sections */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6 min-w-0">
                 {/* Contact Information Card - Commented out since customer already provided details */}
                 {/* 
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
@@ -1722,15 +1722,15 @@ export default function Checkout() {
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <CardTitle className="text-lg">1. Delivery Method</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="flex gap-3 sm:gap-4">
+                  <CardContent className="pt-4 sm:pt-6">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       {(settings.deliveryEnabled ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
                         const isActive = form.watch("orderType") === type
                         return (
                           <button
                             key={type}
                             type="button"
-                            className={`flex-1 p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none
+                            className={`flex-1 p-3 sm:p-4 rounded-xl border-2 text-center transition-all font-semibold focus:outline-none min-w-0
                               ${
                                 isActive
                                   ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
@@ -1740,8 +1740,8 @@ export default function Checkout() {
                               form.setValue("orderType", type as "delivery" | "pickup")
                             }}
                           >
-                            <div className="font-semibold text-base capitalize">{type}</div>
-                            <div className="text-sm text-muted-foreground mt-1">
+                            <div className="font-semibold text-sm sm:text-base capitalize break-words">{type}</div>
+                            <div className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                               {type === "pickup" ? "At our location" : "To your location"}
                             </div>
                           </button>
@@ -1785,7 +1785,7 @@ export default function Checkout() {
                           <label className="text-sm font-semibold mb-2 block text-foreground">
                             Delivery Address
                           </label>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Input
                               placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
                               value={tempAddress}
@@ -1802,7 +1802,7 @@ export default function Checkout() {
                                   setLocationError(null)
                                 }
                               }}
-                              className="flex-1"
+                              className="flex-1 min-w-0 text-sm sm:text-base"
                             />
                             <Button
                               type="button"
@@ -1823,7 +1823,7 @@ export default function Checkout() {
                                 }
                               }}
                               disabled={!tempAddress.trim() || isCalculatingDelivery}
-                              className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90"
+                              className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90 text-sm sm:text-base whitespace-nowrap"
                             >
                               {isCalculatingDelivery ? "Calculating..." : "Set Address"}
                             </Button>
@@ -1909,11 +1909,11 @@ export default function Checkout() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-4">
-                      <div className="flex items-start gap-4 p-4 bg-background/50 rounded-lg border border-accent/20">
-                        <MapPin className="w-5 h-5  mt-0.5 flex-shrink-0" />
+                      <div className="flex items-start gap-2 sm:gap-4 p-3 sm:p-4 bg-background/50 rounded-lg border border-accent/20">
+                        <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-foreground truncate">{locationData.address}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="font-semibold text-sm sm:text-base text-foreground break-words">{locationData.address}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">
                             {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
                           </p>
                         </div>
@@ -1926,7 +1926,7 @@ export default function Checkout() {
                             setLocationData(null)
                             localStorage.removeItem("location")
                           }}
-                          className="flex-shrink-0"
+                          className="flex-shrink-0 text-xs sm:text-sm"
                         >
                           Edit
                         </Button>
@@ -2013,21 +2013,21 @@ export default function Checkout() {
               </div>
 
               {/* Right column - Order Summary */}
-              <div>
+              <div className="min-w-0">
                 <Card className="sticky top-4 border-border/50 shadow-lg">
                   <CardHeader className="bg-gradient-to-r from-accent/10 to-primary/5 border-b border-accent/20 rounded-t-lg">
-                    <CardTitle className="text-lg">Order Summary</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">Order Summary</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
+                  <CardContent className="pt-4 sm:pt-6 space-y-3 sm:space-y-4">
                     {/* Cart items */}
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-2 sm:space-y-3 max-h-64 overflow-y-auto">
                       {cart.map((item) => (
-                        <div key={item.menuItem.id} className="flex justify-between gap-4 p-3 bg-muted/20 rounded-lg">
+                        <div key={item.menuItem.id} className="flex justify-between gap-2 sm:gap-4 p-2 sm:p-3 bg-muted/20 rounded-lg min-w-0">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground truncate">{item.menuItem.name}</p>
+                            <p className="font-medium text-sm sm:text-base text-foreground break-words">{item.menuItem.name}</p>
                             <p className="text-xs text-muted-foreground mt-1">× {item.quantity}</p>
                           </div>
-                          <p className="font-semibold  whitespace-nowrap">
+                          <p className="font-semibold text-sm sm:text-base whitespace-nowrap flex-shrink-0">
                             ₦{(Number.parseFloat(item.menuItem.price) * item.quantity).toLocaleString()}
                           </p>
                         </div>
@@ -2035,23 +2035,23 @@ export default function Checkout() {
                     </div>
 
                     {/* Divider and total */}
-                    <div className="border-t border-border/30 pt-4 space-y-3">
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Subtotal</span>
-                        <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <div className="border-t border-border/30 pt-3 sm:pt-4 space-y-2 sm:space-y-3">
+                      <div className="flex justify-between text-xs sm:text-sm text-muted-foreground gap-2">
+                        <span className="break-words min-w-0">Subtotal</span>
+                        <span className="whitespace-nowrap flex-shrink-0">₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
                       {form.watch("orderType") === "delivery" && deliveryFee > 0 && (
                         <div className="space-y-1">
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Delivery Fee</span>
+                          <div className="flex justify-between text-xs sm:text-sm text-muted-foreground gap-2">
+                            <span className="break-words min-w-0">Delivery Fee</span>
                             {isCalculatingDelivery ? (
-                              <span className="text-xs">Calculating...</span>
+                              <span className="text-xs whitespace-nowrap flex-shrink-0">Calculating...</span>
                             ) : (
-                              <span>₦{deliveryFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              <span className="whitespace-nowrap flex-shrink-0">₦{deliveryFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             )}
                           </div>
                           {deliveryRoute && (
-                            <div className="font-bold text-lg text-muted-foreground/70 pl-0">
+                            <div className="font-bold text-xs sm:text-sm md:text-base text-muted-foreground/70 pl-0 break-words">
                               {deliveryRoute.from} → {deliveryRoute.to}
                             </div>
                           )}
@@ -2059,30 +2059,30 @@ export default function Checkout() {
                       )}
                       {/* Service Charges - Show all active charges individually */}
                       {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
-                        <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
-                          <span>{charge.description} ({charge.amount}%)</span>
-                          <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <div key={charge.id} className="flex justify-between text-xs sm:text-sm text-muted-foreground gap-2">
+                          <span className="break-words min-w-0">{charge.description} ({charge.amount}%)</span>
+                          <span className="whitespace-nowrap flex-shrink-0">₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                       )) : (
                         // Fallback to old method if serviceCharges is empty
                         <>
                           {serviceChargeRate > 0 && (
-                            <div className="flex justify-between text-sm text-muted-foreground">
-                              <span>Service charge ({serviceChargeRate}%)</span>
-                              <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <div className="flex justify-between text-xs sm:text-sm text-muted-foreground gap-2">
+                              <span className="break-words min-w-0">Service charge ({serviceChargeRate}%)</span>
+                              <span className="whitespace-nowrap flex-shrink-0">₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                           )}
                           {vatRate > 0 && (
-                            <div className="flex justify-between text-sm text-muted-foreground">
-                              <span>VAT ({vatRate}%)</span>
-                              <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <div className="flex justify-between text-xs sm:text-sm text-muted-foreground gap-2">
+                              <span className="break-words min-w-0">VAT ({vatRate}%)</span>
+                              <span className="whitespace-nowrap flex-shrink-0">₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                           )}
                         </>
                       )}
-                      <div className="border-t border-border/30 pt-3 flex justify-between text-lg">
-                        <span className="font-semibold text-foreground">Total</span>
-                        <span className="text-2xl font-bold " data-testid="text-total">
+                      <div className="border-t border-border/30 pt-3 flex justify-between items-center gap-2">
+                        <span className="font-semibold text-base sm:text-lg text-foreground">Total</span>
+                        <span className="text-lg sm:text-xl md:text-2xl font-bold break-words" data-testid="text-total">
                           ₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -2093,12 +2093,12 @@ export default function Checkout() {
                       <Button
                         type="submit"
                         size="lg"
-                        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
                         disabled={createOrderMutation.isPending || isProcessingPayment || isCalculatingDelivery}
                         data-testid="button-place-order"
                       >
                         {isCalculatingDelivery 
-                          ? "Calculating Delivery Fee..." 
+                          ? "Calculating..." 
                           : createOrderMutation.isPending || isProcessingPayment 
                             ? "Processing..." 
                             : "Complete Order"}
@@ -2106,7 +2106,7 @@ export default function Checkout() {
                     </div>
 
                     {/* Security note */}
-                    <p className="text-xs text-muted-foreground text-center pt-2">
+                    <p className="text-xs text-muted-foreground text-center pt-2 break-words">
                       🔒 Secure checkout • Your data is encrypted
                     </p>
                   </CardContent>
@@ -2118,42 +2118,42 @@ export default function Checkout() {
 
         {/* Payment Confirmation Modal */}
         <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center">
+              <DialogTitle className="flex items-center text-base sm:text-lg break-words">
                 {selectedPaymentMethod === 'card' && (
-                  <CreditCard className="mr-2 h-5 w-5 text-blue-600" />
+                  <CreditCard className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                 )}
                 {selectedPaymentMethod === 'cash' && (
-                  <Banknote className="mr-2 h-5 w-5 text-green-600" />
+                  <Banknote className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
                 )}
                 {selectedPaymentMethod === 'transfer' && (
-                  <Smartphone className="mr-2 h-5 w-5 text-purple-600" />
+                  <Smartphone className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
                 )}
-                Confirm Your Order
+                <span className="break-words">Confirm Your Order</span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm break-words">
                 Please review your order details before proceeding.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-y-auto">
               {/* Order Summary */}
-              <div className="rounded-lg bg-gray-50 p-4">
-                <h4 className="mb-2 font-medium">Order Summary</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Items ({cart.length})</span>
-                    <span>₦{subtotal.toLocaleString()}</span>
+              <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
+                <h4 className="mb-2 font-medium text-sm sm:text-base">Order Summary</h4>
+                <div className="space-y-1 text-xs sm:text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="break-words min-w-0">Items ({cart.length})</span>
+                    <span className="whitespace-nowrap flex-shrink-0">₦{subtotal.toLocaleString()}</span>
                   </div>
                   {form.watch("orderType") === "delivery" && deliveryFee > 0 && (
                     <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span>Delivery Fee</span>
-                        <span>₦{deliveryFee.toLocaleString()}</span>
+                      <div className="flex justify-between gap-2">
+                        <span className="break-words min-w-0">Delivery Fee</span>
+                        <span className="whitespace-nowrap flex-shrink-0">₦{deliveryFee.toLocaleString()}</span>
                       </div>
                       {deliveryRoute && (
-                        <div className="text-xs text-muted-foreground pl-0">
+                        <div className="text-xs text-muted-foreground pl-0 break-words">
                           {deliveryRoute.from} → {deliveryRoute.to}
                         </div>
                       )}
@@ -2161,71 +2161,71 @@ export default function Checkout() {
                   )}
                   {/* Service Charges - Show all active charges individually */}
                   {serviceCharges.length > 0 ? serviceCharges.map((charge) => (
-                    <div key={charge.id} className="flex justify-between">
-                      <span>{charge.description} ({charge.amount}%)</span>
-                      <span>₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString()}</span>
+                    <div key={charge.id} className="flex justify-between gap-2">
+                      <span className="break-words min-w-0">{charge.description} ({charge.amount}%)</span>
+                      <span className="whitespace-nowrap flex-shrink-0">₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString()}</span>
                     </div>
                   )) : (
                     // Fallback to old method if serviceCharges is empty
                     <>
                       {serviceChargeRate > 0 && (
-                        <div className="flex justify-between">
-                          <span>Service charge ({serviceChargeRate}%)</span>
-                          <span>₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString()}</span>
+                        <div className="flex justify-between gap-2">
+                          <span className="break-words min-w-0">Service charge ({serviceChargeRate}%)</span>
+                          <span className="whitespace-nowrap flex-shrink-0">₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString()}</span>
                         </div>
                       )}
                       {vatRate > 0 && (
-                        <div className="flex justify-between">
-                          <span>VAT ({vatRate}%)</span>
-                          <span>₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString()}</span>
+                        <div className="flex justify-between gap-2">
+                          <span className="break-words min-w-0">VAT ({vatRate}%)</span>
+                          <span className="whitespace-nowrap flex-shrink-0">₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString()}</span>
                         </div>
                       )}
                     </>
                   )}
-                  <div className="flex justify-between border-t pt-2 font-semibold">
-                    <span>Total</span>
-                    <span>₦{calculateTotal().toLocaleString()}</span>
+                  <div className="flex justify-between border-t pt-2 font-semibold gap-2">
+                    <span className="break-words min-w-0">Total</span>
+                    <span className="whitespace-nowrap flex-shrink-0">₦{calculateTotal().toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
               {/* Delivery Information */}
               {form.watch("orderType") === "delivery" && locationData && (
-                <div className="rounded-lg bg-green-50 p-4">
-                  <h4 className="mb-2 font-medium flex items-center">
-                    <MapPin className="h-4 w-4 mr-2 text-green-600" />
-                    Delivery Location
+                <div className="rounded-lg bg-green-50 p-3 sm:p-4">
+                  <h4 className="mb-2 font-medium flex items-center text-sm sm:text-base">
+                    <MapPin className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
+                    <span className="break-words">Delivery Location</span>
                   </h4>
-                  <p className="text-sm text-gray-700">{locationData.address}</p>
+                  <p className="text-xs sm:text-sm text-gray-700 break-words">{locationData.address}</p>
                 </div>
               )}
 
               {/* Pickup Information */}
               {form.watch("orderType") === "pickup" && (
-                <div className="rounded-lg bg-orange-50 p-4">
-                  <h4 className="mb-2 font-medium flex items-center">
-                    <MapPin className="h-4 w-4 mr-2 text-orange-600" />
-                    Pickup Location
+                <div className="rounded-lg bg-orange-50 p-3 sm:p-4">
+                  <h4 className="mb-2 font-medium flex items-center text-sm sm:text-base">
+                    <MapPin className="h-4 w-4 mr-2 text-orange-600 flex-shrink-0" />
+                    <span className="break-words">Pickup Location</span>
                   </h4>
-                  <p className="text-sm text-gray-700">Lafiya Road Nasarawa GRA, Kano</p>
-                  <p className="text-xs text-gray-500 mt-1">Nibbles Kitchen</p>
+                  <p className="text-xs sm:text-sm text-gray-700 break-words">Lafiya Road Nasarawa GRA, Kano</p>
+                  <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Kitchen</p>
                 </div>
               )}
 
               {/* Payment Method Info */}
-              <div className="rounded-lg bg-blue-50 p-4">
-                <h4 className="mb-2 font-medium">Payment Method</h4>
-                <div className="flex items-center space-x-2">
+              <div className="rounded-lg bg-blue-50 p-3 sm:p-4">
+                <h4 className="mb-2 font-medium text-sm sm:text-base break-words">Payment Method</h4>
+                <div className="flex items-center space-x-2 min-w-0">
                   {selectedPaymentMethod === 'card' && (
-                    <CreditCard className="h-4 w-4 text-blue-600" />
+                    <CreditCard className="h-4 w-4 text-blue-600 flex-shrink-0" />
                   )}
                   {selectedPaymentMethod === 'cash' && (
-                    <Banknote className="h-4 w-4 text-green-600" />
+                    <Banknote className="h-4 w-4 text-green-600 flex-shrink-0" />
                   )}
                   {selectedPaymentMethod === 'transfer' && (
-                    <Smartphone className="h-4 w-4 text-purple-600" />
+                    <Smartphone className="h-4 w-4 text-purple-600 flex-shrink-0" />
                   )}
-                  <span className="text-sm">
+                  <span className="text-xs sm:text-sm break-words min-w-0">
                     {paymentMethods.find(m => m.id === selectedPaymentMethod)?.name}
                   </span>
                 </div>
@@ -2235,12 +2235,12 @@ export default function Checkout() {
             <DialogFooter className="flex-col space-y-2">
               <div className="w-full">
                 <Button
-                  className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
+                  className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700 text-sm sm:text-base"
                   onClick={handlePaymentConfirmation}
                   disabled={createOrderMutation.isPending || isProcessingPayment}
                 >
                   {isProcessingPayment ? "Processing..." : "Confirm Order"}
-                  <Check className="ml-2 h-4 w-4" />
+                  <Check className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </DialogFooter>
