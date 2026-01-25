@@ -1315,7 +1315,7 @@ export default function CustomerMenu() {
                       alt={item.menuItem.name || 'Menu item'}
                       width={400}
                       height={160}
-                      aspectRatio="5/2"
+                      aspectRatio="auto"
                       priority={false}
                       className="w-full h-full object-cover"
                     />
