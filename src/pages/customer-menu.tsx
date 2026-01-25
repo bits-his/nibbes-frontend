@@ -895,157 +895,114 @@ export default function CustomerMenu() {
 
       {/* Cart Item Detail Modal */}
       <Dialog open={!!expandedCartItem} onOpenChange={(open) => !open && setExpandedCartItem(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl lg:max-w-3xl p-0 gap-0 overflow-hidden">
+        <DialogContent className="max-w-[90vw] sm:max-w-md p-0 gap-0 overflow-hidden">
           {expandedCartItem && (() => {
             const item = cart.find(i => i.menuItem.id === expandedCartItem);
             if (!item) return null;
             
             return (
-              <div className="flex flex-col sm:flex-row gap-0 max-h-[90vh]">
-                {/* Left: Image Section */}
-                <div className="relative w-full h-52 sm:w-2/5 sm:max-h-[90vh] bg-gradient-to-br from-muted to-muted/50 flex-shrink-0 overflow-hidden">
-                  <OptimizedImage
-                    src={item.menuItem.imageUrl || ''}
-                    alt={item.menuItem.name || 'Menu item'}
-                    width={500}
-                    height={500}
-                    aspectRatio="square"
-                    priority={false}
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Close button - desktop only */}
+              <div className="flex flex-col">
+                {/* Top: Compact Image Section */}
+                <div className="relative w-full bg-gradient-to-br from-muted to-muted/50 flex-shrink-0 overflow-hidden">
+                  <div className="aspect-[5/2]">
+                    <OptimizedImage
+                      src={item.menuItem.imageUrl || ''}
+                      alt={item.menuItem.name || 'Menu item'}
+                      width={400}
+                      height={160}
+                      aspectRatio="5/2"
+                      priority={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  {/* Close button */}
                   <Button
                     size="icon"
                     variant="ghost"
                     onClick={() => setExpandedCartItem(null)}
-                    className="absolute top-3 right-3 h-9 w-9 bg-white/90 hover:bg-white text-foreground rounded-full shadow-lg backdrop-blur-sm border border-border/50 hidden sm:flex"
+                    className="absolute top-2 right-2 h-7 w-7 bg-white/90 hover:bg-white text-foreground rounded-full shadow-lg"
                     aria-label="Close"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-3.5 h-3.5" />
                   </Button>
                 </div>
 
-                {/* Right: Content Section */}
-                <div className="flex flex-col p-5 sm:p-8 w-full sm:w-3/5 overflow-y-auto max-h-[90vh]">
-                  {/* Close button - mobile only */}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setExpandedCartItem(null)}
-                    className="absolute top-2 right-2 h-8 w-8 bg-white/90 hover:bg-white text-foreground rounded-full shadow-md sm:hidden z-10"
-                    aria-label="Close"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-
+                {/* Bottom: Content Section */}
+                <div className="flex flex-col p-4">
                   {/* Header */}
-                  <div className="mb-6 sm:mb-8 pr-8 sm:pr-0">
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-3 leading-tight">
+                  <div className="mb-3">
+                    <h2 className="text-base sm:text-lg font-bold text-foreground mb-1.5 leading-tight line-clamp-2">
                       {item.menuItem.name}
                     </h2>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl sm:text-4xl font-bold text-[#4EB5A4]">
-                        ₦{parseFloat(item.menuItem.price).toLocaleString()}
-                      </span>
-                      <span className="text-sm text-muted-foreground">per item</span>
+                    <span className="text-xl sm:text-2xl font-bold text-[#4EB5A4]">
+                      ₦{parseFloat(item.menuItem.price).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Quantity Section - Inline */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-br from-[#4EB5A4]/10 to-[#4EB5A4]/5 border border-[#4EB5A4]/20 rounded-lg">
+                      <span className="text-sm font-semibold text-foreground">Quantity</span>
+                      <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
+                          className="h-8 w-8 hover:bg-red-50 hover:text-destructive rounded-md"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </Button>
+                        <span className="w-8 text-center font-bold text-lg">{item.quantity}</span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
+                          className="h-8 w-8 hover:bg-[#4EB5A4]/10 hover:text-[#4EB5A4] rounded-md"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Quantity Section - Enhanced Card */}
-                  <div className="mb-6 sm:mb-8">
-                    <div className="bg-gradient-to-br from-[#4EB5A4]/10 to-[#4EB5A4]/5 border-2 border-[#4EB5A4]/20 rounded-2xl p-4 sm:p-5">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground mb-1">Select Quantity</p>
-                          <p className="text-xs text-muted-foreground">How many would you like?</p>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3 bg-white rounded-xl p-2 shadow-sm border border-[#4EB5A4]/20">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, -1)}
-                            data-testid={`modal-button-decrease-${item.menuItem.id}`}
-                            className="h-10 w-10 sm:h-12 sm:w-12 hover:bg-red-50 hover:text-destructive transition-all rounded-lg border border-transparent hover:border-destructive/20"
-                            aria-label={`Decrease quantity of ${item.menuItem.name}`}
-                          >
-                            <Minus className="w-5 h-5" />
-                          </Button>
-                          <div
-                            className="w-12 sm:w-16 text-center font-bold text-2xl sm:text-3xl text-foreground"
-                            data-testid={`modal-quantity-${item.menuItem.id}`}
-                          >
-                            {item.quantity}
-                          </div>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => item.menuItem.id && updateQuantity(item.menuItem.id, 1)}
-                            data-testid={`modal-button-increase-${item.menuItem.id}`}
-                            className="h-10 w-10 sm:h-12 sm:w-12 hover:bg-[#4EB5A4]/10 hover:text-[#4EB5A4] transition-all rounded-lg border border-transparent hover:border-[#4EB5A4]/30"
-                            aria-label={`Increase quantity of ${item.menuItem.name}`}
-                          >
-                            <Plus className="w-5 h-5" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Subtotal Display */}
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#4EB5A4]/20">
-                        <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
-                        <span className="text-2xl sm:text-3xl font-bold text-[#4EB5A4]">
-                          ₦{(parseFloat(item.menuItem.price) * item.quantity).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Subtotal */}
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b">
+                    <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
+                    <span className="text-lg font-bold text-[#4EB5A4]">
+                      ₦{(parseFloat(item.menuItem.price) * item.quantity).toLocaleString()}
+                    </span>
                   </div>
 
                   {/* Special Instructions */}
-                  <div className="mb-6 sm:mb-8 flex-1">
-                    <label className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-[#4EB5A4]/10 flex items-center justify-center">
-                        <ChefHat className="w-4 h-4 text-[#4EB5A4]" />
-                      </div>
+                  <div className="mb-3">
+                    <label className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <ChefHat className="w-3.5 h-3.5 text-[#4EB5A4]" />
                       <span>Special Instructions</span>
-                      <Badge variant="secondary" className="text-xs font-normal">Optional</Badge>
+                      <Badge variant="secondary" className="text-xs">Optional</Badge>
                     </label>
                     <Textarea
-                      id={`modal-instructions-${item.menuItem.id}`}
-                      name={`modal-instructions-${item.menuItem.id}`}
-                      placeholder="Any special requests? (e.g., no onions, extra spicy, well done...)"
+                      placeholder="Any special requests?"
                       value={item.specialInstructions || ""}
                       onChange={(e) =>
                         item.menuItem.id && updateInstructions(item.menuItem.id, e.target.value)
                       }
-                      className="text-sm resize-none min-h-[80px] sm:min-h-[100px] focus:ring-2 focus:ring-[#4EB5A4]/30 focus:border-[#4EB5A4] rounded-xl mt-2"
-                      rows={3}
-                      data-testid={`modal-input-instructions-${item.menuItem.id}`}
+                      className="text-sm resize-none h-16 focus:ring-1 focus:ring-[#4EB5A4]/30 rounded-lg"
+                      rows={2}
                     />
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        item.menuItem.id && removeFromCart(item.menuItem.id);
-                        setExpandedCartItem(null);
-                      }}
-                      data-testid={`modal-button-remove-${item.menuItem.id}`}
-                      className="w-full sm:w-auto sm:flex-1 h-12 text-sm font-medium border-2 border-destructive/30 text-destructive hover:bg-destructive hover:text-white hover:border-destructive transition-all rounded-xl"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Remove from Cart
-                    </Button>
-                    <Button
-                      onClick={() => setExpandedCartItem(null)}
-                      className="w-full sm:flex-[2] h-12 text-base font-semibold bg-gradient-to-r from-[#4EB5A4] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all rounded-xl"
-                    >
-                      Update Cart
-                    </Button>
-                  </div>
+                  {/* Remove Button */}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      item.menuItem.id && removeFromCart(item.menuItem.id);
+                      setExpandedCartItem(null);
+                    }}
+                    className="w-full h-9 text-sm font-medium border border-destructive/30 text-destructive hover:bg-destructive hover:text-white rounded-lg"
+                  >
+                    <X className="w-3.5 h-3.5 mr-1.5" />
+                    Remove from Cart
+                  </Button>
                 </div>
               </div>
             );
