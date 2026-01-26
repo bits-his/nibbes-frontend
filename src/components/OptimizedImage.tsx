@@ -48,6 +48,8 @@ export function OptimizedImage({
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
+  const isLoadedRef = useRef<boolean>(false); // Track loaded state with ref to avoid stale closures
+  const loadedImageSrcRef = useRef<string>(''); // Track the src that was successfully loaded
   const networkStatus = useNetworkStatus();
 
   // Calculate dimensions based on aspect ratio
@@ -65,6 +67,9 @@ export function OptimizedImage({
     effectiveType,
     saveData
   );
+
+  // Track the base image URL (without quality params) to detect actual image changes
+  const baseImageUrlRef = useRef<string>('');
 
   useEffect(() => {
     if (!src) return;
@@ -88,14 +93,45 @@ export function OptimizedImage({
       optimizedSrc = src;
     }
 
-    setImageSrc(optimizedSrc);
-    setHasError(false);
-    setIsLoaded(false);
-    setShowPlaceholder(true);
-    setRetryCount(0);
+    // Extract base URL (without query params) to detect actual image changes
+    const baseUrl = optimizedSrc.split('?')[0];
+    const isNewImage = baseImageUrlRef.current !== baseUrl;
+
+    // Only reset state if it's actually a different image, not just quality change
+    if (isNewImage) {
+      baseImageUrlRef.current = baseUrl;
+      isLoadedRef.current = false;
+      loadedImageSrcRef.current = ''; // Reset loaded src for new image
+      setImageSrc(optimizedSrc);
+      setHasError(false);
+      setIsLoaded(false);
+      setShowPlaceholder(true);
+      setRetryCount(0);
+    } else {
+      // Same image, different quality - don't update src if image is already loaded
+      // This prevents images from disappearing when network quality changes
+      if (!isLoadedRef.current && !loadedImageSrcRef.current) {
+        // Only update src if image hasn't loaded yet
+        setImageSrc((currentSrc) => {
+          if (currentSrc !== optimizedSrc) {
+            return optimizedSrc;
+          }
+          return currentSrc;
+        });
+      } else if (isLoadedRef.current && loadedImageSrcRef.current) {
+        // Image is loaded - lock the src to prevent any changes
+        // This ensures images never disappear once loaded
+        if (imageSrc !== loadedImageSrcRef.current) {
+          setImageSrc(loadedImageSrcRef.current);
+        }
+      }
+    }
   }, [src, imageWidth, imageHeight, quality]);
 
   const handleLoad = () => {
+    isLoadedRef.current = true;
+    // Lock the current src so it never changes once loaded
+    loadedImageSrcRef.current = imageSrc;
     setIsLoaded(true);
     // Delay hiding placeholder for smooth transition
     setTimeout(() => {
@@ -183,7 +219,7 @@ export function OptimizedImage({
         fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
         className={`w-full h-full object-cover transition-opacity duration-300 ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
+          isLoaded || isLoadedRef.current ? 'opacity-100' : 'opacity-0'
         } ${hasError ? 'hidden' : ''}`}
         onLoad={handleLoad}
         onError={handleError}
