@@ -414,7 +414,7 @@ function Router() {
       <Route path="/" component={CustomerMenu} />
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
-      <Route path="/checkout" component={CheckoutWrapper} />
+      {/* Customer checkout removed - now handled directly in cart */}
       <Route path="/checkout-alt" component={CheckoutAlt} />
       <Route path="/staff/checkout" component={CheckoutWrapper} />
       <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />

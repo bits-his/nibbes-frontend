@@ -30,11 +30,12 @@ export default function Signup() {
     setLoading(true)
     setError("")
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      setLoading(false)
-      return
-    }
+    // Password confirmation check removed since confirm password field is commented out
+    // if (password !== confirmPassword) {
+    //   setError("Passwords do not match")
+    //   setLoading(false)
+    //   return
+    // }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters")
@@ -45,7 +46,7 @@ export default function Signup() {
     try {
       const response = await apiRequest("POST", "/api/auth/register", {
         username,
-        email,
+        // email,
         phoneNumber,
         password,
       })
@@ -67,7 +68,22 @@ export default function Signup() {
           setLocation("/")
       }
     } catch (err: any) {
-      setError(err.message || "Signup failed")
+      // Try to parse error message from JSON response
+      let errorMessage = "Signup failed";
+      try {
+        // Error format is usually "400: {error: 'message'}"
+        const errorMatch = err.message.match(/\d+:\s*({.*})/);
+        if (errorMatch && errorMatch[1]) {
+          const errorData = JSON.parse(errorMatch[1]);
+          errorMessage = errorData.error || err.message || "Signup failed";
+        } else {
+          errorMessage = err.message || "Signup failed";
+        }
+      } catch (parseError) {
+        // If parsing fails, use the original error message
+        errorMessage = err.message || "Signup failed";
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false)
     }
@@ -100,7 +116,7 @@ export default function Signup() {
 
             <div className="space-y-2">
               <Label htmlFor="username" className="text-sm font-semibold text-slate-700">
-                Username
+                Name
               </Label>
               <Input
                 id="username"
@@ -113,7 +129,7 @@ export default function Signup() {
               />
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
                 Email Address
               </Label>
@@ -126,7 +142,7 @@ export default function Signup() {
                 required
                 className="h-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
               />
-            </div>
+            </div> */}
 
             <div className="space-y-2">
               <Label htmlFor="phoneNumber" className="text-sm font-semibold text-slate-700">
@@ -167,7 +183,7 @@ export default function Signup() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="confirm-password" className="text-sm font-semibold text-slate-700">
                 Confirm Password
               </Label>
@@ -189,7 +205,7 @@ export default function Signup() {
                   {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </div>
+            </div> */}
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4 pt-2">

@@ -660,6 +660,19 @@ export default function Checkout() {
           
           // Verify payment with Interswitch API (like reference implementation)
           if (response.desc === "Approved by Financial Institution") {
+            // Clear cart and show success message immediately
+            clearCart()
+            toast({
+              title: "Payment Successful! 🎉",
+              description: `Order #${createdOrder.orderNumber} has been paid.`,
+            })
+            
+            // Navigate immediately to docket
+            startTransition(() => {
+              setLocation("/docket")
+            })
+
+            // Verify payment and call backend callback in the background (non-blocking)
             try {
               // Verify transaction with Interswitch
               const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`
@@ -699,32 +712,15 @@ export default function Checkout() {
                     if (attempt < 3) await new Promise(r => setTimeout(r, 1000))
                   }
                 }
-                
-                clearCart()
-                toast({
-                  title: "Payment Successful! 🎉",
-                  description: `Order #${createdOrder.orderNumber} has been paid.`,
-                })
-                startTransition(() => {
-                  setTimeout(() => setLocation("/docket"), 1500)
-                })
               } else {
                 console.error('❌ Interswitch verification failed:', verifyData)
-                toast({
-                  title: "Payment Verification Failed",
-                  description: verifyData.ResponseDescription || "Could not verify payment.",
-                  variant: "destructive",
-                })
               }
-            } catch (err) {
-              console.error('❌ Verification error:', err)
-              toast({
-                title: "Verification Error", 
-                description: "Payment may have succeeded. Please check your orders.",
-                variant: "destructive",
-              })
+            } catch (error) {
+              console.error('❌ Error verifying payment:', error)
+              // Don't show error to user since they're already redirected
             }
           } else {
+            // Payment was not approved by Interswitch
             toast({
               title: "Payment Failed",
               description: response.desc || "Payment was not approved.",
@@ -1472,23 +1468,10 @@ export default function Checkout() {
                     return (
                       <div
                         key={method.id}
-                        className={`w-full p-4 rounded-lg border-2 transition-all ${
-                          isSelected
-                            ? "border-[#4EB5A4] bg-[#4EB5A4]/10"
-                            : "border-border/50"
-                        }`}
+                        className="w-full p-4 rounded-lg border border-border/50 transition-all hover:bg-muted/30"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedPaymentMethod(method.id)
-                                }
-                              }}
-                              className="flex-shrink-0"
-                            />
                             <IconComponent className="w-5 h-5 text-[#4EB5A4] flex-shrink-0" />
                             <div className="flex-1">
                               <p className="font-semibold">{method.name}</p>
@@ -1497,6 +1480,15 @@ export default function Checkout() {
                               </p>
                             </div>
                           </div>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPaymentMethod(method.id)
+                              }
+                            }}
+                            className="flex-shrink-0 w-8 h-8 rounded-md border-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                          />
                         </div>
                       </div>
                     )

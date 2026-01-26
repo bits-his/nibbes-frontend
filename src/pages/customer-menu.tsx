@@ -15,11 +15,12 @@ import {
   Check,
   CreditCard,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +74,7 @@ export default function CustomerMenu() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [tempAddress, setTempAddress] = useState<string>("");
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -488,11 +490,25 @@ export default function CustomerMenu() {
     );
   };
 
-  // Load orderType from localStorage on mount
+  // Load orderType and location from localStorage on mount
   useEffect(() => {
     const savedOrderType = localStorage.getItem("orderType");
     if (savedOrderType === "delivery" || savedOrderType === "pickup") {
       setOrderType(savedOrderType);
+    }
+
+    // Load saved location
+    const savedLocation = localStorage.getItem("location");
+    if (savedLocation) {
+      try {
+        const parsedLocation = JSON.parse(savedLocation);
+        if (parsedLocation && parsedLocation.address) {
+          setLocationData(parsedLocation);
+          setTempAddress(parsedLocation.address);
+        }
+      } catch (error) {
+        console.error("Error parsing saved location:", error);
+      }
     }
   }, []);
 
@@ -562,6 +578,16 @@ export default function CustomerMenu() {
       toast({
         title: "Kitchen is Closed",
         description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if delivery is selected but no location is set
+    if (orderType === "delivery" && !locationData) {
+      toast({
+        title: "Delivery Location Required",
+        description: "Please enter or detect your delivery location to continue.",
         variant: "destructive",
       });
       return;
@@ -775,6 +801,19 @@ export default function CustomerMenu() {
         onComplete: async function (response: any) {
           console.log("🔔 Payment completed:", response);
           if (response.desc === "Approved by Financial Institution") {
+            // Clear cart and show success message immediately
+            clearCart();
+            toast({
+              title: "Payment Successful! 🎉",
+              description: `Order #${createdOrder.orderNumber} has been paid.`,
+            });
+            
+            // Navigate immediately to docket
+            startTransition(() => {
+              setLocation("/docket");
+            });
+
+            // Verify payment and call backend callback in the background (non-blocking)
             try {
               const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`;
               const verifyResponse = await fetch(verifyUrl, {
@@ -810,31 +849,15 @@ export default function CustomerMenu() {
                     if (attempt < 3) await new Promise((r) => setTimeout(r, 1000));
                   }
                 }
-
-                clearCart();
-                toast({
-                  title: "Payment Successful! 🎉",
-                  description: `Order #${createdOrder.orderNumber} has been paid.`,
-                });
-                startTransition(() => {
-                  setTimeout(() => setLocation("/docket"), 1500);
-                });
               } else {
-                toast({
-                  title: "Payment Verification Failed",
-                  description: verifyData.ResponseDescription || "Could not verify payment.",
-                  variant: "destructive",
-                });
+                console.error("❌ Payment verification failed:", verifyData);
               }
-            } catch (err) {
-              console.error("❌ Verification error:", err);
-              toast({
-                title: "Verification Error",
-                description: "Payment may have succeeded. Please check your orders.",
-                variant: "destructive",
-              });
+            } catch (error) {
+              console.error("❌ Error verifying payment:", error);
+              // Don't show error to user since they're already redirected
             }
           } else {
+            // Payment was not approved by Interswitch
             toast({
               title: "Payment Failed",
               description: response.desc || "Payment was not approved.",
@@ -1296,6 +1319,167 @@ export default function CustomerMenu() {
                   </div>
                 </div>
 
+                {/* Delivery Location Input - Show when delivery is selected but no location set */}
+                {orderType === "delivery" && !locationData && (
+                  <Card className="border-orange-300 bg-orange-50/50 shadow-sm mt-4">
+                    <CardHeader className="bg-orange-100/50 border-b border-orange-200">
+                      <CardTitle className="flex items-center gap-2 text-lg text-orange-900">
+                        <MapPin className="w-5 h-5" />
+                        Enter Delivery Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                      <Alert className="border-orange-300 bg-orange-50">
+                        <MapPin className="h-4 w-4 text-orange-600" />
+                        <AlertDescription className="text-orange-900">
+                          Please enter your delivery location
+                        </AlertDescription>
+                      </Alert>
+
+                      {/* Error message */}
+                      {locationError && (
+                        <Alert variant="destructive" className="border-red-400 bg-red-50">
+                          <AlertDescription className="text-red-900 whitespace-pre-line">
+                            <strong className="block mb-2">{locationError.split('.')[0]}.</strong>
+                            {locationError.split('.').slice(1).join('.').trim()}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="space-y-3">
+                        {/* Manual address input */}
+                        <div>
+                          <label className="text-sm font-semibold mb-2 block text-foreground">
+                            Delivery Address
+                          </label>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Input
+                              placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
+                              value={tempAddress}
+                              onChange={(e) => setTempAddress(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && tempAddress.trim()) {
+                                  const newLocationData = {
+                                    address: tempAddress.trim(),
+                                    latitude: 0,
+                                    longitude: 0
+                                  };
+                                  setLocationData(newLocationData);
+                                  localStorage.setItem("location", JSON.stringify(newLocationData));
+                                  setLocationError(null);
+                                }
+                              }}
+                              className="flex-1 min-w-0 text-sm sm:text-base"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (tempAddress.trim()) {
+                                  const newLocationData = {
+                                    address: tempAddress.trim(),
+                                    latitude: 0,
+                                    longitude: 0
+                                  };
+                                  setLocationData(newLocationData);
+                                  localStorage.setItem("location", JSON.stringify(newLocationData));
+                                  setLocationError(null);
+                                  toast({
+                                    title: "Address Set",
+                                    description: "Delivery address has been set successfully.",
+                                  });
+                                }
+                              }}
+                              disabled={!tempAddress.trim() || isCalculatingDelivery}
+                              className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90 text-sm sm:text-base whitespace-nowrap"
+                            >
+                              {isCalculatingDelivery ? "Calculating..." : "Set Address"}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            💡 Tip: Include landmarks for easier delivery (e.g., "Near Central Mosque, Kano")
+                          </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-orange-200" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-orange-50 px-2 text-orange-600">Or use auto-detect</span>
+                          </div>
+                        </div>
+
+                        {/* Auto-detect location button */}
+                        <div className="flex justify-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={checkLocation}
+                            disabled={locationLoading}
+                            className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                          >
+                            {locationLoading ? (
+                              <>
+                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                                Detecting Location...
+                              </>
+                            ) : (
+                              <>
+                                <MapPin className="w-4 h-4 mr-2" />
+                                Auto-Detect My Location
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Location Display - Show when location is set */}
+                {orderType === "delivery" && locationData && (
+                  <Card className="border-accent/30 bg-accent/5 shadow-sm mt-4">
+                    <CardHeader className="bg-accent/10 border-b border-accent/20">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <MapPin className="w-5 h-5" />
+                        Delivery Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start gap-2 sm:gap-4 p-3 sm:p-4 bg-background/50 rounded-lg border border-accent/20">
+                        <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm sm:text-base text-foreground break-words">{locationData.address}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">
+                            {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setTempAddress(locationData.address);
+                            setLocationData(null);
+                            localStorage.removeItem("location");
+                          }}
+                          className="flex-shrink-0 text-xs sm:text-sm"
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                      {isCalculatingDelivery && (
+                        <Alert className="border-blue-300 bg-blue-50 mt-4">
+                          <AlertDescription className="text-blue-900">
+                            Calculating delivery fee...
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Charges Breakdown */}
                 <div className="space-y-1.5 sm:space-y-2 pt-2 border-t">
                   <div className="flex items-center justify-between text-xs sm:text-sm">
@@ -1598,7 +1782,7 @@ export default function CustomerMenu() {
               </p>
             </div>
 
-            <div>
+            {/* <div>
               <label className="text-sm font-semibold mb-2 block">
                 Email Address <span className="text-xs text-muted-foreground">(Optional)</span>
               </label>
@@ -1609,7 +1793,7 @@ export default function CustomerMenu() {
                 onChange={(e) => setGuestEmail(e.target.value)}
                 className="w-full"
               />
-            </div>
+            </div> */}
           </div>
 
           <DialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0">
