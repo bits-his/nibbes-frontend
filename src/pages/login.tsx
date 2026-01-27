@@ -27,7 +27,13 @@ export default function Login() {
     setError("")
 
     try {
-      const response = await apiRequest("POST", "/api/auth/login", { phoneNumber, password })
+      // Detect if input is email or phone number
+      const isEmail = phoneNumber.includes("@");
+      const loginData = isEmail 
+        ? { email: phoneNumber, password }
+        : { phoneNumber, password };
+      
+      const response = await apiRequest("POST", "/api/auth/login", loginData)
       const data = await response.json()
 
       // Check if there's a guest session that needs to be archived
@@ -174,12 +180,12 @@ export default function Login() {
 
             <div className="space-y-2.5">
               <Label htmlFor="phoneNumber" className="text-sm font-semibold text-foreground">
-                Phone Number
+                Phone Number or Email
               </Label>
               <Input
                 id="phoneNumber"
-                type="tel"
-                placeholder="08012345678"
+                type="text"
+                placeholder="08012345678 or your@email.com"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required
