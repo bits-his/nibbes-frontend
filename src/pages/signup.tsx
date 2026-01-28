@@ -101,7 +101,7 @@ export default function Signup() {
           </div>
           <CardTitle className="text-3xl font-bold text-slate-900 sr-only">Nibbles</CardTitle>
           <CardDescription className="text-base text-slate-600 mt-2">
-            Join Nibbles and start managing your orders
+            Kindly join to become a Nibbles Family!
           </CardDescription>
         </CardHeader>
 
@@ -121,7 +121,7 @@ export default function Signup() {
               <Input
                 id="username"
                 type="text"
-                placeholder="johndoe"
+                // placeholder="johndoe"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -151,7 +151,7 @@ export default function Signup() {
               <Input
                 id="phoneNumber"
                 type="tel"
-                placeholder="Enter your phone number"
+                // placeholder="Enter your phone number"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required
@@ -166,20 +166,12 @@ export default function Signup() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-11 pr-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
                 />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
               </div>
             </div>
 
