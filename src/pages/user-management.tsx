@@ -111,10 +111,14 @@ export default function UserManagement() {
 
   // Calculate user statistics
   const userStats = useMemo(() => {
-    const adminCount = users.filter(user => user.role === "admin").length;
-    const kitchenCount = users.filter(user => user.role === "kitchen").length;
+    // Admin role is "C - Suite", Kitchen role is "Kitchen Manager"
+    const adminCount = users.filter(user => user.role === "C - Suite" || user.role === "admin").length;
+    const kitchenCount = users.filter(user => user.role === "Kitchen Manager" || user.role === "kitchen").length;
     const customerCount = users.filter(user => user.role === "customer").length;
-    const customRoleCount = users.filter(user => !["admin", "kitchen", "customer"].includes(user.role)).length;
+    // Exclude standard roles (C - Suite, Kitchen Manager, customer) and legacy roles (admin, kitchen) from custom roles count
+    const customRoleCount = users.filter(user => 
+      !["C - Suite", "Kitchen Manager", "customer", "admin", "kitchen"].includes(user.role)
+    ).length;
     
     return {
       total: users.length,

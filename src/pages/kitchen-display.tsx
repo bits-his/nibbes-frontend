@@ -63,8 +63,12 @@ export default function KitchenDisplay() {
       const response = await apiRequest('GET', '/api/orders/active');
       const data = await response.json();
       
+      // CRITICAL FIX: Filter to only show paid orders (safety filter)
+      // Backend should already filter, but this ensures no unpaid orders slip through
+      const paidOrders = data.filter((order: any) => order.paymentStatus === 'paid');
+      
       // Normalize order items to ensure menuItemName is always present
-      const normalizedData = data.map((order: any) => {
+      const normalizedData = paidOrders.map((order: any) => {
         if (order.orderItems && Array.isArray(order.orderItems)) {
           order.orderItems = order.orderItems.map((item: any) => {
             const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
@@ -206,6 +210,13 @@ export default function KitchenDisplay() {
                 // Add new order to the list
                 const newOrder = normalizeOrder(data.order);
                 
+                // CRITICAL FIX: Only show paid orders in kitchen display
+                // Unpaid orders should not appear until payment is confirmed
+                if (newOrder.paymentStatus !== 'paid') {
+                  console.log(`⚠️ [Kitchen Display] Skipping unpaid order #${newOrder.orderNumber} (paymentStatus: ${newOrder.paymentStatus})`);
+                  return old; // Don't show unpaid orders
+                }
+                
                 // CRITICAL FIX: If orderItems are missing or empty, don't add the order
                 // Backend should always send complete data, but if it doesn't, we skip it
                 // to avoid showing blank orders. The order will appear when backend sends complete data.
@@ -227,6 +238,13 @@ export default function KitchenDisplay() {
               } else if (data.type === "order_status_change" || data.type === "order_update") {
                 // Update existing order or remove if completed/cancelled
                 const updatedOrder = normalizeOrder(data.order);
+                
+                // CRITICAL FIX: Only show paid orders in kitchen display
+                // If order becomes unpaid (shouldn't happen, but safety check), remove it
+                if (updatedOrder.paymentStatus !== 'paid') {
+                  console.log(`⚠️ [Kitchen Display] Removing unpaid order #${updatedOrder.orderNumber} (paymentStatus: ${updatedOrder.paymentStatus})`);
+                  return old.filter(o => o.id !== updatedOrder.id);
+                }
                 
                 // CRITICAL FIX: If orderItems are missing, keep existing order data
                 // Don't replace order with incomplete data - preserve existing items

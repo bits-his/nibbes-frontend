@@ -322,7 +322,7 @@ const PendingPayments: React.FC = () => {
                       {verifyingPayments.has(payment.transactionRef) ? 'Verifying...' : 'Verify Payment'}
                     </Button>
                     
-                    {/* <Button
+                    <Button
                       onClick={() => verifyPayment(payment.transactionRef, true)}
                       disabled={verifyingPayments.has(payment.transactionRef)}
                       variant="secondary"
@@ -330,7 +330,7 @@ const PendingPayments: React.FC = () => {
                     >
                       <CheckCircle className="h-4 w-4" />
                       Force Verify
-                    </Button> */}
+                    </Button>
                     
                     <Button
                       variant="outline"

@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Users, DollarSign, ShoppingCart, TrendingUp, CreditCard, Clock, Calendar, Download } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Users, DollarSign, ShoppingCart, TrendingUp, CreditCard, Clock, Calendar, Download, X } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
@@ -49,6 +50,33 @@ interface DailyPerformance {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d']
 
+interface Transaction {
+  id: string
+  orderNumber: number
+  customerName: string
+  customerPhone: string
+  paymentMethod: string
+  paymentStatus: string
+  status: string
+  totalAmount: string
+  createdAt: string
+  orderType: string
+}
+
+/**
+ * Normalize payment method string (same as backend)
+ * Removes duplicates and sorts alphabetically
+ */
+function normalizePaymentMethod(paymentMethod: string | null | undefined): string {
+  if (!paymentMethod) return 'Unknown';
+  
+  const methods = paymentMethod.split(' + ').map(m => m.trim().toLowerCase()).filter(Boolean);
+  const uniqueMethods = Array.from(new Set(methods));
+  uniqueMethods.sort();
+  
+  return uniqueMethods.join(' + ');
+}
+
 export default function CashierAnalytics() {
   const [cashierMetrics, setCashierMetrics] = useState<CashierMetric[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
@@ -58,6 +86,11 @@ export default function CashierAnalytics() {
   const [startDate, setStartDate] = useState<string>("")
   const [endDate, setEndDate] = useState<string>("")
   const [loading, setLoading] = useState(true)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [showTransactions, setShowTransactions] = useState(false)
+  const [selectedCashierId, setSelectedCashierId] = useState<string>("")
+  const [selectedDate, setSelectedDate] = useState<string>("")
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -103,6 +136,43 @@ export default function CashierAnalytics() {
     fetchAnalytics()
   }
 
+  const fetchTransactions = async (cashierId: string, date?: string) => {
+    try {
+      setLoadingTransactions(true)
+      const params = new URLSearchParams()
+      if (date) params.append('date', date)
+      
+      const url = `/api/cashier-analytics/${cashierId}/transactions${params.toString() ? '?' + params.toString() : ''}`
+      const response = await apiRequest('GET', url)
+      const data: any = await response.json()
+      
+      if (data.success) {
+        setTransactions(data.data)
+        setShowTransactions(true)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch transactions",
+        variant: "destructive"
+      })
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }
+
+  const handleCashierClick = (cashierId: string) => {
+    setSelectedCashierId(cashierId)
+    setSelectedDate("")
+    fetchTransactions(cashierId)
+  }
+
+  const handleDateClick = (cashierId: string, date: string) => {
+    setSelectedCashierId(cashierId)
+    setSelectedDate(date)
+    fetchTransactions(cashierId, date)
+  }
+
   // Filter data by selected cashier
   const filteredMetrics = selectedCashier === "all" 
     ? cashierMetrics 
@@ -129,15 +199,16 @@ export default function CashierAnalytics() {
   const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0
   const successRate = totalOrders > 0 ? (totalPaidOrders / totalOrders) * 100 : 0
 
-  // Payment method chart data
+  // Payment method chart data (normalize payment methods)
   const paymentMethodData = filteredPaymentMethods.reduce((acc: any[], pm) => {
-    const existing = acc.find(item => item.name === pm.paymentMethod)
+    const normalizedMethod = normalizePaymentMethod(pm.paymentMethod)
+    const existing = acc.find(item => item.name === normalizedMethod)
     if (existing) {
       existing.value += Number(pm.totalAmount)
       existing.count += Number(pm.transactionCount)
     } else {
       acc.push({
-        name: pm.paymentMethod || 'Unknown',
+        name: normalizedMethod,
         value: Number(pm.totalAmount),
         count: Number(pm.transactionCount)
       })
@@ -158,6 +229,8 @@ export default function CashierAnalytics() {
   // Daily performance chart data
   const dailyChartData = filteredDailyPerformance.map(d => ({
     date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    dateValue: d.date, // Store original date for click handler
+    cashierId: d.cashierId, // Store cashier ID for click handler
     orders: Number(d.orderCount),
     revenue: Number(d.revenue)
   })).reverse()
@@ -314,7 +387,12 @@ export default function CashierAnalytics() {
               </thead>
               <tbody>
                 {filteredMetrics.map((cashier) => (
-                  <tr key={cashier.cashierId} className="border-b hover:bg-gray-50">
+                  <tr 
+                    key={cashier.cashierId} 
+                    className="border-b hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handleCashierClick(cashier.cashierId)}
+                    title="Click to view transactions"
+                  >
                     <td className="p-3 font-medium">{cashier.cashierName}</td>
                     <td className="p-3 text-right">{Number(cashier.totalOrders).toLocaleString()}</td>
                     <td className="p-3 text-right text-green-600">{Number(cashier.paidOrders).toLocaleString()}</td>
@@ -403,6 +481,7 @@ export default function CashierAnalytics() {
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Daily Performance (Last 30 Days)
+            <span className="text-xs font-normal text-gray-500 ml-2">(Click on a point to view transactions)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -412,14 +491,129 @@ export default function CashierAnalytics() {
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
-              <Tooltip formatter={(value: any) => Number(value).toLocaleString()} />
+              <Tooltip 
+                formatter={(value: any) => Number(value).toLocaleString()}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload as any
+                    return (
+                      <div className="bg-white p-3 border rounded shadow-lg">
+                        <p className="font-semibold">{data.date}</p>
+                        <p className="text-sm">Orders: {data.orders}</p>
+                        <p className="text-sm">Revenue: ₦{data.revenue.toLocaleString()}</p>
+                        {selectedCashier !== "all" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDateClick(data.cashierId, data.dateValue)
+                            }}
+                            className="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors"
+                          >
+                            View Transactions →
+                          </button>
+                        )}
+                      </div>
+                    )
+                  }
+                  return null
+                }}
+              />
               <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="orders" stroke="#0088FE" name="Orders" />
-              <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#00C49F" name="Revenue (₦)" />
+              <Line 
+                yAxisId="left" 
+                type="monotone" 
+                dataKey="orders" 
+                stroke="#0088FE" 
+                name="Orders"
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+              <Line 
+                yAxisId="right" 
+                type="monotone" 
+                dataKey="revenue" 
+                stroke="#00C49F" 
+                name="Revenue (₦)"
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Transactions Modal */}
+      <Dialog open={showTransactions} onOpenChange={setShowTransactions}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Transactions
+              {selectedCashierId && cashierMetrics.find(c => c.cashierId === selectedCashierId) && (
+                <span className="text-base font-normal text-gray-600 ml-2">
+                  - {cashierMetrics.find(c => c.cashierId === selectedCashierId)?.cashierName}
+                </span>
+              )}
+              {selectedDate && (
+                <span className="text-base font-normal text-gray-600 ml-2">
+                  - {new Date(selectedDate).toLocaleDateString()}
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {loadingTransactions ? "Loading transactions..." : `${transactions.length} transaction(s) found`}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingTransactions ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No transactions found for the selected criteria.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium text-gray-600">Order #</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Customer</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Phone</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Payment Method</th>
+                    <th className="text-right p-3 font-medium text-gray-600">Amount</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Status</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((transaction) => (
+                    <tr key={transaction.id} className="border-b hover:bg-gray-50">
+                      <td className="p-3 font-medium">#{transaction.orderNumber}</td>
+                      <td className="p-3">{transaction.customerName}</td>
+                      <td className="p-3">{transaction.customerPhone}</td>
+                      <td className="p-3">{normalizePaymentMethod(transaction.paymentMethod)}</td>
+                      <td className="p-3 text-right font-medium">₦{Number(transaction.totalAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          transaction.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          transaction.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {transaction.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-sm text-gray-600">
+                        {new Date(transaction.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
