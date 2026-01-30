@@ -89,13 +89,24 @@ export default function CashierAnalytics() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [showTransactions, setShowTransactions] = useState(false)
   const [selectedCashierId, setSelectedCashierId] = useState<string>("")
-  const [selectedDate, setSelectedDate] = useState<string>("")
+  const [transactionFromDate, setTransactionFromDate] = useState<string>("")
+  const [transactionToDate, setTransactionToDate] = useState<string>("")
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchAnalytics(startDate, endDate)
   }, [startDate, endDate])
+
+  // Set default date to today when modal opens (only if dates aren't already set)
+  useEffect(() => {
+    if (showTransactions && selectedCashierId && !transactionFromDate && !transactionToDate) {
+      const today = new Date().toISOString().split('T')[0]
+      setTransactionFromDate(today)
+      setTransactionToDate(today)
+      // Don't fetch here - handleCashierClick or handleDateClick will handle it
+    }
+  }, [showTransactions, selectedCashierId])
 
   const fetchAnalytics = async (start?: string, end?: string) => {
     try {
@@ -136,11 +147,13 @@ export default function CashierAnalytics() {
     fetchAnalytics()
   }
 
-  const fetchTransactions = async (cashierId: string, date?: string) => {
+  const fetchTransactions = async (cashierId: string, fromDate?: string, toDate?: string) => {
     try {
       setLoadingTransactions(true)
       const params = new URLSearchParams()
-      if (date) params.append('date', date)
+      // Always send dates - if not provided, backend will default to today
+      if (fromDate) params.append('fromDate', fromDate)
+      if (toDate) params.append('toDate', toDate)
       
       const url = `/api/cashier-analytics/${cashierId}/transactions${params.toString() ? '?' + params.toString() : ''}`
       const response = await apiRequest('GET', url)
@@ -163,14 +176,35 @@ export default function CashierAnalytics() {
 
   const handleCashierClick = (cashierId: string) => {
     setSelectedCashierId(cashierId)
-    setSelectedDate("")
-    fetchTransactions(cashierId)
+    // Default to today's date
+    const today = new Date().toISOString().split('T')[0]
+    setTransactionFromDate(today)
+    setTransactionToDate(today)
+    fetchTransactions(cashierId, today, today)
   }
 
   const handleDateClick = (cashierId: string, date: string) => {
     setSelectedCashierId(cashierId)
-    setSelectedDate(date)
-    fetchTransactions(cashierId, date)
+    // Set both from and to date to the selected date
+    setTransactionFromDate(date)
+    setTransactionToDate(date)
+    fetchTransactions(cashierId, date, date)
+  }
+
+  const handleTransactionFilter = () => {
+    if (selectedCashierId) {
+      fetchTransactions(selectedCashierId, transactionFromDate || undefined, transactionToDate || undefined)
+    }
+  }
+
+  const handleTransactionReset = () => {
+    // Reset to today
+    const today = new Date().toISOString().split('T')[0]
+    setTransactionFromDate(today)
+    setTransactionToDate(today)
+    if (selectedCashierId) {
+      fetchTransactions(selectedCashierId, today, today)
+    }
   }
 
   // Filter data by selected cashier
@@ -553,16 +587,52 @@ export default function CashierAnalytics() {
                   - {cashierMetrics.find(c => c.cashierId === selectedCashierId)?.cashierName}
                 </span>
               )}
-              {selectedDate && (
-                <span className="text-base font-normal text-gray-600 ml-2">
-                  - {new Date(selectedDate).toLocaleDateString()}
-                </span>
-              )}
             </DialogTitle>
             <DialogDescription>
               {loadingTransactions ? "Loading transactions..." : `${transactions.length} transaction(s) found`}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Date Range Filters */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pb-4 border-b">
+            <div>
+              <label className="text-xs md:text-sm font-medium text-gray-700 mb-1 block">From Date</label>
+              <Input
+                type="date"
+                value={transactionFromDate}
+                onChange={(e) => setTransactionFromDate(e.target.value)}
+                className="w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs md:text-sm font-medium text-gray-700 mb-1 block">To Date</label>
+              <Input
+                type="date"
+                value={transactionToDate}
+                onChange={(e) => setTransactionToDate(e.target.value)}
+                className="w-full text-sm"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button 
+                onClick={handleTransactionFilter} 
+                className="w-full bg-[#FF6B35] hover:bg-[#FF5722] text-white text-sm"
+                disabled={loadingTransactions}
+              >
+                Apply
+              </Button>
+            </div>
+            <div className="flex items-end">
+              <Button 
+                onClick={handleTransactionReset} 
+                variant="outline" 
+                className="w-full text-sm"
+                disabled={loadingTransactions}
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
           
           {loadingTransactions ? (
             <div className="flex items-center justify-center py-8">
@@ -570,7 +640,7 @@ export default function CashierAnalytics() {
             </div>
           ) : transactions.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              No transactions found for the selected criteria.
+              No transactions found for the selected date range.
             </div>
           ) : (
             <div className="overflow-x-auto">
