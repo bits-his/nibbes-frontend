@@ -68,21 +68,48 @@ export default function Signup() {
           setLocation("/")
       }
     } catch (err: any) {
-      // Try to parse error message from JSON response
-      let errorMessage = "Signup failed";
+      // CRITICAL FIX: Better error message parsing and user-friendly messages
+      let errorMessage = "Unable to create account. Please try again.";
+      
       try {
-        // Error format is usually "400: {error: 'message'}"
-        const errorMatch = err.message.match(/\d+:\s*({.*})/);
-        if (errorMatch && errorMatch[1]) {
-          const errorData = JSON.parse(errorMatch[1]);
-          errorMessage = errorData.error || err.message || "Signup failed";
+        // Error format is usually "400: {error: 'message'}" or "Load failed"
+        if (err.message && err.message.includes("Load failed")) {
+          errorMessage = "Connection error. Please check your internet connection and try again.";
         } else {
-          errorMessage = err.message || "Signup failed";
+          const errorMatch = err.message.match(/\d+:\s*({.*})/);
+          if (errorMatch && errorMatch[1]) {
+            const errorData = JSON.parse(errorMatch[1]);
+            const backendError = errorData.error || errorData.message;
+            
+            // Map common backend errors to user-friendly messages
+            if (backendError) {
+              if (backendError.includes("phone number already exists")) {
+                errorMessage = "An account with this phone number already exists. Please use a different number or try logging in.";
+              } else if (backendError.includes("Phone number is required")) {
+                errorMessage = "Please enter your phone number.";
+              } else if (backendError.includes("Name and password are required")) {
+                errorMessage = "Please fill in all required fields.";
+              } else {
+                errorMessage = backendError;
+              }
+            } else {
+              errorMessage = err.message || "Unable to create account. Please try again.";
+            }
+          } else if (err.message) {
+            // Check for network errors
+            if (err.message.includes("fetch") || err.message.includes("network") || err.message.includes("Failed to fetch")) {
+              errorMessage = "Network error. Please check your internet connection and try again.";
+            } else {
+              errorMessage = err.message;
+            }
+          }
         }
       } catch (parseError) {
-        // If parsing fails, use the original error message
-        errorMessage = err.message || "Signup failed";
+        // If parsing fails, provide a generic but helpful message
+        console.error("Error parsing signup error:", parseError, err);
+        errorMessage = "Unable to create account. Please check your connection and try again.";
       }
+      
       setError(errorMessage);
     } finally {
       setLoading(false)

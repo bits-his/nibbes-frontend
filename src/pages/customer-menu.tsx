@@ -203,12 +203,14 @@ export default function CustomerMenu() {
   }, []);
 
   // Fetch menu items with SHORT stale time for real-time stock updates
-  const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
+  const { data: menuItems, isLoading: menuLoading, error: menuError } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
     staleTime: 30 * 1000, // 30 seconds - refresh often for accurate stock levels
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: true, // Refetch when user returns to tab
     refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds for stock updates
+    retry: 3, // Retry up to 3 times on failure
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
   // Extract unique categories from menu items (memoized)
@@ -219,6 +221,18 @@ export default function CustomerMenu() {
 
   // Use loading state from menu only
   const isLoading = menuLoading;
+  
+  // Handle menu loading errors with better UX
+  useEffect(() => {
+    if (menuError) {
+      console.error("Error loading menu:", menuError);
+      toast({
+        title: "Unable to Load Menu",
+        description: "There was a problem loading the menu. Please refresh the page or try again later.",
+        variant: "destructive",
+      });
+    }
+  }, [menuError, toast]);
 
   // Helper function to sort items by specific item priority
   const sortByItemPriority = (items: any[]) => {
@@ -1135,6 +1149,23 @@ export default function CustomerMenu() {
               </Card>
             ))}
           </div>
+        ) : menuError ? (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-red-900 mb-2">Unable to Load Menu</h3>
+              <p className="text-sm text-red-700 mb-4">
+                There was a problem loading the menu. Please check your connection and try again.
+              </p>
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-100"
+              >
+                Refresh Page
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <>
             <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
