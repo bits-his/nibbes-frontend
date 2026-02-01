@@ -49,7 +49,9 @@ export default function KitchenDisplay() {
     lastOrderTimestampRef.current = lastOrderTimestamp;
   }, [lastOrderTimestamp]);
 
-  // Function to fetch and sync missed orders
+  // Function to fetch and sync missed orders - use ref to avoid dependency issues
+  const syncMissedOrdersRef = useRef<() => Promise<void>>();
+  
   const syncMissedOrders = useCallback(async () => {
     try {
       console.log('🔄 [Kitchen Display] Syncing missed orders...');
@@ -116,6 +118,11 @@ export default function KitchenDisplay() {
       console.error('❌ [Kitchen Display] Error syncing missed orders:', error);
     }
   }, []);
+  
+  // Update ref when function changes
+  useEffect(() => {
+    syncMissedOrdersRef.current = syncMissedOrders;
+  }, [syncMissedOrders]);
   
 
   // Fetch kitchen status
@@ -239,7 +246,9 @@ export default function KitchenDisplay() {
           // CRITICAL FIX: Immediately sync missed orders on reconnect
           // This catches any orders that were created while WebSocket was disconnected
           console.log('🔄 [Kitchen Display] WebSocket reconnected, syncing missed orders...');
-          syncMissedOrders();
+          if (syncMissedOrdersRef.current) {
+            syncMissedOrdersRef.current();
+          }
         };
 
         socket.onmessage = (event) => {
@@ -547,7 +556,9 @@ export default function KitchenDisplay() {
           // CRITICAL FIX: Sync missed orders immediately when connection drops
           // This ensures we don't miss orders created during disconnection
           console.log('🔄 [Kitchen Display] Connection dropped, syncing missed orders...');
-          syncMissedOrders();
+          if (syncMissedOrdersRef.current) {
+            syncMissedOrdersRef.current();
+          }
           
           // Auto-reconnect with exponential backoff
           if (reconnectAttempts < maxReconnectAttempts) {
@@ -579,25 +590,9 @@ export default function KitchenDisplay() {
     // Initial connection
     connect();
 
-    // CRITICAL FIX: Periodic polling fallback (every 45 seconds)
-    // This ensures we catch any orders missed by WebSocket
-    // Only poll if WebSocket is connected (to avoid unnecessary load)
-    pollingIntervalRef.current = setInterval(() => {
-      if (wsConnected) {
-        console.log('🔄 [Kitchen Display] Periodic sync check...');
-        syncMissedOrders();
-      }
-    }, 45000); // Poll every 45 seconds
-
     return () => {
       // Set flag to prevent reconnection on unmount
       isUnmounting = true;
-      
-      // Clear polling interval
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
       
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
@@ -606,7 +601,36 @@ export default function KitchenDisplay() {
         socket.close();
       }
     };
-  }, [wsConnected, syncMissedOrders]); // Include dependencies
+  }, []); // Empty deps - WebSocket connects once and stays connected
+
+  // Separate useEffect for periodic polling - depends on wsConnected
+  useEffect(() => {
+    // CRITICAL FIX: Periodic polling fallback (every 45 seconds)
+    // This ensures we catch any orders missed by WebSocket
+    // Only poll if WebSocket is connected (to avoid unnecessary load)
+    if (wsConnected) {
+      pollingIntervalRef.current = setInterval(() => {
+        console.log('🔄 [Kitchen Display] Periodic sync check...');
+        if (syncMissedOrdersRef.current) {
+          syncMissedOrdersRef.current();
+        }
+      }, 45000); // Poll every 45 seconds
+    } else {
+      // Clear interval when disconnected
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      // Clear polling interval on unmount or when wsConnected changes
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [wsConnected]); // Only depend on wsConnected
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
