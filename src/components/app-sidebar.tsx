@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   AlertCircle,
   Settings,
+  Eye,
 } from "lucide-react";
 import {
   Sidebar,
@@ -115,6 +116,13 @@ const menuItems: MenuItem[] = [
     title: "Main Kitchen",
     url: "/store-management",
     icon: Store,
+    roles: ["admin", "kitchen"],
+    permissions: ["main_kitchen"],
+  },
+  {
+    title: "Supervisor",
+    url: "/supervisor",
+    icon: Eye,
     roles: ["admin", "kitchen"],
     permissions: ["main_kitchen"],
   },

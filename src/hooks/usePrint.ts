@@ -270,11 +270,13 @@ export const usePrint = () => {
             font-weight: normal;
           }
           .item-note-content {
-            font-size: 12px;
+            font-size: 18px;
             color: #000;
             margin-top: auto;
             padding-bottom: 20px;
-            font-weight: normal;
+            font-weight: bold;
+            line-height: 1.5;
+            letter-spacing: 0.5px;
           }
           .item-note-order-number {
             position: absolute;

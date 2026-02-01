@@ -963,7 +963,24 @@ export default function Checkout() {
         return await response.json()
       } catch (error: any) {
         clearTimeout(timeoutId)
-        if (error.name === 'AbortError') {
+        if (error.name === 'AbortError' || error.message?.includes('timeout')) {
+          // Network timeout occurred - verify if order was actually created
+          if (orderData.idempotencyKey) {
+            try {
+              console.log('⏱️ Timeout detected, verifying order with idempotencyKey:', orderData.idempotencyKey)
+              const verifyResponse = await apiRequest('GET', `/api/orders/verify?idempotencyKey=${encodeURIComponent(orderData.idempotencyKey)}`)
+              if (verifyResponse.ok) {
+                const verifiedOrder = await verifyResponse.json()
+                if (verifiedOrder && verifiedOrder.id) {
+                  console.log('✅ Order was created despite timeout, returning existing order:', verifiedOrder.orderNumber)
+                  // Return the verified order as if it was successful
+                  return verifiedOrder
+                }
+              }
+            } catch (verifyError) {
+              console.error('❌ Error verifying order after timeout:', verifyError)
+            }
+          }
           throw new Error('Request timeout - please check your connection and try again')
         }
         throw error
@@ -971,6 +988,15 @@ export default function Checkout() {
     },
     onSuccess: (data: any) => {
       console.log('✅ Walk-in order created successfully:', data)
+      
+      // Check if this is a duplicate order (returned from idempotency check)
+      if (data.isDuplicate) {
+        toast({
+          title: "Order Already Exists",
+          description: `Order #${data.orderNumber} was already created. Showing existing order.`,
+          variant: "default",
+        })
+      }
       
       // Calculate breakdown for display
       const itemsSubtotal = walkInOrder?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
@@ -1013,7 +1039,7 @@ export default function Checkout() {
       }
       
       toast({
-        title: "Order Created Successfully!",
+        title: data.isDuplicate ? "Order Found" : "Order Created Successfully!",
         description: `Order #${data.orderNumber} has been sent to kitchen.`,
       })
       
@@ -1021,10 +1047,10 @@ export default function Checkout() {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
       queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] })
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
       console.error('❌ Walk-in order creation failed:', error)
       
-      // Handle stock validation errors
+      // Handle stock validation errors (don't verify for these - order wasn't created)
       if (error.stockError) {
         const details = error.details || []
         toast({
@@ -1036,6 +1062,19 @@ export default function Checkout() {
           duration: 6000,
         })
         // Staff should review and remove unavailable items from cart
+        return
+      }
+
+      // For network/timeout errors, try to verify if order was actually created
+      // This handles the case where order was created but response was lost
+      if (error.message?.includes('timeout') || error.message?.includes('network') || error.name === 'AbortError') {
+        // The verification is already handled in mutationFn, but if it still fails, show error
+        toast({
+          title: "Network Error",
+          description: error.message || "Unable to create order. Please check your connection and verify if order was created.",
+          variant: "destructive",
+          duration: 8000,
+        })
         return
       }
       
@@ -1242,6 +1281,9 @@ export default function Checkout() {
         return
       }
 
+      // Generate idempotency key to prevent duplicate orders on retry
+      const idempotencyKey = `IDEMPOTENCY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       // For cash/POS/transfer payments, create order directly with paid status
       const orderData = {
         customerName: walkInOrder.customerName,
@@ -1253,6 +1295,7 @@ export default function Checkout() {
         paymentStatus: "paid",
         items: walkInOrder.items,
         totalAmount: calculateTotal(), // Include total with all charges
+        idempotencyKey, // Include idempotency key to prevent duplicates
         // Add payment splits info if multi-payment is enabled
         ...(multiPaymentEnabled && {
           paymentSplits: paymentSplits.map(split => ({

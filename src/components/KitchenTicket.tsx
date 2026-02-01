@@ -71,10 +71,12 @@
         fontSize: 8,
       },
       noteContent: {
-        fontSize: 8,
-        color: '#666',
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#000',
         marginBottom: 15,
         minHeight: 20,
+        lineHeight: 1.5,
       },
       noteOrderNumber: {
         position: 'absolute',

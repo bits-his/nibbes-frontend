@@ -284,9 +284,11 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   noteContent: {
-    fontSize: 8,
-    color: '#666',
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#000',
     marginBottom: 20,
+    lineHeight: 1.5,
   },
   noteOrderNumber: {
     position: 'absolute',

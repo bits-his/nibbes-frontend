@@ -49,6 +49,7 @@ const DocketPage = lazy(() => import("@/pages/docket"));
 const InventoryPage = lazy(() => import("@/pages/inventory"));
 const CustomerAnalyticsDashboard = lazy(() => import("@/pages/customer-analytics-enhanced"));
 const StoreManagement = lazy(() => import("@/pages/store-management"));
+const Supervisor = lazy(() => import("@/pages/supervisor"));
 const EMcard = lazy(() => import("@/pages/EMcard"));
 const ManagerReportsList = lazy(() => import("@/pages/ManagerReportsList"));
 const ManagerReportDetail = lazy(() => import("@/pages/ManagerReportDetail"));
@@ -608,6 +609,15 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["main_kitchen"]}>
             <StoreManagement />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/supervisor"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["main_kitchen"]}>
+            <Supervisor />
           </ProtectedRoute>
         )}
       />
