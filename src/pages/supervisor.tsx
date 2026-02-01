@@ -281,7 +281,8 @@ export default function Supervisor() {
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Quantity</TableHead>}
                     <TableHead className="text-gray-700 text-right">Remaining</TableHead>
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Used/Sold</TableHead>}
-                    {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Total Value</TableHead>}
+                    {/* Total Value column commented out as requested */}
+                    {/* {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Total Value</TableHead>} */}
                     <TableHead className="text-right text-gray-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -316,11 +317,12 @@ export default function Supervisor() {
                             {quantityUsed} {item.unit}
                           </TableCell>
                         )}
-                        {!isKitchenStaff && (
+                        {/* Total Value cell commented out as requested */}
+                        {/* {!isKitchenStaff && (
                           <TableCell className="text-right font-semibold text-gray-900">
                             ₦{totalItemValue.toLocaleString()}
                           </TableCell>
-                        )}
+                        )} */}
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             {/* Edit, Delete, and Restock buttons commented out for read-only mode */}
