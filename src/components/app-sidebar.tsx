@@ -124,7 +124,7 @@ const menuItems: MenuItem[] = [
     url: "/supervisor",
     icon: Eye,
     roles: ["admin", "kitchen"],
-    permissions: ["main_kitchen"],
+    permissions: ["supervisor"],
   },
   {
     title: "Transactions",

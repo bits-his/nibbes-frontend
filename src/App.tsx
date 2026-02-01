@@ -616,7 +616,7 @@ function Router() {
       <Route
         path="/supervisor"
         component={() => (
-          <ProtectedRoute requiredPermissions={["main_kitchen"]}>
+          <ProtectedRoute requiredPermissions={["supervisor"]}>
             <Supervisor />
           </ProtectedRoute>
         )}
