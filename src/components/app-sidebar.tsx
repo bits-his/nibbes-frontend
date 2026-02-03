@@ -113,7 +113,7 @@ const menuItems: MenuItem[] = [
     permissions: ["sales_inventory"],
   },
   {
-    title: "Main Kitchen",
+    title: "Nibbles Kitchen",
     url: "/store-management",
     icon: Store,
     roles: ["admin", "kitchen"],
