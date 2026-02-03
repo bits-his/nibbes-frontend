@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList, Volume2, Search } from "lucide-react";
+import { Clock, CheckCircle, XCircle, ChefHat, Package, ClipboardList, Volume2, Search, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function DocketPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [isWsConnected, setIsWsConnected] = useState(false);
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -24,8 +25,22 @@ export default function DocketPage() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [lookupPhone, setLookupPhone] = useState("");
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Check if we just came from payment (URL parameter detection)
+  const [justPaid, setJustPaid] = useState(false);
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success' || urlParams.get('from') === 'payment') {
+      console.log('🎉 Detected payment success redirect - will refetch orders');
+      setJustPaid(true);
+      // Clear the URL parameter
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // Get user-specific or guest-specific active orders
+  // CRITICAL FIX: Add polling fallback when WebSocket is disconnected or after payment
   const { data: orders, isLoading, refetch } = useQuery<OrderWithItems[]>({
     queryKey: user 
       ? ["/api/orders/active/customer"] 
@@ -52,9 +67,34 @@ export default function DocketPage() {
       }
       return [];
     },
-    enabled: !!(user || guestSession || lookupPhone), // Run query if user, guest session, or phone lookup exists
-    // Remove all polling options since we're using WebSockets for real-time updates
+    enabled: !!(user || guestSession || lookupPhone),
+    // CRITICAL FIX: Add polling fallback
+    // Poll every 5 seconds when WebSocket is disconnected OR for 30 seconds after payment
+    refetchInterval: (!isWsConnected || justPaid) ? 5000 : false,
+    refetchIntervalInBackground: false,
   });
+
+  // Stop polling 30 seconds after payment redirect
+  useEffect(() => {
+    if (justPaid) {
+      const timer = setTimeout(() => {
+        console.log('✅ 30 seconds passed since payment - stopping extra polling');
+        setJustPaid(false);
+      }, 30000); // 30 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [justPaid]);
+
+  // Force refetch 2 seconds after landing on page from payment
+  useEffect(() => {
+    if (justPaid) {
+      const timer = setTimeout(() => {
+        console.log('🔄 Force refetching orders 2 seconds after payment redirect');
+        refetch();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [justPaid, refetch]);
 
   // Handle phone number lookup
   const handlePhoneLookup = () => {
@@ -70,6 +110,26 @@ export default function DocketPage() {
     // Phone number will trigger the query automatically via queryKey
     setIsLookingUp(true);
     refetch().finally(() => setIsLookingUp(false));
+  };
+
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast({
+        title: "✅ Refreshed",
+        description: "Orders updated successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "❌ Refresh Failed",
+        description: "Could not refresh orders. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Filter orders to only show paid orders
@@ -101,8 +161,13 @@ export default function DocketPage() {
         socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
-          console.log("Docket WebSocket connected");
+          console.log("✅ Docket WebSocket connected");
+          setIsWsConnected(true);
           reconnectAttempts = 0;
+          
+          // CRITICAL FIX: Refetch orders after reconnection to sync state
+          console.log("🔄 Refetching orders after WebSocket reconnection");
+          refetch();
         };
 
     socket.onmessage = (event) => {
@@ -121,6 +186,12 @@ export default function DocketPage() {
             // This order doesn't belong to the current user - ignore it
             return;
           }
+
+          console.log(`📦 Docket received ${data.type} for order #${data.order.orderNumber}`, {
+            paymentStatus: data.order.paymentStatus,
+            status: data.order.status,
+            belongsToUser: orderBelongsToUser || orderBelongsToGuest || orderBelongsToPhone
+          });
 
           // Normalize order structure
           const normalizeOrder = (order: any): OrderWithItems => {
@@ -154,29 +225,30 @@ export default function DocketPage() {
                 
                 // Filter to only show paid orders
                 if (normalizedOrder.paymentStatus !== 'paid') {
+                  console.log(`🚫 Removing unpaid order #${normalizedOrder.orderNumber} from docket`);
                   return old.filter(o => o.id !== normalizedOrder.id);
                 }
                 
-                if (data.type === "new_order") {
+                // CRITICAL FIX: Treat order_status_change with paid status as new order if not in cache
+                const index = old.findIndex(o => o.id === normalizedOrder.id);
+                
+                if (data.type === "new_order" || index < 0) {
+                  // New order or order not in cache - add it
                   const exists = old.some(o => o.id === normalizedOrder.id);
-                  if (!exists) {
+                  if (!exists && normalizedOrder.paymentStatus === 'paid') {
+                    console.log(`➕ Adding new paid order #${normalizedOrder.orderNumber} to docket`);
                     return [normalizedOrder, ...old].sort((a, b) =>
                       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                     );
                   }
                 } else {
-                  const index = old.findIndex(o => o.id === normalizedOrder.id);
-                  if (index >= 0) {
-                    const updated = [...old];
-                    updated[index] = normalizedOrder;
-                    return updated.sort((a, b) =>
-                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                    );
-                  } else if (normalizedOrder.paymentStatus === 'paid') {
-                    return [normalizedOrder, ...old].sort((a, b) =>
-                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                    );
-                  }
+                  // Order exists - update it
+                  console.log(`🔄 Updating existing order #${normalizedOrder.orderNumber} in docket`);
+                  const updated = [...old];
+                  updated[index] = normalizedOrder;
+                  return updated.sort((a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                  );
                 }
                 
                 // Check if order became ready and play notification sound
@@ -201,12 +273,18 @@ export default function DocketPage() {
                 
                 // Filter to only show paid orders
                 if (normalizedOrder.paymentStatus !== 'paid') {
+                  console.log(`🚫 Removing unpaid order #${normalizedOrder.orderNumber} from docket`);
                   return { orders: old.orders.filter(o => o.id !== normalizedOrder.id) };
                 }
                 
-                if (data.type === "new_order") {
+                // CRITICAL FIX: Treat order_status_change with paid status as new order if not in cache
+                const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
+                
+                if (data.type === "new_order" || index < 0) {
+                  // New order or order not in cache - add it
                   const exists = old.orders.some(o => o.id === normalizedOrder.id);
-                  if (!exists) {
+                  if (!exists && normalizedOrder.paymentStatus === 'paid') {
+                    console.log(`➕ Adding new paid order #${normalizedOrder.orderNumber} to docket`);
                     return {
                       orders: [normalizedOrder, ...old.orders].sort((a, b) =>
                         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -214,22 +292,15 @@ export default function DocketPage() {
                     };
                   }
                 } else {
-                  const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
-                  if (index >= 0) {
-                    const updated = [...old.orders];
-                    updated[index] = normalizedOrder;
-                    return {
-                      orders: updated.sort((a, b) =>
-                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                      )
-                    };
-                  } else if (normalizedOrder.paymentStatus === 'paid') {
-                    return {
-                      orders: [normalizedOrder, ...old.orders].sort((a, b) =>
-                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                      )
-                    };
-                  }
+                  // Order exists - update it
+                  console.log(`🔄 Updating existing order #${normalizedOrder.orderNumber} in docket`);
+                  const updated = [...old.orders];
+                  updated[index] = normalizedOrder;
+                  return {
+                    orders: updated.sort((a, b) =>
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    )
+                  };
                 }
                 
                 // Check if order became ready and play notification sound
@@ -254,12 +325,18 @@ export default function DocketPage() {
                 
                 // Filter to only show paid orders
                 if (normalizedOrder.paymentStatus !== 'paid') {
+                  console.log(`🚫 Removing unpaid order #${normalizedOrder.orderNumber} from docket`);
                   return { orders: old.orders.filter(o => o.id !== normalizedOrder.id) };
                 }
                 
-                if (data.type === "new_order") {
+                // CRITICAL FIX: Treat order_status_change with paid status as new order if not in cache
+                const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
+                
+                if (data.type === "new_order" || index < 0) {
+                  // New order or order not in cache - add it
                   const exists = old.orders.some(o => o.id === normalizedOrder.id);
-                  if (!exists) {
+                  if (!exists && normalizedOrder.paymentStatus === 'paid') {
+                    console.log(`➕ Adding new paid order #${normalizedOrder.orderNumber} to docket`);
                     return {
                       orders: [normalizedOrder, ...old.orders].sort((a, b) =>
                         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -267,22 +344,15 @@ export default function DocketPage() {
                     };
                   }
                 } else {
-                  const index = old.orders.findIndex(o => o.id === normalizedOrder.id);
-                  if (index >= 0) {
-                    const updated = [...old.orders];
-                    updated[index] = normalizedOrder;
-                    return {
-                      orders: updated.sort((a, b) =>
-                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                      )
-                    };
-                  } else if (normalizedOrder.paymentStatus === 'paid') {
-                    return {
-                      orders: [normalizedOrder, ...old.orders].sort((a, b) =>
-                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                      )
-                    };
-                  }
+                  // Order exists - update it
+                  console.log(`🔄 Updating existing order #${normalizedOrder.orderNumber} in docket`);
+                  const updated = [...old.orders];
+                  updated[index] = normalizedOrder;
+                  return {
+                    orders: updated.sort((a, b) =>
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    )
+                  };
                 }
                 
                 // Check if order became ready and play notification sound
@@ -392,29 +462,32 @@ export default function DocketPage() {
     };
 
         socket.onerror = (error) => {
-          console.error("Docket WebSocket error:", error);
+          console.error("❌ Docket WebSocket error:", error);
+          setIsWsConnected(false);
         };
 
         socket.onclose = () => {
-          console.log("Docket WebSocket disconnected");
+          console.log("🔌 Docket WebSocket disconnected");
+          setIsWsConnected(false);
           socket = null;
           
           // Auto-reconnect with exponential backoff
           if (reconnectAttempts < maxReconnectAttempts) {
             const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
             reconnectAttempts++;
-            console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`);
+            console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`);
             reconnectTimeout = setTimeout(() => {
               connect();
             }, delay);
           } else {
-            console.error("Max reconnection attempts reached for Docket WebSocket");
+            console.error("❌ Max reconnection attempts reached for Docket WebSocket");
           }
         };
 
         setWs(socket);
       } catch (error) {
-        console.error("Error creating WebSocket connection:", error);
+        console.error("❌ Error creating WebSocket connection:", error);
+        setIsWsConnected(false);
         // Retry connection
         if (reconnectAttempts < maxReconnectAttempts) {
           const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
@@ -436,7 +509,7 @@ export default function DocketPage() {
         socket.close();
       }
     };
-  }, [user, guestSession, lookupPhone]);
+  }, [user, guestSession, lookupPhone, refetch]);
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -498,6 +571,18 @@ const getStatusCardColor = (status: string) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-normal">
+            {/* Manual Refresh Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            
             {/* Audio notification toggle */}
             <Button
               variant={audioEnabled ? "default" : "outline"}
@@ -534,9 +619,32 @@ const getStatusCardColor = (status: string) => {
             <Badge variant="outline" className="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base whitespace-nowrap">
               Orders: {activeOrders?.length || 0}
             </Badge>
-            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" title="Live updates" />
+            <div 
+              className={`h-3 w-3 rounded-full ${isWsConnected ? 'bg-green-500' : 'bg-yellow-500'} animate-pulse`} 
+              title={isWsConnected ? "Live updates" : "Reconnecting..."}
+            />
           </div>
         </div>
+
+        {/* Connection Status Banner */}
+        {!isWsConnected && (
+          <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded-lg flex items-center gap-2">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+            <p className="text-sm text-yellow-800">
+              Reconnecting to live updates... Orders will refresh automatically every 5 seconds.
+            </p>
+          </div>
+        )}
+
+        {/* Payment Success Banner */}
+        {justPaid && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <p className="text-sm text-green-800">
+              🎉 Payment successful! Your order will appear here shortly...
+            </p>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -597,9 +705,9 @@ const getStatusCardColor = (status: string) => {
               </div>
             </CardContent>
           </Card>
-        ) : orders && orders.length > 0 ? (
+        ) : activeOrders && activeOrders.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {orders.map((order) => (
+            {activeOrders.map((order) => (
               <Card 
                 key={order.id} 
                 className={`overflow-hidden border-2 hover:shadow-lg transition-shadow ${getStatusCardColor(order.status)}`}

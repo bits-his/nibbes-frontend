@@ -62,6 +62,7 @@ export default function TVDisplay() {
   const [isConnected, setIsConnected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date())
   const wsRef = useRef<WebSocket | null>(null)
   
   // Pagination: 10 orders per page (5 columns x 2 rows)
@@ -87,12 +88,18 @@ export default function TVDisplay() {
   }, [readyOrders.length, totalPages, ordersPerPage])
 
   // Fetch initial ready orders
-  const fetchReadyOrders = async () => {
-    console.log('🔵 TV Display: Initializing...')
-    console.log('🔵 TV Display: Fetching existing ready orders...')
+  const fetchReadyOrders = async (isPeriodicSync = false) => {
+    if (isPeriodicSync) {
+      console.log('🔄 TV Display: Periodic sync (3-minute refresh)...')
+    } else {
+      console.log('🔵 TV Display: Initializing...')
+      console.log('🔵 TV Display: Fetching existing ready orders...')
+    }
     
     try {
-      setLoading(true)
+      if (!isPeriodicSync) {
+        setLoading(true)
+      }
       
       // Fetch orders without authentication from public TV Display endpoint
       const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5050' : 'https://server.brainstorm.ng/nibbleskitchen')
@@ -110,7 +117,9 @@ export default function TVDisplay() {
         } else {
           console.log('⚠️ Could not fetch orders (status: ' + response.status + '), will rely on WebSocket only')
         }
-        setLoading(false)
+        if (!isPeriodicSync) {
+          setLoading(false)
+        }
         return
       }
       
@@ -130,14 +139,37 @@ export default function TVDisplay() {
       )
       
       setReadyOrders(ready)
-      console.log('🎯 TV Display: Ready orders loaded successfully!')
+      setLastSyncTime(new Date())
+      
+      if (isPeriodicSync) {
+        console.log('✅ TV Display: Periodic sync completed!')
+      } else {
+        console.log('🎯 TV Display: Ready orders loaded successfully!')
+      }
     } catch (error) {
       console.error('❌ Error fetching ready orders:', error)
       console.log('⚠️ Will rely on WebSocket for updates')
     } finally {
-      setLoading(false)
+      if (!isPeriodicSync) {
+        setLoading(false)
+      }
     }
   }
+
+  // CRITICAL FIX: Add periodic sync every 3 minutes (180,000ms)
+  useEffect(() => {
+    console.log('⏰ TV Display: Setting up 3-minute periodic sync')
+    
+    const syncInterval = setInterval(() => {
+      console.log('🔔 TV Display: 3-minute timer triggered - syncing with backend...')
+      fetchReadyOrders(true)
+    }, 180000) // 3 minutes = 180,000 milliseconds
+    
+    return () => {
+      console.log('🛑 TV Display: Clearing periodic sync interval')
+      clearInterval(syncInterval)
+    }
+  }, [])
 
   // WebSocket connection and real-time updates
   useEffect(() => {
@@ -155,12 +187,16 @@ export default function TVDisplay() {
           console.log("✅ TV Display: WebSocket connected successfully!")
           console.log('🟢 Connection Status: LIVE')
           setIsConnected(true)
+          
+          // CRITICAL FIX: Sync orders after WebSocket reconnection
+          console.log('🔄 TV Display: Syncing orders after WebSocket reconnection')
+          fetchReadyOrders(true)
         }
         
         socket.onmessage = (event) => {
           const message: WebSocketMessage = JSON.parse(event.data)
           
-          console.log("TV Display received message:", message)
+          console.log("📨 TV Display received message:", message.type, message.order?.orderNumber || '')
           
           // Handle different WebSocket events
           switch(message.type) {
@@ -187,24 +223,24 @@ export default function TVDisplay() {
         }
         
         socket.onerror = (error) => {
-          console.error("TV Display WebSocket error:", error)
+          console.error("❌ TV Display WebSocket error:", error)
           setIsConnected(false)
         }
         
         socket.onclose = () => {
-          console.log("TV Display WebSocket disconnected")
+          console.log("🔌 TV Display WebSocket disconnected")
           setIsConnected(false)
           
           // Attempt to reconnect after 3 seconds
           setTimeout(() => {
-            console.log("Attempting to reconnect...")
+            console.log("🔄 Attempting to reconnect...")
             connectWebSocket()
           }, 3000)
         }
         
         wsRef.current = socket
       } catch (error) {
-        console.error("Error connecting to WebSocket:", error)
+        console.error("❌ Error connecting to WebSocket:", error)
         setIsConnected(false)
         
         // Retry connection after 3 seconds
@@ -262,7 +298,11 @@ export default function TVDisplay() {
     // If order status is "completed", remove it
     else if (orderData.status === "completed") {
       console.log('🗑️ TV Display: Removing COMPLETED order #' + orderData.orderNumber)
-      setReadyOrders(prev => prev.filter(o => o.id !== orderData.id))
+      setReadyOrders(prev => {
+        const filtered = prev.filter(o => o.id !== orderData.id)
+        console.log('📊 TV Display: Orders remaining after removal:', filtered.length)
+        return filtered
+      })
     }
     // If order status is "pending" or "preparing", remove it if it exists
     else if (orderData.status === "pending" || orderData.status === "preparing") {
@@ -314,7 +354,7 @@ export default function TVDisplay() {
           🍽️ READY ORDERS
         </h1>
         <p className="text-center text-base md:text-lg lg:text-xl xl:text-2xl text-white/90 mt-1">
-          Orders ready for pickup
+          Orders ready for pickup • Auto-refresh every 3 minutes
         </p>
       </div>
 
@@ -369,12 +409,17 @@ export default function TVDisplay() {
         )}
       </div>
 
-      {/* Footer - Order Count */}
+      {/* Footer - Order Count & Last Sync Time */}
       <div className="bg-white border-t-2 border-[#50BAA8] py-2 md:py-3 px-4 md:px-6 shadow-lg flex-shrink-0">
         <div className="flex justify-between items-center">
-          <p className="text-sm md:text-lg lg:text-xl xl:text-2xl text-gray-600">
-            Total Ready Orders: <span className="text-[#50BAA8] font-bold">{readyOrders.length}</span>
-          </p>
+          <div className="flex flex-col">
+            <p className="text-sm md:text-lg lg:text-xl xl:text-2xl text-gray-600">
+              Total Ready Orders: <span className="text-[#50BAA8] font-bold">{readyOrders.length}</span>
+            </p>
+            <p className="text-xs md:text-sm text-gray-400">
+              Last synced: {lastSyncTime.toLocaleTimeString()}
+            </p>
+          </div>
           <TimeDisplay />
         </div>
       </div>
