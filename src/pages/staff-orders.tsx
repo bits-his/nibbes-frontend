@@ -128,12 +128,16 @@ const MenuItemCard = memo<MenuItemCardProps>(({
   
   const handleIncrement = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    onUpdateQuantity(item.id, 1);
+    if (item.id !== undefined) {
+      onUpdateQuantity(item.id, 1);
+    }
   }, [item.id, onUpdateQuantity]);
   
   const handleDecrement = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    onUpdateQuantity(item.id, -1);
+    if (item.id !== undefined) {
+      onUpdateQuantity(item.id, -1);
+    }
   }, [item.id, onUpdateQuantity]);
   
   return (
