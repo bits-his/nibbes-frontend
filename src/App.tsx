@@ -49,6 +49,7 @@ const DocketPage = lazy(() => import("@/pages/docket"));
 const InventoryPage = lazy(() => import("@/pages/inventory"));
 const CustomerAnalyticsDashboard = lazy(() => import("@/pages/customer-analytics-enhanced"));
 const StoreManagement = lazy(() => import("@/pages/store-management"));
+const Supervisor = lazy(() => import("@/pages/supervisor"));
 const EMcard = lazy(() => import("@/pages/EMcard"));
 const ManagerReportsList = lazy(() => import("@/pages/ManagerReportsList"));
 const ManagerReportDetail = lazy(() => import("@/pages/ManagerReportDetail"));
@@ -181,32 +182,57 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const login = async (userData: User, token: string) => {
-    try {
-      // Update token first
-      localStorage.setItem("token", token);
-      
-      // Fetch user permissions and update the user data before storing
-      const response = await apiRequest('GET', '/api/permissions/me');
-      const data = await response.json();
-      
-      if (data) {
-        const permissionNames = data.permissions?.map((p: any) => p.name) || [];
-        
-        // Update user with permissions
-        const userWithPermissions = { ...userData, permissions: permissionNames };
-        setUser(userWithPermissions);
-        localStorage.setItem("user", JSON.stringify(userWithPermissions));
-      } else {
-        // If permission fetch fails, still store the user without permissions
-        setUser(userData);
-        localStorage.setItem("user", JSON.stringify(userData));
+    // CRITICAL FIX: Update token first and ensure it's set before any API calls
+    localStorage.setItem("token", token);
+    
+    // Set user immediately to avoid blocking UI
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+    
+    // Fetch permissions asynchronously (non-blocking) with retry logic
+    const fetchPermissionsWithRetry = async (retries = 3, delay = 500) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          // Small delay to ensure token is available
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, delay * i));
+          }
+          
+          const response = await apiRequest('GET', '/api/permissions/me');
+          const data = await response.json();
+          
+          if (data && data.permissions) {
+            const permissionNames = data.permissions.map((p: any) => p.name) || [];
+            
+            // Update user with permissions
+            const userWithPermissions = { ...userData, permissions: permissionNames };
+            setUser(userWithPermissions);
+            localStorage.setItem("user", JSON.stringify(userWithPermissions));
+            return; // Success, exit retry loop
+          }
+        } catch (error: any) {
+          console.error(`Error fetching permissions (attempt ${i + 1}/${retries}):`, error);
+          
+          // If it's the last retry, give up and use default permissions
+          if (i === retries - 1) {
+            console.warn("Failed to fetch permissions after retries, using default permissions");
+            // For customers, use default customer permissions
+            if (userData.role === 'customer') {
+              const defaultCustomerPermissions = ['customer_menu', 'docket_display', 'profile'];
+              const userWithDefaultPermissions = { ...userData, permissions: defaultCustomerPermissions };
+              setUser(userWithDefaultPermissions);
+              localStorage.setItem("user", JSON.stringify(userWithDefaultPermissions));
+            }
+          }
+        }
       }
-    } catch (error) {
-      console.error("Error fetching permissions on login:", error);
-      // If there's an error, still store the user without permissions
-      setUser(userData);
-      localStorage.setItem("user", JSON.stringify(userData));
-    }
+    };
+    
+    // Fetch permissions in background (non-blocking)
+    fetchPermissionsWithRetry().catch(err => {
+      console.error("Background permission fetch failed:", err);
+      // User is already set, so login can proceed
+    });
   };
 
   const logout = () => {
@@ -414,7 +440,7 @@ function Router() {
       <Route path="/" component={CustomerMenu} />
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
-      <Route path="/checkout" component={CheckoutWrapper} />
+      {/* Customer checkout removed - now handled directly in cart */}
       <Route path="/checkout-alt" component={CheckoutAlt} />
       <Route path="/staff/checkout" component={CheckoutWrapper} />
       <Route path="/payment-instructions" component={lazy(() => import("./pages/payment-instructions"))} />
@@ -608,6 +634,15 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["main_kitchen"]}>
             <StoreManagement />
+          </ProtectedRoute>
+        )}
+      />
+      
+      <Route
+        path="/supervisor"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["supervisor"]}>
+            <Supervisor />
           </ProtectedRoute>
         )}
       />

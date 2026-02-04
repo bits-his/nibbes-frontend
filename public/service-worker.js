@@ -1,7 +1,7 @@
-// Nibbles Service Worker - Version 3.0.2
+// Nibbles Service Worker - Version 3.0.3
 // OPTIMIZED FOR OFFLINE SUPPORT AND PERFORMANCE
 
-const VERSION = '3.0.2';
+const VERSION = '3.0.3';
 const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
 const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 
@@ -80,8 +80,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip WebSocket connections
+  if (url.pathname.startsWith('/ws')) {
+    return;
+  }
+
   // -------------------------------------------------------------------------
-  // Strategy 3: NETWORK-FIRST for Menu API (always fresh data)
+  // Strategy 1: NETWORK-FIRST for Menu API (always fresh data)
   // -------------------------------------------------------------------------
   if (url.pathname === '/api/menu/all' || url.pathname.includes('/api/menu/')) {
     event.respondWith(
@@ -103,18 +108,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-          // Return cached version immediately if available, otherwise wait for network
-    return;
-  }
-
-  // Skip WebSocket connections
-  if (url.pathname.startsWith('/ws')) {
-    return;
-  }
-
   // -------------------------------------------------------------------------
-  // Strategy 4: CACHE-FIRST for images (including Cloudinary)
+  // Strategy 2: CACHE-FIRST for images (including Cloudinary)
   // -------------------------------------------------------------------------
+  const isCloudinaryImage = url.hostname.includes('cloudinary.com');
   if (isCloudinaryImage || 
       request.destination === 'image' || 
       url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i)) {
@@ -158,7 +155,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 1: NETWORK FIRST for HTML (always fresh)
+  // Strategy 3: NETWORK FIRST for HTML (always fresh)
   // -------------------------------------------------------------------------
   if (request.mode === 'navigate' || 
       request.headers.get('accept')?.includes('text/html') ||
@@ -183,7 +180,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 2: CACHE FIRST for static assets (images, fonts, CSS, JS)
+  // Strategy 4: CACHE FIRST for static assets (CSS, JS, fonts)
   // Use stale-while-revalidate pattern for better performance
   // -------------------------------------------------------------------------
   event.respondWith(
@@ -192,7 +189,7 @@ self.addEventListener('fetch', (event) => {
         // Fetch from network in background to update cache
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
-            // Cache successful responses (images, fonts, etc.)
+            // Cache successful responses (CSS, JS, fonts, etc.)
             if (networkResponse && networkResponse.status === 200) {
               const responseToCache = networkResponse.clone();
               cache.put(request, responseToCache);

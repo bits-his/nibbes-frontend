@@ -26,6 +26,8 @@ interface StoreItem {
   costPrice: number
   category: string
   imageUrl?: string
+  totalIn: number
+  totalOut: number
 }
 
 interface Category {
@@ -233,7 +235,7 @@ export default function StoreManagement() {
       uploadFormData.append("file", file)
 
       // Upload to CDN via backend endpoint
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+      const BACKEND_URL =  'https://server.brainstorm.ng/nibbleskitchen' ; //|| import.meta.env.VITE_BACKEND_URL ;
       const response = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
         method: "POST",
         headers: {
@@ -807,7 +809,7 @@ export default function StoreManagement() {
                 <TableBody>
                   {items.map((item) => {
                     const totalItemValue = item.currentBalance * item.costPrice;
-                    const quantityUsed = item.initialQuantity - item.currentBalance;
+                    const quantityUsed = item.totalOut || 0;
 
                     return (
                       <TableRow
@@ -823,7 +825,7 @@ export default function StoreManagement() {
                         </TableCell>
                         {!isKitchenStaff && (
                           <TableCell className="text-right text-gray-900 font-medium">
-                            {item.initialQuantity} {item.unit}
+                            {item.totalIn} {item.unit}
                           </TableCell>
                         )}
                         <TableCell className="text-right text-green-600 font-semibold">

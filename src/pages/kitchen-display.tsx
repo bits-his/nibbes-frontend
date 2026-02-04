@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Clock, ChefHat, Search, Printer, Power } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -22,11 +22,15 @@ export default function KitchenDisplay() {
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [canceledOrdersCount, setCanceledOrdersCount] = useState<number>(0);
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [lastOrderTimestamp, setLastOrderTimestamp] = useState<Date | null>(null);
   
   // Use refs to store latest values without causing WebSocket reconnection
   const userRef = useRef(user);
   const toastRef = useRef(toast);
   const setCanceledOrdersCountRef = useRef(setCanceledOrdersCount);
+  const lastOrderTimestampRef = useRef<Date | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Update refs when values change
   useEffect(() => {
@@ -40,6 +44,85 @@ export default function KitchenDisplay() {
   useEffect(() => {
     setCanceledOrdersCountRef.current = setCanceledOrdersCount;
   }, [setCanceledOrdersCount]);
+
+  useEffect(() => {
+    lastOrderTimestampRef.current = lastOrderTimestamp;
+  }, [lastOrderTimestamp]);
+
+  // Function to fetch and sync missed orders - use ref to avoid dependency issues
+  const syncMissedOrdersRef = useRef<() => Promise<void>>();
+  
+  const syncMissedOrders = useCallback(async () => {
+    try {
+      console.log('🔄 [Kitchen Display] Syncing missed orders...');
+      const response = await apiRequest('GET', '/api/orders/active');
+      const data = await response.json();
+      
+      // Filter to only show paid orders
+      const paidOrders = data.filter((order: any) => order.paymentStatus === 'paid');
+      
+      // Normalize order items
+      const normalizedData = paidOrders.map((order: any) => {
+        if (order.orderItems && Array.isArray(order.orderItems)) {
+          order.orderItems = order.orderItems.map((item: any) => {
+            const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
+              || (item.menuItem?.name && typeof item.menuItem.name === 'string' && item.menuItem.name.trim())
+              || 'Unknown Item';
+            return {
+              ...item,
+              menuItemName: menuItemName,
+              menuItem: menuItemName !== 'Unknown Item' ? { name: menuItemName } : (item.menuItem || null)
+            };
+          });
+        }
+        return order;
+      });
+      
+      // Update query cache with synced orders
+      queryClient.setQueryData(
+        ["/api/orders/active"],
+        (old: OrderWithItems[] = []) => {
+          // Merge old and new orders, avoiding duplicates
+          const orderMap = new Map<string, OrderWithItems>();
+          
+          // Add existing orders
+          old.forEach(order => orderMap.set(String(order.id), order));
+          
+          // Add/update with synced orders
+          normalizedData.forEach((order: OrderWithItems) => {
+            orderMap.set(String(order.id), order);
+          });
+          
+          const merged = Array.from(orderMap.values());
+          
+          // Update last order timestamp
+          if (merged.length > 0) {
+            const newestOrder = merged.sort((a, b) => 
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )[0];
+            const newestTimestamp = new Date(newestOrder.createdAt);
+            if (!lastOrderTimestampRef.current || newestTimestamp > lastOrderTimestampRef.current) {
+              setLastOrderTimestamp(newestTimestamp);
+            }
+          }
+          
+          // Sort by createdAt descending
+          return merged.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        }
+      );
+      
+      console.log('✅ [Kitchen Display] Missed orders synced');
+    } catch (error) {
+      console.error('❌ [Kitchen Display] Error syncing missed orders:', error);
+    }
+  }, []);
+  
+  // Update ref when function changes
+  useEffect(() => {
+    syncMissedOrdersRef.current = syncMissedOrders;
+  }, [syncMissedOrders]);
   
 
   // Fetch kitchen status
@@ -63,8 +146,12 @@ export default function KitchenDisplay() {
       const response = await apiRequest('GET', '/api/orders/active');
       const data = await response.json();
       
+      // CRITICAL FIX: Filter to only show paid orders (safety filter)
+      // Backend should already filter, but this ensures no unpaid orders slip through
+      const paidOrders = data.filter((order: any) => order.paymentStatus === 'paid');
+      
       // Normalize order items to ensure menuItemName is always present
-      const normalizedData = data.map((order: any) => {
+      const normalizedData = paidOrders.map((order: any) => {
         if (order.orderItems && Array.isArray(order.orderItems)) {
           order.orderItems = order.orderItems.map((item: any) => {
             const menuItemName = (item.menuItemName && typeof item.menuItemName === 'string' && item.menuItemName.trim())
@@ -152,8 +239,16 @@ export default function KitchenDisplay() {
         socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
-          console.log("WebSocket connected");
+          console.log("✅ [Kitchen Display] WebSocket connected");
           reconnectAttempts = 0; // Reset on successful connection
+          setWsConnected(true);
+          
+          // CRITICAL FIX: Immediately sync missed orders on reconnect
+          // This catches any orders that were created while WebSocket was disconnected
+          console.log('🔄 [Kitchen Display] WebSocket reconnected, syncing missed orders...');
+          if (syncMissedOrdersRef.current) {
+            syncMissedOrdersRef.current();
+          }
         };
 
         socket.onmessage = (event) => {
@@ -206,6 +301,13 @@ export default function KitchenDisplay() {
                 // Add new order to the list
                 const newOrder = normalizeOrder(data.order);
                 
+                // CRITICAL FIX: Only show paid orders in kitchen display
+                // Unpaid orders should not appear until payment is confirmed
+                if (newOrder.paymentStatus !== 'paid') {
+                  console.log(`⚠️ [Kitchen Display] Skipping unpaid order #${newOrder.orderNumber} (paymentStatus: ${newOrder.paymentStatus})`);
+                  return old; // Don't show unpaid orders
+                }
+                
                 // CRITICAL FIX: If orderItems are missing or empty, don't add the order
                 // Backend should always send complete data, but if it doesn't, we skip it
                 // to avoid showing blank orders. The order will appear when backend sends complete data.
@@ -219,14 +321,29 @@ export default function KitchenDisplay() {
                 if (!exists) {
                   const updated = [newOrder, ...old];
                   // Sort by createdAt descending (newest first)
-                  return updated.sort((a, b) => 
+                  const sorted = updated.sort((a, b) => 
                     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                   );
+                  
+                  // Update last order timestamp
+                  const orderTimestamp = new Date(newOrder.createdAt);
+                  if (!lastOrderTimestampRef.current || orderTimestamp > lastOrderTimestampRef.current) {
+                    setLastOrderTimestamp(orderTimestamp);
+                  }
+                  
+                  return sorted;
                 }
                 return old;
               } else if (data.type === "order_status_change" || data.type === "order_update") {
                 // Update existing order or remove if completed/cancelled
                 const updatedOrder = normalizeOrder(data.order);
+                
+                // CRITICAL FIX: Only show paid orders in kitchen display
+                // If order becomes unpaid (shouldn't happen, but safety check), remove it
+                if (updatedOrder.paymentStatus !== 'paid') {
+                  console.log(`⚠️ [Kitchen Display] Removing unpaid order #${updatedOrder.orderNumber} (paymentStatus: ${updatedOrder.paymentStatus})`);
+                  return old.filter(o => o.id !== updatedOrder.id);
+                }
                 
                 // CRITICAL FIX: If orderItems are missing, keep existing order data
                 // Don't replace order with incomplete data - preserve existing items
@@ -422,11 +539,13 @@ export default function KitchenDisplay() {
     };
 
         socket.onerror = (error) => {
-          console.error("WebSocket error:", error);
+          console.error("❌ [Kitchen Display] WebSocket error:", error);
+          setWsConnected(false);
         };
 
         socket.onclose = () => {
-          console.log("WebSocket disconnected");
+          console.log("🔌 [Kitchen Display] WebSocket disconnected");
+          setWsConnected(false);
           
           // Don't reconnect if component is unmounting
           if (isUnmounting) {
@@ -434,10 +553,17 @@ export default function KitchenDisplay() {
             return;
           }
           
+          // CRITICAL FIX: Sync missed orders immediately when connection drops
+          // This ensures we don't miss orders created during disconnection
+          console.log('🔄 [Kitchen Display] Connection dropped, syncing missed orders...');
+          if (syncMissedOrdersRef.current) {
+            syncMissedOrdersRef.current();
+          }
+          
           // Auto-reconnect with exponential backoff
           if (reconnectAttempts < maxReconnectAttempts) {
             const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
-            console.log(`Reconnecting in ${delay}ms... (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+            console.log(`🔄 [Kitchen Display] Reconnecting in ${delay}ms... (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
             
             reconnectTimeout = setTimeout(() => {
               if (!isUnmounting) {
@@ -446,7 +572,7 @@ export default function KitchenDisplay() {
               }
             }, delay);
           } else {
-            console.error("Max reconnection attempts reached. Please refresh the page.");
+            console.error("❌ [Kitchen Display] Max reconnection attempts reached. Please refresh the page.");
             toastRef.current({
               title: "Connection Lost",
               description: "WebSocket connection failed. Please refresh the page to reconnect.",
@@ -475,7 +601,36 @@ export default function KitchenDisplay() {
         socket.close();
       }
     };
-  }, []); // Empty deps - WebSocket connects once and stays connected (using closures for handlers)
+  }, []); // Empty deps - WebSocket connects once and stays connected
+
+  // Separate useEffect for periodic polling - depends on wsConnected
+  useEffect(() => {
+    // CRITICAL FIX: Periodic polling fallback (every 45 seconds)
+    // This ensures we catch any orders missed by WebSocket
+    // Only poll if WebSocket is connected (to avoid unnecessary load)
+    if (wsConnected) {
+      pollingIntervalRef.current = setInterval(() => {
+        console.log('🔄 [Kitchen Display] Periodic sync check...');
+        if (syncMissedOrdersRef.current) {
+          syncMissedOrdersRef.current();
+        }
+      }, 45000); // Poll every 45 seconds
+    } else {
+      // Clear interval when disconnected
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      // Clear polling interval on unmount or when wsConnected changes
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [wsConnected]); // Only depend on wsConnected
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {

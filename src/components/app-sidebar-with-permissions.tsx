@@ -117,6 +117,13 @@ const menuItems: MenuItem[] = [
     permissions: ["main_kitchen"],
   },
   { 
+    title: "Supervisor", 
+    url: "/supervisor", 
+    icon: Store, 
+    roles: ["C - Suite", "admin", "kitchen"],
+    permissions: ["main_kitchen"],
+  },
+  { 
     title: "Transactions", 
     url: "/transactions", 
     icon: CreditCard, 

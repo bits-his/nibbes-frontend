@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth"
 export default function Login() {
   const [, setLocation] = useLocation()
   const { login } = useAuth()
-  const [email, setEmail] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
@@ -27,7 +27,13 @@ export default function Login() {
     setError("")
 
     try {
-      const response = await apiRequest("POST", "/api/auth/login", { email, password })
+      // Detect if input is email or phone number
+      const isEmail = phoneNumber.includes("@");
+      const loginData = isEmail 
+        ? { email: phoneNumber, password }
+        : { phoneNumber, password };
+      
+      const response = await apiRequest("POST", "/api/auth/login", loginData)
       const data = await response.json()
 
       // Check if there's a guest session that needs to be archived
@@ -74,11 +80,11 @@ export default function Login() {
           
           // Display specific error message based on error type
           if (errorData.errorType === 'USER_NOT_FOUND') {
-            setError(errorData.error || 'No account found with this email address')
+            setError(errorData.error || 'No account found with this phone number')
           } else if (errorData.errorType === 'INVALID_PASSWORD') {
             setError(errorData.error || 'Incorrect password')
           } else if (errorData.errorType === 'MISSING_FIELDS') {
-            setError('Please enter both email and password')
+            setError('Please enter both phone number and password')
           } else if (errorData.errorType === 'SERVER_ERROR') {
             setError('Server error. Please try again in a few moments.')
           } else {
@@ -105,15 +111,15 @@ export default function Login() {
   const handleGuestLogin = (role: "admin" | "kitchen" | "customer") => {
     switch (role) {
       case "admin":
-        setEmail("admin@example.com")
+        setPhoneNumber("08012345678")
         setPassword("admin123")
         break
       case "kitchen":
-        setEmail("kitchen@example.com")
+        setPhoneNumber("08012345679")
         setPassword("kitchen123")
         break
       case "customer":
-        setEmail("customer@example.com")
+        setPhoneNumber("08012345680")
         setPassword("customer123")
         break
     }
@@ -173,15 +179,15 @@ export default function Login() {
             )}
 
             <div className="space-y-2.5">
-              <Label htmlFor="email" className="text-sm font-semibold text-foreground">
-                Email Address
+              <Label htmlFor="phoneNumber" className="text-sm font-semibold text-foreground">
+                Phone Number or Email
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="phoneNumber"
+                type="text"
+                // placeholder=""
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 required
                 className="h-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
               />
@@ -194,20 +200,20 @@ export default function Login() {
               <div className="relative group">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-11 pr-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
-                <button
+                {/* <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+                </button> */}
               </div>
             </div>
 

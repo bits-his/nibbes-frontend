@@ -271,6 +271,12 @@ export default function Checkout() {
       }
     }
 
+    // Load orderType from localStorage (set in cart)
+    const savedOrderType = localStorage.getItem("orderType")
+    if (savedOrderType === "delivery" || savedOrderType === "pickup") {
+      form.setValue("orderType", savedOrderType)
+    }
+
     if (user) {
       form.setValue("customerName", user.username || user.email)
       form.setValue("customerPhone", user.phone || "")
@@ -654,6 +660,19 @@ export default function Checkout() {
           
           // Verify payment with Interswitch API (like reference implementation)
           if (response.desc === "Approved by Financial Institution") {
+            // Clear cart and show success message immediately
+            clearCart()
+            toast({
+              title: "Payment Successful! 🎉",
+              description: `Order #${createdOrder.orderNumber} has been paid.`,
+            })
+            
+            // Navigate immediately to docket
+            startTransition(() => {
+              setLocation("/docket")
+            })
+
+            // Verify payment and call backend callback in the background (non-blocking)
             try {
               // Verify transaction with Interswitch
               const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`
@@ -693,32 +712,15 @@ export default function Checkout() {
                     if (attempt < 3) await new Promise(r => setTimeout(r, 1000))
                   }
                 }
-                
-                clearCart()
-                toast({
-                  title: "Payment Successful! 🎉",
-                  description: `Order #${createdOrder.orderNumber} has been paid.`,
-                })
-                startTransition(() => {
-                  setTimeout(() => setLocation("/docket"), 1500)
-                })
               } else {
                 console.error('❌ Interswitch verification failed:', verifyData)
-                toast({
-                  title: "Payment Verification Failed",
-                  description: verifyData.ResponseDescription || "Could not verify payment.",
-                  variant: "destructive",
-                })
               }
-            } catch (err) {
-              console.error('❌ Verification error:', err)
-              toast({
-                title: "Verification Error", 
-                description: "Payment may have succeeded. Please check your orders.",
-                variant: "destructive",
-              })
+            } catch (error) {
+              console.error('❌ Error verifying payment:', error)
+              // Don't show error to user since they're already redirected
             }
           } else {
+            // Payment was not approved by Interswitch
             toast({
               title: "Payment Failed",
               description: response.desc || "Payment was not approved.",
@@ -961,7 +963,24 @@ export default function Checkout() {
         return await response.json()
       } catch (error: any) {
         clearTimeout(timeoutId)
-        if (error.name === 'AbortError') {
+        if (error.name === 'AbortError' || error.message?.includes('timeout')) {
+          // Network timeout occurred - verify if order was actually created
+          if (orderData.idempotencyKey) {
+            try {
+              console.log('⏱️ Timeout detected, verifying order with idempotencyKey:', orderData.idempotencyKey)
+              const verifyResponse = await apiRequest('GET', `/api/orders/verify?idempotencyKey=${encodeURIComponent(orderData.idempotencyKey)}`)
+              if (verifyResponse.ok) {
+                const verifiedOrder = await verifyResponse.json()
+                if (verifiedOrder && verifiedOrder.id) {
+                  console.log('✅ Order was created despite timeout, returning existing order:', verifiedOrder.orderNumber)
+                  // Return the verified order as if it was successful
+                  return verifiedOrder
+                }
+              }
+            } catch (verifyError) {
+              console.error('❌ Error verifying order after timeout:', verifyError)
+            }
+          }
           throw new Error('Request timeout - please check your connection and try again')
         }
         throw error
@@ -969,6 +988,15 @@ export default function Checkout() {
     },
     onSuccess: (data: any) => {
       console.log('✅ Walk-in order created successfully:', data)
+      
+      // Check if this is a duplicate order (returned from idempotency check)
+      if (data.isDuplicate) {
+        toast({
+          title: "Order Already Exists",
+          description: `Order #${data.orderNumber} was already created. Showing existing order.`,
+          variant: "default",
+        })
+      }
       
       // Calculate breakdown for display
       const itemsSubtotal = walkInOrder?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
@@ -1011,7 +1039,7 @@ export default function Checkout() {
       }
       
       toast({
-        title: "Order Created Successfully!",
+        title: data.isDuplicate ? "Order Found" : "Order Created Successfully!",
         description: `Order #${data.orderNumber} has been sent to kitchen.`,
       })
       
@@ -1019,10 +1047,10 @@ export default function Checkout() {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
       queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] })
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
       console.error('❌ Walk-in order creation failed:', error)
       
-      // Handle stock validation errors
+      // Handle stock validation errors (don't verify for these - order wasn't created)
       if (error.stockError) {
         const details = error.details || []
         toast({
@@ -1034,6 +1062,19 @@ export default function Checkout() {
           duration: 6000,
         })
         // Staff should review and remove unavailable items from cart
+        return
+      }
+
+      // For network/timeout errors, try to verify if order was actually created
+      // This handles the case where order was created but response was lost
+      if (error.message?.includes('timeout') || error.message?.includes('network') || error.name === 'AbortError') {
+        // The verification is already handled in mutationFn, but if it still fails, show error
+        toast({
+          title: "Network Error",
+          description: error.message || "Unable to create order. Please check your connection and verify if order was created.",
+          variant: "destructive",
+          duration: 8000,
+        })
         return
       }
       
@@ -1240,6 +1281,9 @@ export default function Checkout() {
         return
       }
 
+      // Generate idempotency key to prevent duplicate orders on retry
+      const idempotencyKey = `IDEMPOTENCY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       // For cash/POS/transfer payments, create order directly with paid status
       const orderData = {
         customerName: walkInOrder.customerName,
@@ -1251,6 +1295,7 @@ export default function Checkout() {
         paymentStatus: "paid",
         items: walkInOrder.items,
         totalAmount: calculateTotal(), // Include total with all charges
+        idempotencyKey, // Include idempotency key to prevent duplicates
         // Add payment splits info if multi-payment is enabled
         ...(multiPaymentEnabled && {
           paymentSplits: paymentSplits.map(split => ({
@@ -1466,23 +1511,10 @@ export default function Checkout() {
                     return (
                       <div
                         key={method.id}
-                        className={`w-full p-4 rounded-lg border-2 transition-all ${
-                          isSelected
-                            ? "border-[#4EB5A4] bg-[#4EB5A4]/10"
-                            : "border-border/50"
-                        }`}
+                        className="w-full p-4 rounded-lg border border-border/50 transition-all hover:bg-muted/30"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedPaymentMethod(method.id)
-                                }
-                              }}
-                              className="flex-shrink-0"
-                            />
                             <IconComponent className="w-5 h-5 text-[#4EB5A4] flex-shrink-0" />
                             <div className="flex-1">
                               <p className="font-semibold">{method.name}</p>
@@ -1491,6 +1523,15 @@ export default function Checkout() {
                               </p>
                             </div>
                           </div>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPaymentMethod(method.id)
+                              }
+                            }}
+                            className="flex-shrink-0 w-8 h-8 rounded-md border-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                          />
                         </div>
                       </div>
                     )

@@ -42,8 +42,8 @@ export default function GuestCheckout() {
         expiresAt: data.expiresAt
       })
 
-      // Redirect to checkout
-      setLocation("/checkout")
+      // Redirect to home (cart is now on the home page)
+      setLocation("/")
     } catch (err: any) {
       try {
         const errorMatch = err.message.match(/\d+:\s*({.*})/)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, Minus, X, ChefHat, AlertCircle, Wifi } from "lucide-react";
@@ -41,6 +41,196 @@ const orderFormSchema = z.object({
 
 type OrderFormValues = z.infer<typeof orderFormSchema>;
 
+// PERFORMANCE FIX: Custom debounce hook
+const useDebouncedValue = <T,>(value: T, delay: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+  
+  return debouncedValue;
+};
+
+// PERFORMANCE FIX: Move priority map outside component (created only once)
+const ITEM_PRIORITY_MAP = new Map<string, number>([
+  ['beef philadelphia', 1],
+  ['chicken philadelphia', 2],
+  ['beef loaded fries', 3],
+  ['chicken loaded fries', 4],
+  ['beef shawarma', 5],
+  ['chicken shawarma', 6],
+  ['beef burger', 7],
+  ['chicken burger', 8],
+  ['oriental rice, charcoal grilled chicken and coleslaw', 9],
+  ['signature rice, charcoal grilled chicken and coleslaw', 10],
+  ['smokey jollof rice, charcoal grilled chicken and coleslaw', 11],
+  ['creamy wings', 12],
+  ['beef kofta wrap', 13],
+  ['chicken kofta wrap', 14],
+  ['meat pie', 15],
+  ['french fries and ketchup', 16],
+]);
+
+// PERFORMANCE FIX: Optimized sorting function (O(n log n) instead of O(n²))
+const sortByItemPriority = (items: MenuItem[]): MenuItem[] => {
+  return [...items].sort((a, b) => {
+    const aName = a.name.toLowerCase().trim();
+    const bName = b.name.toLowerCase().trim();
+    const aPriority = ITEM_PRIORITY_MAP.get(aName) ?? 999;
+    const bPriority = ITEM_PRIORITY_MAP.get(bName) ?? 999;
+    
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
+    
+    return 0;
+  });
+};
+
+// PERFORMANCE FIX: Memoized Menu Item Card Component
+interface MenuItemCardProps {
+  item: MenuItem;
+  isInCart: boolean;
+  cartQuantity: number;
+  onAddToCart: (item: MenuItem) => void;
+  onUpdateQuantity: (id: number, delta: number) => void;
+  kitchenOpen: boolean;
+}
+
+const MenuItemCard = memo<MenuItemCardProps>(({ 
+  item, 
+  isInCart, 
+  cartQuantity,
+  onAddToCart,
+  onUpdateQuantity,
+  kitchenOpen 
+}) => {
+  // Determine if item is SOLD OUT
+  const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
+    ? item.stockBalance <= 0
+    : !item.available;
+  
+  const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
+  const canAddMore = !isOutOfStock && (item.stockBalance === null || item.stockBalance === undefined || cartQuantity < item.stockBalance);
+  
+  const handleClick = useCallback(() => {
+    if (canAddMore && kitchenOpen) {
+      onAddToCart(item);
+    }
+  }, [canAddMore, kitchenOpen, onAddToCart, item]);
+  
+  const handleIncrement = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (item.id !== undefined) {
+      onUpdateQuantity(item.id, 1);
+    }
+  }, [item.id, onUpdateQuantity]);
+  
+  const handleDecrement = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (item.id !== undefined) {
+      onUpdateQuantity(item.id, -1);
+    }
+  }, [item.id, onUpdateQuantity]);
+  
+  return (
+    <Card
+      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''} ${isOutOfStock ? 'opacity-75' : ''}`}
+      onClick={handleClick}
+      data-testid={`card-menu-item-${item.id}`}
+    >
+      <div className="aspect-video overflow-hidden relative">
+        <ImageWithSkeleton
+          src={item.imageUrl || ''}
+          alt={item.name}
+          containerClassName="w-full h-full"
+        />
+        {isInCart && (
+          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1 z-10">
+            <Plus className="w-3 h-3 md:w-4 md:h-4" />
+          </div>
+        )}
+        {isOutOfStock && (
+          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
+            <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
+              SOLD OUT
+            </span>
+          </div>
+        )}
+        {!isOutOfStock && isLowStock && (
+          <div className="absolute top-2 left-2 z-10">
+            <Badge variant="destructive" className="text-xs font-semibold shadow-md">
+              Only {item.stockBalance} left!
+            </Badge>
+          </div>
+        )}
+      </div>
+      <CardContent className="p-3 md:p-4">
+        <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{item.name}</h3>
+        <p className="text-base md:text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
+        {item.stockBalance !== null && item.stockBalance !== undefined ? (
+          <div className="flex items-center gap-1 mt-2">
+            <span className="text-xs text-muted-foreground">Stock:</span>
+            <span className={`text-xs font-semibold ${
+              item.stockBalance <= 0 ? 'text-red-600' :
+              item.stockBalance <= 3 ? 'text-orange-500' :
+              'text-green-600'
+            }`}>
+              {item.stockBalance} portions
+            </span>
+          </div>
+        ) : (
+          <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
+        )}
+        
+        {isInCart && cartQuantity > 0 && (
+          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={handleDecrement}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <span className="font-semibold text-base min-w-[2rem] text-center">
+              {cartQuantity}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={handleIncrement}
+              disabled={!canAddMore}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if these specific props change
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.stockBalance === nextProps.item.stockBalance &&
+    prevProps.item.available === nextProps.item.available &&
+    prevProps.isInCart === nextProps.isInCart &&
+    prevProps.cartQuantity === nextProps.cartQuantity &&
+    prevProps.kitchenOpen === nextProps.kitchenOpen
+  );
+});
+
+MenuItemCard.displayName = 'MenuItemCard';
+
 export default function StaffOrders() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -48,7 +238,10 @@ export default function StaffOrders() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [expandedCartItem, setExpandedCartItem] = useState<number | null>(null); // Track which cart item is expanded
+  const [expandedCartItem, setExpandedCartItem] = useState<number | null>(null);
+  
+  // PERFORMANCE FIX: Debounce search query (300ms delay)
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   
   // Network status for adaptive loading
   const networkStatus = useNetworkStatus();
@@ -68,17 +261,21 @@ export default function StaffOrders() {
     },
   });
 
-  // PERFORMANCE: Fetch menu items with caching (reduces network payload)
+  // PERFORMANCE FIX: Fetch menu items with better caching and no unnecessary refetches
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
     staleTime: 10 * 60 * 1000, // 10 minutes cache
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    refetchOnWindowFocus: false, // ✅ NEW: Don't refetch on window focus
+    refetchOnMount: false,        // ✅ NEW: Don't refetch on component mount
   });
 
   // Fetch categories from API
   const { data: categoriesData } = useQuery<string[]>({
     queryKey: ["/api/menu/categories"],
-    staleTime: 10 * 60 * 1000, // Cache categories for 10 minutes
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   // Add "All" to the beginning of categories (memoized)
@@ -86,66 +283,26 @@ export default function StaffOrders() {
     return ["All", ...(categoriesData || [])];
   }, [categoriesData]);
 
-  // Helper function to sort items by specific item priority
-  const sortByItemPriority = (items: any[]) => {
-    // Define item priority order (lower number = appears first)
-    // Using lowercase for case-insensitive matching
-    const itemPriority: { [key: string]: number } = {
-      'beef philadelphia': 1,
-      'chicken philadelphia': 2,
-      'beef loaded fries': 3,
-      'chicken loaded fries': 4,
-      'beef shawarma': 5,
-      'chicken shawarma': 6,
-      'beef burger': 7,
-      'chicken burger': 8,
-      'oriental rice, charcoal grilled chicken and coleslaw': 9,
-      'signature rice, charcoal grilled chicken and coleslaw': 10,
-      'smokey jollof rice, charcoal grilled chicken and coleslaw': 11,
-      'creamy wings': 12, // "Wings & fries" = "Creamy Wings" in database
-      'beef kofta wrap': 13,
-      'chicken kofta wrap': 14,
-      'meat pie': 15,
-      'french fries and ketchup': 16,
-      // Everything else gets priority 999 (appears last)
-    };
-    
-    return [...items].sort((a, b) => {
-      const aName = a.name.toLowerCase().trim();
-      const bName = b.name.toLowerCase().trim();
-      const aPriority = itemPriority[aName] || 999;
-      const bPriority = itemPriority[bName] || 999;
-      
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority; // Sort by priority
-      }
-      
-      // If same priority, keep original order
-      return 0;
-    });
-  };
-
-  // Filter items (memoized to prevent unnecessary recalculations)
+  // PERFORMANCE FIX: Filter items with debounced search (memoized)
   const filteredItems = useMemo(() => {
     if (!menuItems) return [];
     
     const filtered = menuItems.filter(
       (item) => {
         const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-        const matchesSearch = searchQuery === "" || 
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = debouncedSearchQuery === "" || 
+          item.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          item.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
         
-        // Show all items, including SOLD OUT ones
         return matchesCategory && matchesSearch;
       }
     );
 
     // Sort: Priority items first (only when viewing "All" categories)
     return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
-  }, [menuItems, selectedCategory, searchQuery]);
+  }, [menuItems, selectedCategory, debouncedSearchQuery]);
 
-  // PERFORMANCE: Infinite scroll for pagination (reduces initial payload from 68MB to manageable chunks)
+  // PERFORMANCE FIX: Infinite scroll with increased items per load for desktop
   const {
     displayedItems: visibleItems,
     hasMore,
@@ -154,7 +311,7 @@ export default function StaffOrders() {
     reset: resetPagination,
     sentinelRef,
   } = useInfiniteScroll(filteredItems, {
-    itemsPerLoad: networkStatus.isSlow ? 8 : 16, // Load fewer items on slow networks
+    itemsPerLoad: networkStatus.isSlow ? 8 : 24, // ✅ INCREASED from 16 to 24 for desktop
     threshold: 300,
     enabled: true,
   });
@@ -162,9 +319,9 @@ export default function StaffOrders() {
   // Reset pagination when filters change
   useEffect(() => {
     resetPagination();
-  }, [selectedCategory, searchQuery, resetPagination]);
+  }, [selectedCategory, debouncedSearchQuery, resetPagination]);
 
-  const addToCart = (menuItem: MenuItem) => {
+  const addToCart = useCallback((menuItem: MenuItem) => {
     // Check if kitchen is closed
     if (!kitchenStatus.isOpen) {
       toast({
@@ -212,9 +369,9 @@ export default function StaffOrders() {
       }
       return [...prev, { menuItem, quantity: 1 }];
     });
-  };
+  }, [kitchenStatus.isOpen, cart, toast]);
 
-  const updateQuantity = (menuItemId: number, delta: number) => {
+  const updateQuantity = useCallback((menuItemId: number, delta: number) => {
     setCart((prev) => {
       const item = prev.find((cartItem) => cartItem.menuItem.id === menuItemId);
       if (!item) return prev;
@@ -251,13 +408,13 @@ export default function StaffOrders() {
           : cartItem
       );
     });
-  };
+  }, [toast]);
 
-  const removeFromCart = (menuItemId: number) => {
+  const removeFromCart = useCallback((menuItemId: number) => {
     setCart((prev) => prev.filter((item) => item.menuItem.id !== menuItemId));
-  };
+  }, []);
 
-  const updateInstructions = (menuItemId: number, instructions: string) => {
+  const updateInstructions = useCallback((menuItemId: number, instructions: string) => {
     setCart((prev) =>
       prev.map((item) =>
         item.menuItem.id === menuItemId
@@ -265,16 +422,17 @@ export default function StaffOrders() {
           : item
       )
     );
-  };
+  }, []);
 
-  const subtotal = cart.reduce(
-    (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,
-    0
-  );
+  const subtotal = useMemo(() => {
+    return cart.reduce(
+      (sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity,
+      0
+    );
+  }, [cart]);
   
   // Calculate total with service charges
-  const calculateTotal = () => {
-    // If no items in cart, return 0
+  const calculateTotal = useCallback(() => {
     if (subtotal === 0) {
       return 0
     }
@@ -289,16 +447,16 @@ export default function StaffOrders() {
       }
     })
     return total
-  }
+  }, [subtotal, serviceCharges]);
   
   // Helper function to calculate individual service charge amounts
-  const calculateServiceChargeAmount = (charge: ServiceCharge) => {
+  const calculateServiceChargeAmount = useCallback((charge: ServiceCharge) => {
     const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount
     if (charge.type === 'percentage') {
       return (subtotal * (amount / 100))
     }
     return amount
-  }
+  }, [subtotal]);
   
   // Fetch active service charges
   useEffect(() => {
@@ -333,7 +491,6 @@ export default function StaffOrders() {
         }
       } catch (error) {
         console.error('❌ Error fetching kitchen status:', error)
-        // Default to open if check fails
         setKitchenStatus({ isOpen: true })
       }
     }
@@ -344,9 +501,7 @@ export default function StaffOrders() {
     return () => clearInterval(interval)
   }, [])
 
-  // No longer creating order here - just preparing data for checkout
-  const handleProceedToCheckout = () => {
-    // Check if kitchen is closed
+  const handleProceedToCheckout = useCallback(() => {
     if (!kitchenStatus.isOpen) {
       toast({
         title: "Kitchen is Closed",
@@ -361,11 +516,10 @@ export default function StaffOrders() {
       description: "Please confirm payment method...",
     });
     
-    // Store cart and customer data for checkout (NO order created yet)
     localStorage.setItem('pendingWalkInOrder', JSON.stringify({
       customerName: form.getValues('customerName'),
       customerPhone: form.getValues('customerPhone'),
-      total: calculateTotal(), // Include all service charges
+      total: calculateTotal(),
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
         quantity: item.quantity,
@@ -377,23 +531,18 @@ export default function StaffOrders() {
     
     setCart([]);
     form.reset({ customerName: "Nibbles Kitchen", customerPhone: "" });
-    
-    // Redirect to staff checkout page
     setLocation('/staff/checkout');
-  };
+  }, [kitchenStatus.isOpen, form, calculateTotal, cart, toast, setLocation]);
 
-  // F1 keyboard shortcut to proceed to checkout
-  // Supports: F1, Cmd+F1 (Mac), Ctrl+F1 (Windows)
+  // F1 keyboard shortcut
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       const isF1 = event.key === 'F1' || event.key === 'f1';
-      const isMac = event.metaKey; // Cmd key on Mac
-      const isWindows = event.ctrlKey; // Ctrl key on Windows
+      const isMac = event.metaKey;
+      const isWindows = event.ctrlKey;
       
-      // Check if F1 is pressed (with or without modifier) and cart has items
       if (isF1 && cart.length > 0 && (isMac || isWindows || !event.metaKey && !event.ctrlKey)) {
         event.preventDefault();
-        // Check if kitchen is closed
         if (!kitchenStatus.isOpen) {
           toast({
             title: "Kitchen is Closed",
@@ -402,7 +551,6 @@ export default function StaffOrders() {
           });
           return;
         }
-        // Validate form before proceeding
         const values = form.getValues();
         if (values.customerName && values.customerName.length >= 2) {
           handleProceedToCheckout();
@@ -420,9 +568,9 @@ export default function StaffOrders() {
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [cart, form]);
+  }, [cart, form, handleProceedToCheckout, kitchenStatus.isOpen, toast]);
 
-  const onSubmit = (values: OrderFormValues) => {
+  const onSubmit = useCallback((values: OrderFormValues) => {
     if (cart.length === 0) {
       toast({
         title: "Empty Order",
@@ -432,87 +580,81 @@ export default function StaffOrders() {
       return;
     }
 
-    // Proceed to checkout instead of creating order
     handleProceedToCheckout();
-  };
+  }, [cart.length, handleProceedToCheckout, toast]);
 
-  const handleClearOrder = () => {
+  const handleClearOrder = useCallback(() => {
     setCart([]);
     form.reset();
-  };
+  }, [form]);
 
-  // WebSocket connection for real-time updates
+  // PERFORMANCE FIX: Optimized WebSocket connection - only invalidate when necessary
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log("Staff Orders WebSocket connected");
+      console.log("✅ Staff Orders WebSocket connected");
     };
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (
+      
+      // PERFORMANCE FIX: Only invalidate menu when menu items actually change
+      if (data.type === "menu_item_update") {
+        console.log("🔄 Menu item updated - refreshing menu");
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
+      } 
+      // ✅ FIXED: Don't invalidate menu on order updates (orders don't affect menu)
+      else if (
         data.type === "order_update" || 
         data.type === "new_order" || 
         data.type === "order_status_change"
       ) {
-        // Refresh active orders when there are changes
+        console.log("📦 Order updated - refreshing orders only (not menu)");
+        // Only refresh orders, not menu items
         queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-        // Also refresh menu items to update stock balances after orders
-        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
-      } else if (data.type === "menu_item_update") {
-        // Refresh menu data and categories when items are updated
-        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
-      } else if (data.type === "service-charges-updated") {
-        // Trigger service charges refresh by dispatching custom event
+      } 
+      else if (data.type === "service-charges-updated") {
         window.dispatchEvent(new CustomEvent('service-charges-updated', { detail: data.charges }));
-      } else if (data.type === "order_cancelled_notification") {
-        // Debug log
+      } 
+      else if (data.type === "order_cancelled_notification") {
         console.log('📢 [Staff Orders] Received order_cancelled_notification:', data);
-        console.log('[Staff Orders] Current user role:', user?.role);
         
-        // Show notification to staff roles only (not customers)
         const userRole = user?.role || '';
         const targetRoles = data.targetRoles || ['admin', 'staff', 'cashier', 'kitchen'];
         
-        console.log(`[Staff Orders] Checking if role '${userRole}' is in targetRoles:`, targetRoles);
-        
         if (userRole && targetRoles.includes(userRole)) {
-          console.log('✅ [Staff Orders] Showing cancellation notification to user');
+          console.log('✅ [Staff Orders] Showing cancellation notification');
           toast({
             title: "🚫 Order Cancelled",
             description: data.message || `Order #${data.orderNumber} has been cancelled`,
             duration: 5000,
           });
           
-          // Refresh orders and menu items
           queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
           queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
-        } else {
-          console.log('❌ [Staff Orders] User role not authorized for cancellation notification');
         }
       }
     };
 
     socket.onerror = (error) => {
-      console.error("Staff Orders WebSocket error:", error);
+      console.error("❌ Staff Orders WebSocket error:", error);
     };
 
     socket.onclose = () => {
-      console.log("Staff Orders WebSocket disconnected");
+      console.log("🔌 Staff Orders WebSocket disconnected");
     };
 
-    // Cleanup function to close the WebSocket connection
     return () => {
       socket.close();
     };
-  }, [user, toast]); // Add user to dependencies so WebSocket handler has access to current user role
+  }, [user, toast]);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Kitchen Closed Banner - Very Prominent */}
+      {/* Kitchen Closed Banner */}
       {!kitchenStatus.isOpen && (
         <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg border-b-4 border-primary/80">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
@@ -526,7 +668,7 @@ export default function StaffOrders() {
         </div>
       )}
 
-      {/* Network Status Indicator (subtle) */}
+      {/* Network Status Indicator */}
       {networkStatus.isSlow && (
         <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 py-1 px-4">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-xs text-orange-700 dark:text-orange-300">
@@ -537,7 +679,7 @@ export default function StaffOrders() {
       )}
 
       <div className="flex flex-col md:flex-row h-auto md:h-screen overflow-hidden">
-        {/* Menu Section - Full width on mobile, flex-1 on desktop */}
+        {/* Menu Section */}
         <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">
           <div className="p-4 md:p-6 border-b">
             <h1 className="font-serif text-2xl md:text-3xl font-bold mb-3 md:mb-4">Walk-in Orders</h1>
@@ -551,6 +693,9 @@ export default function StaffOrders() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full"
               />
+              {searchQuery !== debouncedSearchQuery && (
+                <p className="text-xs text-muted-foreground mt-1">Searching...</p>
+              )}
             </div>
             
             {/* Category Filters */}
@@ -586,109 +731,22 @@ export default function StaffOrders() {
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                   {(visibleItems || []).map((item) => {
-                  const isInCart = cart.some(cartItem => cartItem.menuItem.id === item.id);
-                  const cartItem = cart.find(cartItem => cartItem.menuItem.id === item.id);
-                  
-                  // Determine if item is SOLD OUT: prioritize stock balance over manual available setting
-                  const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
-                    ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
-                    : !item.available;        // Stock not tracked: use manual available setting
-                  
-                  const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
-                  const canAddMore = !isOutOfStock && (item.stockBalance === null || item.stockBalance === undefined || !cartItem || cartItem.quantity < item.stockBalance);
-                  
-                  return (
-                    <Card
-                      key={item.id}
-                      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''} ${isOutOfStock ? 'opacity-75' : ''}`}
-                      onClick={() => canAddMore && kitchenStatus.isOpen && addToCart(item)}
-                      data-testid={`card-menu-item-${item.id}`}
-                    >
-                      <div className="aspect-video overflow-hidden relative">
-                        <ImageWithSkeleton
-                          src={item.imageUrl || ''}
-                          alt={item.name}
-                          containerClassName="w-full h-full"
-                        />
-                        {isInCart && (
-                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1 z-10">
-                            <Plus className="w-3 h-3 md:w-4 md:h-4" />
-                          </div>
-                        )}
-                        {/* SOLD OUT Overlay */}
-                        {isOutOfStock && (
-                          <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
-                            <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
-                              SOLD OUT
-                            </span>
-                          </div>
-                        )}
-                        {/* Low Stock Badge */}
-                        {!isOutOfStock && isLowStock && (
-                          <div className="absolute top-2 left-2 z-10">
-                            <Badge variant="destructive" className="text-xs font-semibold shadow-md">
-                              Only {item.stockBalance} left!
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                      <CardContent className="p-3 md:p-4">
-                        <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{item.name}</h3>
-                        <p className="text-base md:text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
-                        {/* Stock Balance Indicator */}
-                        {item.stockBalance !== null && item.stockBalance !== undefined ? (
-                          <div className="flex items-center gap-1 mt-2">
-                            <span className="text-xs text-muted-foreground">Stock:</span>
-                            <span className={`text-xs font-semibold ${
-                              item.stockBalance <= 0 ? 'text-red-600' :
-                              item.stockBalance <= 3 ? 'text-orange-500' :
-                              'text-green-600'
-                            }`}>
-                              {item.stockBalance} portions
-                            </span>
-                          </div>
-                        ) : (
-                          <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
-                        )}
-                        
-                        {/* Quantity Controls - Show only if item is in cart */}
-                        {isInCart && cartItem && (
-                          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateQuantity(item.id, -1);
-                              }}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="font-semibold text-base min-w-[2rem] text-center">
-                              {cartItem.quantity}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateQuantity(item.id, 1);
-                              }}
-                              disabled={!canAddMore}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
+                    const cartItem = cart.find(c => c.menuItem.id === item.id);
+                    return (
+                      <MenuItemCard
+                        key={item.id}
+                        item={item}
+                        isInCart={!!cartItem}
+                        cartQuantity={cartItem?.quantity || 0}
+                        onAddToCart={addToCart}
+                        onUpdateQuantity={updateQuantity}
+                        kitchenOpen={kitchenStatus.isOpen}
+                      />
+                    );
                   })}
                 </div>
                 
-                {/* Infinite Scroll Sentinel and Load More */}
+                {/* Infinite Scroll Sentinel */}
                 {hasMore && (
                   <>
                     <div ref={sentinelRef} className="h-4" aria-hidden="true" />
@@ -715,7 +773,7 @@ export default function StaffOrders() {
           </div>
         </div>
 
-        {/* Cart Section - Full width on mobile, fixed width on desktop */}
+        {/* Cart Section */}
         <div className="w-full md:w-[400px] md:pb-[0px] pb-[70px] md:pt-[70px] flex flex-col bg-card border-t md:border-t-0 md:border-l">
           <CardHeader className="border-b">
             <CardTitle className="text-lg md:text-xl">Current Order</CardTitle>
@@ -779,14 +837,10 @@ export default function StaffOrders() {
                         onClick={() => item.menuItem.id !== undefined && setExpandedCartItem(item.menuItem.id)}
                       >
                         <CardContent className="p-0 relative">
-                          {/* Top badges container */}
                           <div className="absolute top-1.5 left-1.5 right-1.5 z-10 flex justify-between items-start">
-                            {/* Quantity Badge */}
                             <div className="bg-[#4EB5A4] text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold shadow-md">
                               {item.quantity}
                             </div>
-
-                            {/* Remove Button */}
                             <Button
                               size="icon"
                               variant="ghost"
@@ -800,8 +854,6 @@ export default function StaffOrders() {
                               <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </Button>
                           </div>
-
-                          {/* Image Only */}
                           <ImageWithSkeleton
                             src={item.menuItem.imageUrl || ''}
                             alt={item.menuItem.name || 'Menu item'}
@@ -814,14 +866,12 @@ export default function StaffOrders() {
                 )}
               </div>
 
-              {/* Desktop submit section - hidden on mobile */}
+              {/* Desktop submit section */}
               <div className="p-4 md:p-6 border-t space-y-3 md:space-y-4 hidden md:block">
-                {/* Subtotal */}
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span>Subtotal</span>
                   <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                {/* Service Charges - Dynamic from API (only show if subtotal > 0) */}
                 {subtotal > 0 && serviceCharges.map((charge) => (
                   <div key={charge.id} className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>
@@ -831,7 +881,6 @@ export default function StaffOrders() {
                     <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 ))}
-                {/* Total */}
                 <div className="flex items-center justify-between text-base md:text-xl border-t pt-3">
                   <span className="font-semibold">Total</span>
                   <span className="font-bold" data-testid="text-total">
@@ -862,7 +911,7 @@ export default function StaffOrders() {
         </div>
       </div>
 
-      {/* Floating submit bar for mobile when cart has items - only visible on mobile */}
+      {/* Floating submit bar for mobile */}
       {cart.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 md:hidden z-10">
           <div className="flex items-center justify-between">
@@ -903,7 +952,6 @@ export default function StaffOrders() {
             
             return (
               <div className="flex flex-col">
-                {/* Top: Compact Image Section */}
                 <div className="relative w-full bg-gradient-to-br from-muted to-muted/50 flex-shrink-0 overflow-hidden">
                   <div className="aspect-[5/2]">
                     <ImageWithSkeleton
@@ -912,7 +960,6 @@ export default function StaffOrders() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  {/* Close button */}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -924,9 +971,7 @@ export default function StaffOrders() {
                   </Button>
                 </div>
 
-                {/* Bottom: Content Section */}
                 <div className="flex flex-col p-4">
-                  {/* Header */}
                   <div className="mb-3">
                     <h2 className="text-base sm:text-lg font-bold text-foreground mb-1.5 leading-tight line-clamp-2">
                       {item.menuItem.name}
@@ -936,7 +981,6 @@ export default function StaffOrders() {
                     </span>
                   </div>
 
-                  {/* Quantity Section - Inline */}
                   <div className="mb-3">
                     <div className="flex items-center justify-between p-3 bg-gradient-to-br from-[#4EB5A4]/10 to-[#4EB5A4]/5 border border-[#4EB5A4]/20 rounded-lg">
                       <span className="text-sm font-semibold text-foreground">Quantity</span>
@@ -969,7 +1013,6 @@ export default function StaffOrders() {
                     )}
                   </div>
 
-                  {/* Subtotal */}
                   <div className="flex items-center justify-between mb-3 pb-3 border-b">
                     <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
                     <span className="text-lg font-bold text-[#4EB5A4]">
@@ -977,7 +1020,6 @@ export default function StaffOrders() {
                     </span>
                   </div>
 
-                  {/* Special Instructions */}
                   <div className="mb-3">
                     <label className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
                       <ChefHat className="w-3.5 h-3.5 text-[#4EB5A4]" />
@@ -995,7 +1037,6 @@ export default function StaffOrders() {
                     />
                   </div>
 
-                  {/* Remove Button */}
                   <Button
                     variant="outline"
                     onClick={() => {

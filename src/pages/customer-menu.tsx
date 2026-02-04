@@ -12,19 +12,26 @@ import {
   ChefHat,
   AlertCircle,
   Wifi,
+  Check,
+  CreditCard,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
+import { startTransition } from "react";
+import { getGuestSession, saveGuestSession } from "@/lib/guestSession";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import type { MenuItem } from "@shared/schema";
@@ -45,16 +52,21 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { measurePerformance, logPerformanceMetrics } from "@/utils/performance";
+import { useSettings } from "@/context/SettingsContext";
+import { useServiceCharges } from "@/context/ServiceChargesContext";
 
 export default function CustomerMenu() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth(); // Add user authentication
   const { cart, addToCart: addToCartContext, updateQuantity: updateQuantityContext, removeFromCart, clearCart, updateSpecialInstructions } = useCart();
+  const { settings } = useSettings();
+  const { serviceChargeRate, vatRate, serviceCharges } = useServiceCharges();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartOpen, setCartOpen] = useState(false);
   const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null); // Track which cart item is expanded
+  const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup"); // Delivery method selection
   const [locationData, setLocationData] = useState<{
     latitude: number;
     longitude: number;
@@ -62,6 +74,16 @@ export default function CustomerMenu() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [tempAddress, setTempAddress] = useState<string>("");
+  const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showGuestDataModal, setShowGuestDataModal] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [isCreatingGuestSession, setIsCreatingGuestSession] = useState(false);
   
   // Kitchen status state
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean }>({ isOpen: true });
@@ -181,12 +203,14 @@ export default function CustomerMenu() {
   }, []);
 
   // Fetch menu items with SHORT stale time for real-time stock updates
-  const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
+  const { data: menuItems, isLoading: menuLoading, error: menuError } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
     staleTime: 30 * 1000, // 30 seconds - refresh often for accurate stock levels
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: true, // Refetch when user returns to tab
     refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds for stock updates
+    retry: 3, // Retry up to 3 times on failure
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
   // Extract unique categories from menu items (memoized)
@@ -197,6 +221,18 @@ export default function CustomerMenu() {
 
   // Use loading state from menu only
   const isLoading = menuLoading;
+  
+  // Handle menu loading errors with better UX
+  useEffect(() => {
+    if (menuError) {
+      console.error("Error loading menu:", menuError);
+      toast({
+        title: "Unable to Load Menu",
+        description: "There was a problem loading the menu. Please refresh the page or try again later.",
+        variant: "destructive",
+      });
+    }
+  }, [menuError, toast]);
 
   // Helper function to sort items by specific item priority
   const sortByItemPriority = (items: any[]) => {
@@ -468,13 +504,418 @@ export default function CustomerMenu() {
     );
   };
 
+  // Load orderType and location from localStorage on mount
+  useEffect(() => {
+    const savedOrderType = localStorage.getItem("orderType");
+    if (savedOrderType === "delivery" || savedOrderType === "pickup") {
+      setOrderType(savedOrderType);
+    }
+
+    // Load saved location
+    const savedLocation = localStorage.getItem("location");
+    if (savedLocation) {
+      try {
+        const parsedLocation = JSON.parse(savedLocation);
+        if (parsedLocation && parsedLocation.address) {
+          setLocationData(parsedLocation);
+          setTempAddress(parsedLocation.address);
+        }
+      } catch (error) {
+        console.error("Error parsing saved location:", error);
+      }
+    }
+  }, []);
+
+  // Calculate delivery fee when orderType is delivery and location is available
+  useEffect(() => {
+    const calculateDeliveryFee = async () => {
+      if (orderType !== "delivery" || !locationData?.address) {
+        setDeliveryFee(0);
+        return;
+      }
+
+      setIsCalculatingDelivery(true);
+      try {
+        const response = await apiRequest("POST", "/api/delivery/calculate-fee", {
+          deliveryLocation: locationData.address
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            setDeliveryFee(result.data.price);
+          } else {
+            setDeliveryFee(0);
+          }
+        } else {
+          setDeliveryFee(0);
+        }
+      } catch (error) {
+        console.error('Error calculating delivery fee:', error);
+        setDeliveryFee(0);
+      } finally {
+        setIsCalculatingDelivery(false);
+      }
+    };
+
+    calculateDeliveryFee();
+  }, [orderType, locationData]);
+
+  // Calculate total with charges
+  const calculateTotal = useMemo(() => {
+    if (cart.length === 0) return 0;
+    
+    const baseAmount = subtotal + deliveryFee;
+    
+    // Apply all service charges if available, otherwise use legacy rates
+    let totalCharges = 0;
+    if (serviceCharges.length > 0) {
+      totalCharges = serviceCharges.reduce((total, charge) => {
+        return total + (baseAmount * (Number(charge.amount) / 100));
+      }, 0);
+    } else {
+      // Fallback to legacy calculation
+      totalCharges = (baseAmount * (serviceChargeRate / 100)) + (baseAmount * (vatRate / 100));
+    }
+    
+    return baseAmount + totalCharges;
+  }, [subtotal, deliveryFee, serviceCharges, serviceChargeRate, vatRate]);
+
+  const handleOrderTypeChange = (type: "pickup" | "delivery") => {
+    setOrderType(type);
+    localStorage.setItem("orderType", type);
+  };
+
   const handleCheckout = () => {
+    // Check if kitchen is closed
+    if (!kitchenStatus.isOpen) {
+      toast({
+        title: "Kitchen is Closed",
+        description: "The kitchen is currently closed. Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if delivery is selected but no location is set
+    if (orderType === "delivery" && !locationData) {
+      toast({
+        title: "Delivery Location Required",
+        description: "Please enter or detect your delivery location to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if user is logged in or has guest session
+    const guestSession = getGuestSession();
+    if (!user && !guestSession) {
+      // Show guest data capture modal first
+      setShowGuestDataModal(true);
+      return;
+    }
+
     // Store location info in localStorage if available
     if (locationData) {
       localStorage.setItem("location", JSON.stringify(locationData));
     }
+    // Store orderType
+    localStorage.setItem("orderType", orderType);
 
-    setLocation("/checkout");
+    // Open confirmation modal
+    setShowConfirmModal(true);
+  };
+
+  // Handle guest data submission
+  const handleGuestDataSubmit = async () => {
+    if (!guestName.trim() || !guestPhone.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide your name and phone number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingGuestSession(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/guest/session", {
+        guestName: guestName.trim(),
+        guestPhone: guestPhone.trim(),
+        guestEmail: guestEmail.trim() || undefined,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create guest session");
+      }
+
+      const data = await response.json();
+
+      // Save guest session
+      saveGuestSession({
+        guestId: data.guestId,
+        guestName: data.guestName,
+        guestPhone: data.guestPhone,
+        guestEmail: data.guestEmail,
+        createdAt: new Date().toISOString(),
+        expiresAt: data.expiresAt,
+      });
+
+      // Close guest data modal and open confirmation modal
+      setShowGuestDataModal(false);
+      setShowConfirmModal(true);
+
+      toast({
+        title: "Guest Session Created",
+        description: "You can now proceed with your order.",
+      });
+    } catch (error: any) {
+      console.error("Error creating guest session:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create guest session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingGuestSession(false);
+    }
+  };
+
+  // Handle Interswitch payment directly from cart
+  const handleConfirmOrder = async () => {
+    if (isProcessingPayment) return;
+
+    // Validate that we have customer data
+    const guestSession = getGuestSession();
+    if (!user && !guestSession) {
+      toast({
+        title: "Guest Information Required",
+        description: "Please provide your information to continue.",
+        variant: "destructive",
+      });
+      setShowConfirmModal(false);
+      setShowGuestDataModal(true);
+      return;
+    }
+
+    const customerName = user?.username || guestSession?.guestName;
+    const customerPhone = user?.phone || guestSession?.guestPhone;
+
+    if (!customerName || !customerPhone) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide your name and phone number.",
+        variant: "destructive",
+      });
+      setShowConfirmModal(false);
+      setShowGuestDataModal(true);
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    try {
+      toast({
+        title: "Creating Order",
+        description: "Please wait...",
+      });
+
+      const txnRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const orderData = {
+        customerName,
+        customerPhone,
+        orderType: "online",
+        paymentMethod: "online",
+        paymentStatus: "pending",
+        transactionRef: txnRef,
+        ...(locationData &&
+          orderType === "delivery" && {
+            location: {
+              latitude: locationData.latitude,
+              longitude: locationData.longitude,
+              address: locationData.address,
+            },
+            deliveryFee: deliveryFee,
+          }),
+        ...(guestSession && {
+          guestId: guestSession.guestId,
+          guestName: guestSession.guestName,
+          guestPhone: guestSession.guestPhone,
+          guestEmail: guestSession.guestEmail,
+        }),
+        items: cart.map((item) => ({
+          menuItemId: item.menuItem.id,
+          quantity: item.quantity,
+          price: item.menuItem.price,
+          specialInstructions: item.specialInstructions,
+        })),
+      };
+
+      const response = await apiRequest("POST", "/api/orders", orderData);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+
+      const createdOrder = await response.json();
+
+      if (!createdOrder || !createdOrder.id) {
+        throw new Error("Invalid order response - missing order ID");
+      }
+
+      setIsProcessingPayment(false);
+      setShowConfirmModal(false);
+
+      const amount = Math.round(calculateTotal * 100); // Amount in kobo
+
+      localStorage.setItem(
+        "pendingPaymentOrder",
+        JSON.stringify({
+          orderId: createdOrder.id,
+          orderNumber: createdOrder.orderNumber,
+          txnRef: txnRef,
+        })
+      );
+
+      // Check if Interswitch script is loaded
+      if (typeof (window as any).webpayCheckout === "undefined") {
+        toast({
+          title: "Payment System Unavailable",
+          description: "Redirecting to home page...",
+          variant: "destructive",
+        });
+        startTransition(() => {
+          setTimeout(() => {
+            setLocation("/");
+          }, 1500);
+        });
+        return;
+      }
+
+      // Interswitch Inline Checkout Configuration - LIVE MODE
+      const paymentConfig = {
+        merchant_code: "MX169500",
+        pay_item_id: "Default_Payable_MX169500",
+        txn_ref: txnRef,
+        amount: amount,
+        currency: 566, // NGN
+        site_redirect_url: window.location.origin + "/docket",
+        cust_id: createdOrder.id.toString(),
+        cust_name: orderData.customerName,
+        cust_email: guestSession?.guestEmail || user?.email || "customer@nibbleskitchen.com",
+        cust_phone: orderData.customerPhone || "",
+        merchant_name: "Nibbles Kitchen",
+        logo_url: window.location.origin + "/nibbles.jpg",
+        mode: "LIVE",
+        payment_channels: ["card", "bank"],
+        onComplete: async function (response: any) {
+          console.log("🔔 Payment completed:", response);
+          if (response.desc === "Approved by Financial Institution") {
+            // Clear cart and show success message immediately
+            clearCart();
+            toast({
+              title: "Payment Successful! 🎉",
+              description: `Order #${createdOrder.orderNumber} has been paid.`,
+            });
+            
+            // Navigate immediately to docket
+            startTransition(() => {
+              setLocation("/docket");
+            });
+
+            // Verify payment and call backend callback in the background (non-blocking)
+            try {
+              const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`;
+              const verifyResponse = await fetch(verifyUrl, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" },
+              });
+              const verifyData = await verifyResponse.json();
+
+              if (verifyData.ResponseCode === "00") {
+                const backendUrl =
+                  import.meta.env.VITE_BACKEND_URL ||
+                  "https://server.brainstorm.ng/nibbleskitchen";
+                let callbackSuccess = false;
+
+                for (let attempt = 1; attempt <= 3 && !callbackSuccess; attempt++) {
+                  try {
+                    const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        txnref: txnRef,
+                        resp: "00",
+                        amount: amount,
+                        orderId: createdOrder.id,
+                        interswitchResponse: verifyData,
+                      }),
+                    });
+                    const callbackData = await callbackRes.json();
+                    console.log("✅ Backend callback response:", callbackData);
+                    callbackSuccess = true;
+                  } catch (err) {
+                    console.error(`❌ Backend callback attempt ${attempt} failed:`, err);
+                    if (attempt < 3) await new Promise((r) => setTimeout(r, 1000));
+                  }
+                }
+              } else {
+                console.error("❌ Payment verification failed:", verifyData);
+              }
+            } catch (error) {
+              console.error("❌ Error verifying payment:", error);
+              // Don't show error to user since they're already redirected
+            }
+          } else {
+            // Payment was not approved by Interswitch
+            toast({
+              title: "Payment Failed",
+              description: response.desc || "Payment was not approved.",
+              variant: "destructive",
+            });
+          }
+        },
+        onClose: function () {
+          console.log("Payment modal closed by user");
+          toast({
+            title: "Payment Cancelled",
+            description: "Redirecting to home page...",
+          });
+          startTransition(() => {
+            setTimeout(() => {
+              setLocation("/");
+            }, 1000);
+          });
+        },
+        onError: function (error: any) {
+          console.error("Payment error:", error);
+          toast({
+            title: "Payment Error",
+            description: "An error occurred. Redirecting to home page...",
+            variant: "destructive",
+          });
+          startTransition(() => {
+            setTimeout(() => {
+              setLocation("/");
+            }, 2000);
+          });
+        },
+      };
+
+      (window as any).webpayCheckout(paymentConfig);
+    } catch (error: any) {
+      console.error("Order creation error:", error);
+      toast({
+        title: "Order Failed",
+        description: error?.message || "Unable to create order. Please try again.",
+        variant: "destructive",
+      });
+      setIsProcessingPayment(false);
+    }
   };
 
   return (
@@ -708,6 +1149,23 @@ export default function CustomerMenu() {
               </Card>
             ))}
           </div>
+        ) : menuError ? (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-red-900 mb-2">Unable to Load Menu</h3>
+              <p className="text-sm text-red-700 mb-4">
+                There was a problem loading the menu. Please check your connection and try again.
+              </p>
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-100"
+              >
+                Refresh Page
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <>
             <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
@@ -865,27 +1323,285 @@ export default function CustomerMenu() {
             {/* Cart Footer */}
             {cart.length > 0 && (
               <div className="p-3 sm:p-5 border-t bg-muted/30 space-y-3 sm:space-y-4 sticky bottom-0 bg-background">
-                <div className="space-y-1.5 sm:space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm sm:text-lg font-semibold text-foreground">Subtotal</span>
-                    <span className="font-bold text-base sm:text-xl text-[#4EB5A4]" data-testid="text-subtotal">
+                {/* Delivery Method Selection */}
+                <div className="space-y-2">
+                  <p className="text-xs sm:text-sm font-semibold text-foreground">1. Delivery Method</p>
+                  <div className="flex gap-2 sm:gap-3">
+                    {(settings.deliveryEnabled ? ["pickup", "delivery"] : ["pickup"]).map((type) => {
+                      const isActive = orderType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          className={`flex-1 p-2 sm:p-3 rounded-lg border-2 text-center transition-all font-semibold focus:outline-none text-xs sm:text-sm ${
+                            isActive
+                              ? "border-[#4EB5A4] bg-[#4EB5A4]/10 text-foreground shadow-md"
+                              : "hover:border-accent/50 bg-muted/30 text-foreground hover:border-accent/70"
+                          }`}
+                          onClick={() => handleOrderTypeChange(type as "pickup" | "delivery")}
+                        >
+                          <div className="font-semibold capitalize">{type}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {type === "pickup" ? "At our location" : "To your location"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Delivery Location Input - Show when delivery is selected but no location set */}
+                {orderType === "delivery" && !locationData && (
+                  <Card className="border-orange-300 bg-orange-50/50 shadow-sm mt-4">
+                    <CardHeader className="bg-orange-100/50 border-b border-orange-200">
+                      <CardTitle className="flex items-center gap-2 text-lg text-orange-900">
+                        <MapPin className="w-5 h-5" />
+                        Enter Delivery Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                      <Alert className="border-orange-300 bg-orange-50">
+                        <MapPin className="h-4 w-4 text-orange-600" />
+                        <AlertDescription className="text-orange-900">
+                          Please enter your delivery location
+                        </AlertDescription>
+                      </Alert>
+
+                      {/* Error message */}
+                      {locationError && (
+                        <Alert variant="destructive" className="border-red-400 bg-red-50">
+                          <AlertDescription className="text-red-900 whitespace-pre-line">
+                            <strong className="block mb-2">{locationError.split('.')[0]}.</strong>
+                            {locationError.split('.').slice(1).join('.').trim()}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="space-y-3">
+                        {/* Manual address input */}
+                        <div>
+                          <label className="text-sm font-semibold mb-2 block text-foreground">
+                            Delivery Address
+                          </label>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Input
+                              placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
+                              value={tempAddress}
+                              onChange={(e) => setTempAddress(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && tempAddress.trim()) {
+                                  const newLocationData = {
+                                    address: tempAddress.trim(),
+                                    latitude: 0,
+                                    longitude: 0
+                                  };
+                                  setLocationData(newLocationData);
+                                  localStorage.setItem("location", JSON.stringify(newLocationData));
+                                  setLocationError(null);
+                                }
+                              }}
+                              className="flex-1 min-w-0 text-sm sm:text-base"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (tempAddress.trim()) {
+                                  const newLocationData = {
+                                    address: tempAddress.trim(),
+                                    latitude: 0,
+                                    longitude: 0
+                                  };
+                                  setLocationData(newLocationData);
+                                  localStorage.setItem("location", JSON.stringify(newLocationData));
+                                  setLocationError(null);
+                                  toast({
+                                    title: "Address Set",
+                                    description: "Delivery address has been set successfully.",
+                                  });
+                                }
+                              }}
+                              disabled={!tempAddress.trim() || isCalculatingDelivery}
+                              className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90 text-sm sm:text-base whitespace-nowrap"
+                            >
+                              {isCalculatingDelivery ? "Calculating..." : "Set Address"}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            💡 Tip: Include landmarks for easier delivery (e.g., "Near Central Mosque, Kano")
+                          </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-orange-200" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-orange-50 px-2 text-orange-600">Or use auto-detect</span>
+                          </div>
+                        </div>
+
+                        {/* Auto-detect location button */}
+                        <div className="flex justify-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={checkLocation}
+                            disabled={locationLoading}
+                            className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                          >
+                            {locationLoading ? (
+                              <>
+                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                                Detecting Location...
+                              </>
+                            ) : (
+                              <>
+                                <MapPin className="w-4 h-4 mr-2" />
+                                Auto-Detect My Location
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Location Display - Show when location is set */}
+                {orderType === "delivery" && locationData && (
+                  <Card className="border-accent/30 bg-accent/5 shadow-sm mt-4">
+                    <CardHeader className="bg-accent/10 border-b border-accent/20">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <MapPin className="w-5 h-5" />
+                        Delivery Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start gap-2 sm:gap-4 p-3 sm:p-4 bg-background/50 rounded-lg border border-accent/20">
+                        <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm sm:text-base text-foreground break-words">{locationData.address}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">
+                            {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setTempAddress(locationData.address);
+                            setLocationData(null);
+                            localStorage.removeItem("location");
+                          }}
+                          className="flex-shrink-0 text-xs sm:text-sm"
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                      {isCalculatingDelivery && (
+                        <Alert className="border-blue-300 bg-blue-50 mt-4">
+                          <AlertDescription className="text-blue-900">
+                            Calculating delivery fee...
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Charges Breakdown */}
+                <div className="space-y-1.5 sm:space-y-2 pt-2 border-t">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-semibold text-foreground">
                       ₦{subtotal.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Delivery fee and charges calculated at checkout
-                  </p>
+                  
+                  {orderType === "delivery" && (
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <span className="text-muted-foreground">Delivery Fee</span>
+                      <span className="font-semibold text-foreground">
+                        {isCalculatingDelivery ? (
+                          <span className="text-xs">Calculating...</span>
+                        ) : (
+                          `₦${deliveryFee.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Service Charges */}
+                  {serviceCharges.length > 0 ? (
+                    serviceCharges.map((charge) => (
+                      <div key={charge.id} className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">
+                          {charge.description} ({charge.amount}%)
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          ₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      {serviceChargeRate > 0 && (
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <span className="text-muted-foreground">
+                            Service charge ({serviceChargeRate}%)
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            ₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {vatRate > 0 && (
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <span className="text-muted-foreground">VAT ({vatRate}%)</span>
+                          <span className="font-semibold text-foreground">
+                            ₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-sm sm:text-lg font-bold text-foreground">Total</span>
+                    <span className="font-bold text-base sm:text-xl text-[#4EB5A4]" data-testid="text-total">
+                      ₦{calculateTotal.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
                 </div>
+
                 <Button
                   size="lg"
                   className="w-full h-11 sm:h-14 text-sm sm:text-lg font-semibold bg-gradient-to-r from-[#4EB5A4] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all"
                   onClick={handleCheckout}
+                  disabled={isCalculatingDelivery}
                   data-testid="button-checkout"
                 >
-                  Proceed to Checkout
+                  {isCalculatingDelivery ? "Calculating..." : "Proceed to Checkout"}
                 </Button>
               </div>
             )}
@@ -910,7 +1626,7 @@ export default function CustomerMenu() {
                       alt={item.menuItem.name || 'Menu item'}
                       width={400}
                       height={160}
-                      aspectRatio="5/2"
+                      aspectRatio="auto"
                       priority={false}
                       className="w-full h-full object-cover"
                     />
@@ -1056,6 +1772,205 @@ export default function CustomerMenu() {
           </div>
         </div>
       )} */}
+      {/* Guest Data Capture Modal */}
+      <Dialog open={showGuestDataModal} onOpenChange={setShowGuestDataModal}>
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Guest Information</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Please provide your details to complete your order
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Full Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Enter your full name"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                className="w-full"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Phone Number <span className="text-destructive">*</span>
+              </label>
+              <Input
+                type="tel"
+                placeholder="08012345678"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                className="w-full"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                We'll use this to send you order updates
+              </p>
+            </div>
+
+            {/* <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Email Address <span className="text-xs text-muted-foreground">(Optional)</span>
+              </label>
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                className="w-full"
+              />
+            </div> */}
+          </div>
+
+          <DialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowGuestDataModal(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGuestDataSubmit}
+              disabled={isCreatingGuestSession || !guestName.trim() || !guestPhone.trim()}
+              className="w-full sm:w-auto bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700"
+            >
+              {isCreatingGuestSession ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Creating Session...
+                </span>
+              ) : (
+                "Continue"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Confirmation Modal */}
+      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-base sm:text-lg break-words">
+              <Check className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-[#4EB5A4] flex-shrink-0" />
+              <span className="break-words">Confirm Your Order</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm break-words">
+              Please review your order details before proceeding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Order Summary */}
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
+              <h4 className="mb-2 font-medium text-sm sm:text-base">Order Summary</h4>
+              <div className="space-y-1 text-xs sm:text-sm">
+                <div className="flex justify-between gap-2">
+                  <span className="break-words min-w-0">Items ({cart.length})</span>
+                  <span className="whitespace-nowrap flex-shrink-0">₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                {orderType === "delivery" && deliveryFee > 0 && (
+                  <div className="flex justify-between gap-2">
+                    <span className="break-words min-w-0">Delivery Fee</span>
+                    <span className="whitespace-nowrap flex-shrink-0">₦{deliveryFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {/* Service Charges */}
+                {serviceCharges.length > 0 ? (
+                  serviceCharges.map((charge) => (
+                    <div key={charge.id} className="flex justify-between gap-2">
+                      <span className="break-words min-w-0">{charge.description} ({charge.amount}%)</span>
+                      <span className="whitespace-nowrap flex-shrink-0">
+                        ₦{((subtotal + deliveryFee) * (Number(charge.amount) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    {serviceChargeRate > 0 && (
+                      <div className="flex justify-between gap-2">
+                        <span className="break-words min-w-0">Service charge ({serviceChargeRate}%)</span>
+                        <span className="whitespace-nowrap flex-shrink-0">
+                          ₦{((subtotal + deliveryFee) * (serviceChargeRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    {vatRate > 0 && (
+                      <div className="flex justify-between gap-2">
+                        <span className="break-words min-w-0">VAT ({vatRate}%)</span>
+                        <span className="whitespace-nowrap flex-shrink-0">
+                          ₦{((subtotal + deliveryFee) * (vatRate / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between border-t pt-2 font-semibold gap-2">
+                  <span className="break-words min-w-0">Total</span>
+                  <span className="whitespace-nowrap flex-shrink-0">₦{calculateTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Location Information */}
+            {orderType === "pickup" ? (
+              <div className="rounded-lg bg-orange-50 p-3 sm:p-4">
+                <h4 className="mb-2 font-medium flex items-center text-sm sm:text-base">
+                  <MapPin className="h-4 w-4 mr-2 text-orange-600 flex-shrink-0" />
+                  <span className="break-words">Pickup Location</span>
+                </h4>
+                <p className="text-xs sm:text-sm text-gray-700 break-words">Lafiya Road Nasarawa GRA, Kano</p>
+                <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Kitchen</p>
+              </div>
+            ) : locationData ? (
+              <div className="rounded-lg bg-green-50 p-3 sm:p-4">
+                <h4 className="mb-2 font-medium flex items-center text-sm sm:text-base">
+                  <MapPin className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
+                  <span className="break-words">Delivery Location</span>
+                </h4>
+                <p className="text-xs sm:text-sm text-gray-700 break-words">{locationData.address}</p>
+              </div>
+            ) : null}
+
+            {/* Payment Method Info */}
+            <div className="rounded-lg bg-blue-50 p-3 sm:p-4">
+              <h4 className="mb-2 font-medium text-sm sm:text-base break-words">Payment Method</h4>
+              <div className="flex items-center space-x-2 min-w-0">
+                <CreditCard className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                <span className="text-xs sm:text-sm break-words min-w-0">Card/Transfer</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col space-y-2">
+            <div className="w-full">
+              <Button
+                className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700 text-sm sm:text-base"
+                onClick={handleConfirmOrder}
+                disabled={isProcessingPayment}
+              >
+                {isProcessingPayment ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </span>
+                ) : (
+                  <>
+                    Confirm Order
+                    <Check className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </main>
     </>
   );

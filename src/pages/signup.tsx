@@ -30,11 +30,12 @@ export default function Signup() {
     setLoading(true)
     setError("")
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      setLoading(false)
-      return
-    }
+    // Password confirmation check removed since confirm password field is commented out
+    // if (password !== confirmPassword) {
+    //   setError("Passwords do not match")
+    //   setLoading(false)
+    //   return
+    // }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters")
@@ -45,7 +46,7 @@ export default function Signup() {
     try {
       const response = await apiRequest("POST", "/api/auth/register", {
         username,
-        email,
+        // email,
         phoneNumber,
         password,
       })
@@ -67,7 +68,49 @@ export default function Signup() {
           setLocation("/")
       }
     } catch (err: any) {
-      setError(err.message || "Signup failed")
+      // CRITICAL FIX: Better error message parsing and user-friendly messages
+      let errorMessage = "Unable to create account. Please try again.";
+      
+      try {
+        // Error format is usually "400: {error: 'message'}" or "Load failed"
+        if (err.message && err.message.includes("Load failed")) {
+          errorMessage = "Connection error. Please check your internet connection and try again.";
+        } else {
+          const errorMatch = err.message.match(/\d+:\s*({.*})/);
+          if (errorMatch && errorMatch[1]) {
+            const errorData = JSON.parse(errorMatch[1]);
+            const backendError = errorData.error || errorData.message;
+            
+            // Map common backend errors to user-friendly messages
+            if (backendError) {
+              if (backendError.includes("phone number already exists")) {
+                errorMessage = "An account with this phone number already exists. Please use a different number or try logging in.";
+              } else if (backendError.includes("Phone number is required")) {
+                errorMessage = "Please enter your phone number.";
+              } else if (backendError.includes("Name and password are required")) {
+                errorMessage = "Please fill in all required fields.";
+              } else {
+                errorMessage = backendError;
+              }
+            } else {
+              errorMessage = err.message || "Unable to create account. Please try again.";
+            }
+          } else if (err.message) {
+            // Check for network errors
+            if (err.message.includes("fetch") || err.message.includes("network") || err.message.includes("Failed to fetch")) {
+              errorMessage = "Network error. Please check your internet connection and try again.";
+            } else {
+              errorMessage = err.message;
+            }
+          }
+        }
+      } catch (parseError) {
+        // If parsing fails, provide a generic but helpful message
+        console.error("Error parsing signup error:", parseError, err);
+        errorMessage = "Unable to create account. Please check your connection and try again.";
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false)
     }
@@ -85,7 +128,7 @@ export default function Signup() {
           </div>
           <CardTitle className="text-3xl font-bold text-slate-900 sr-only">Nibbles</CardTitle>
           <CardDescription className="text-base text-slate-600 mt-2">
-            Join Nibbles and start managing your orders
+            Kindly join to become a Nibbles Family!
           </CardDescription>
         </CardHeader>
 
@@ -100,12 +143,12 @@ export default function Signup() {
 
             <div className="space-y-2">
               <Label htmlFor="username" className="text-sm font-semibold text-slate-700">
-                Username
+                Name
               </Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="johndoe"
+                // placeholder="johndoe"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -113,7 +156,7 @@ export default function Signup() {
               />
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
                 Email Address
               </Label>
@@ -126,7 +169,7 @@ export default function Signup() {
                 required
                 className="h-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
               />
-            </div>
+            </div> */}
 
             <div className="space-y-2">
               <Label htmlFor="phoneNumber" className="text-sm font-semibold text-slate-700">
@@ -135,7 +178,7 @@ export default function Signup() {
               <Input
                 id="phoneNumber"
                 type="tel"
-                placeholder="Enter your phone number"
+                // placeholder="Enter your phone number"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required
@@ -150,24 +193,16 @@ export default function Signup() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-11 pr-11 border-slate-200 focus:border-teal-500 focus:ring-teal-500 transition-colors"
                 />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="confirm-password" className="text-sm font-semibold text-slate-700">
                 Confirm Password
               </Label>
@@ -189,7 +224,7 @@ export default function Signup() {
                   {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </div>
+            </div> */}
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4 pt-2">
