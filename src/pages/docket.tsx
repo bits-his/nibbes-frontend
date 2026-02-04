@@ -42,10 +42,15 @@ export default function DocketPage() {
     // Remove all polling options since we're using WebSockets for real-time updates
   });
 
-  // Filter orders to only show paid orders
+  // Filter orders appropriately based on user type
   const activeOrders = orders?.filter(order => {
-    // Only show orders with paymentStatus === 'paid'
-    return order.paymentStatus === 'paid';
+    // For authenticated users: only show paid orders (prevents showing pending payment orders)
+    if (user) {
+      return order.paymentStatus === 'paid';
+    }
+    // For guest users: show all orders (including pending payment)
+    // Guests need to see their order immediately after placing it
+    return true;
   });
 
   // Request notification and audio permission on mount
@@ -167,10 +172,8 @@ export default function DocketPage() {
               (old: { orders: OrderWithItems[] } = { orders: [] }) => {
                 const normalizedOrder = normalizeOrder(data.order);
                 
-                // Filter to only show paid orders
-                if (normalizedOrder.paymentStatus !== 'paid') {
-                  return { orders: old.orders.filter(o => o.id !== normalizedOrder.id) };
-                }
+                // For guests: show ALL orders (including pending payment)
+                // Don't filter by payment status
                 
                 if (data.type === "new_order") {
                   const exists = old.orders.some(o => o.id === normalizedOrder.id);
@@ -191,7 +194,8 @@ export default function DocketPage() {
                         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                       )
                     };
-                  } else if (normalizedOrder.paymentStatus === 'paid') {
+                  } else {
+                    // Add new order regardless of payment status
                     return {
                       orders: [normalizedOrder, ...old.orders].sort((a, b) =>
                         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -475,8 +479,13 @@ const getStatusCardColor = (status: string) => {
                     {getStatusBadge(order.status)}
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <Badge variant="outline">{order.orderType}</Badge>
+                    {order.paymentStatus === 'pending' && !user && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                        Payment Pending
+                      </Badge>
+                    )}
                     <span className="font-medium">{order.customerName}</span>
                   </div>
                 </CardHeader>
