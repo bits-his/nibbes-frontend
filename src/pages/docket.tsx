@@ -134,8 +134,13 @@ export default function DocketPage() {
 
   // Filter orders to only show paid orders
   const activeOrders = orders?.filter(order => {
-    // Only show orders with paymentStatus === 'paid'
-    return order.paymentStatus === 'paid';
+    // For authenticated users: only show paid orders (prevents showing pending payment orders)
+    if (user) {
+      return order.paymentStatus === 'paid';
+    }
+    // For guest users: show all orders (including pending payment)
+    // Guests need to see their order immediately after placing it
+    return true;
   });
 
   // Request notification and audio permission on mount
@@ -726,8 +731,13 @@ const getStatusCardColor = (status: string) => {
                     {getStatusBadge(order.status)}
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <Badge variant="outline">{order.orderType}</Badge>
+                    {order.paymentStatus === 'pending' && !user && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                        Payment Pending
+                      </Badge>
+                    )}
                     <span className="font-medium">{order.customerName}</span>
                   </div>
                 </CardHeader>
