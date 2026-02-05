@@ -728,7 +728,7 @@ export default function CustomerMenu() {
         customerName,
         customerPhone,
         orderType: "online",
-        paymentMethod: "online",
+        paymentMethod: "transfer",
         paymentStatus: "pending",
         transactionRef: txnRef,
         ...(locationData &&
@@ -1788,7 +1788,7 @@ export default function CustomerMenu() {
                 Full Name <span className="text-destructive">*</span>
               </label>
               <Input
-                placeholder="Enter your full name"
+                // placeholder=""
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
                 className="w-full"
@@ -1802,7 +1802,7 @@ export default function CustomerMenu() {
               </label>
               <Input
                 type="tel"
-                placeholder="08012345678"
+                // placeholder=""
                 value={guestPhone}
                 onChange={(e) => setGuestPhone(e.target.value)}
                 className="w-full"
