@@ -62,7 +62,7 @@ export default function MenuManagement() {
   const [selectedFormCategory, setSelectedFormCategory] = useState<string>("");
   const [previewItemCode, setPreviewItemCode] = useState<string>("");
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
-  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [editingPriceValue, setEditingPriceValue] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   
