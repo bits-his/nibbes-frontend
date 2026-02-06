@@ -2,13 +2,49 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Settings as SettingsIcon } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useLocation } from 'wouter';
+import { Truck, Settings as SettingsIcon, ShieldAlert } from 'lucide-react';
 
 export default function Settings() {
   const { settings, updateSettings, loading } = useSettings();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  // Check if user has settings permission
+  const userPermissions = user?.permissions || [];
+  const hasSettingsPermission = userPermissions.includes('settings');
+
+  // If user doesn't have permission, show access denied
+  if (!hasSettingsPermission) {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <ShieldAlert className="w-16 h-16 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl">Access Denied</CardTitle>
+            <CardDescription>
+              You don't have permission to access System Settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground text-center">
+              This page is restricted to administrators only. Please contact your system administrator if you need access to settings.
+            </p>
+            <Button onClick={() => setLocation('/')} className="w-full">
+              Go to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleDeliveryToggle = async (enabled: boolean) => {
     try {
