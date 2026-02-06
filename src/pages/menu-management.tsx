@@ -813,8 +813,10 @@ export default function MenuManagement() {
                                 variant="outline"
                                 className="h-8"
                                 onClick={() => {
-                                  setEditingPriceId(item.id);
-                                  setEditingPriceValue(item.price);
+                                  if (item.id !== undefined) {
+                                    setEditingPriceId(item.id);
+                                    setEditingPriceValue(item.price);
+                                  }
                                 }}
                                 title="Edit Price"
                               >
