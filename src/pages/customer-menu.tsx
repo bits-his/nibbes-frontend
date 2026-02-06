@@ -1180,8 +1180,13 @@ export default function CustomerMenu() {
                   ? item.stockBalance <= 0  // Stock tracked: SOLD OUT if balance <= 0
                   : !item.available;        // Stock not tracked: use manual available setting
                 
-                const canAddMore = item.stockBalance === null || item.stockBalance === undefined || 
-                                   (cartItem ? cartItem.quantity < item.stockBalance : true);
+                const isUnavailable = !item.available;
+                
+                const canAddMore = !isUnavailable && (
+                  item.stockBalance === null || 
+                  item.stockBalance === undefined || 
+                  (cartItem ? cartItem.quantity < item.stockBalance : true)
+                );
                 
                 return (
                   <MenuItemCard

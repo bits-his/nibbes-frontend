@@ -24,11 +24,10 @@ export const insertMenuItemSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   imageUrl: z.string().optional(),
   available: z.boolean().default(true),
-  quantity: z.number().optional(),
   menuId: z.string().optional(), // Auto-generated, optional on insert
 });
 
-// Form schema excludes menuId to prevent accidental overwrites during editing
+// Form schema excludes menuId and quantity
 export const menuItemFormSchema = insertMenuItemSchema.omit({ menuId: true });
 
 export type MenuItem = z.infer<typeof menuItemSchema>;

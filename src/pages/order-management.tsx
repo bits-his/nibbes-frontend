@@ -643,11 +643,16 @@ const getStatusBadge = (status: string) => {
                     <div key={item.id} className="flex justify-between p-3 bg-muted rounded-lg">
                       <div>
                         <div className="font-medium">
-                          {item.quantity}x {item.menuItem.name}
+                          {item.quantity}x {item.menuItem?.name || 'Deleted Item'}
                         </div>
                         {item.specialInstructions && (
                           <div className="text-sm text-muted-foreground italic">
                             {item.specialInstructions}
+                          </div>
+                        )}
+                        {!item.menuItem && (
+                          <div className="text-xs text-red-600 mt-1">
+                            ⚠️ This item has been removed from the menu
                           </div>
                         )}
                       </div>

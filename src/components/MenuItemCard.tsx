@@ -30,6 +30,9 @@ export const MenuItemCard = memo<MenuItemCardProps>(
     onAddToCart,
     onUpdateQuantity,
   }) => {
+    // Check if item is manually unavailable
+    const isUnavailable = !item.available;
+    
     return (
       <Card
         className={`overflow-hidden hover-elevate transition-all ${
@@ -49,6 +52,7 @@ export const MenuItemCard = memo<MenuItemCardProps>(
           
           {/* Low Stock Badge */}
           {!isOutOfStock &&
+            !isUnavailable &&
             item.stockBalance !== null &&
             item.stockBalance !== undefined &&
             item.stockBalance > 0 &&
@@ -59,7 +63,7 @@ export const MenuItemCard = memo<MenuItemCardProps>(
             )}
           
           {/* Cart Quantity Badge */}
-          {isInCart && !isOutOfStock && (
+          {isInCart && !isOutOfStock && !isUnavailable && (
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs font-semibold z-10">
               {cartQuantity}
             </div>
@@ -78,7 +82,8 @@ export const MenuItemCard = memo<MenuItemCardProps>(
           {item.stockBalance !== null &&
             item.stockBalance !== undefined &&
             item.stockBalance > 0 &&
-            item.stockBalance <= 5 && (
+            item.stockBalance <= 5 &&
+            !isUnavailable && (
               <div className="flex items-center gap-1 text-xs">
                 <span
                   className={`font-medium ${
@@ -113,7 +118,7 @@ export const MenuItemCard = memo<MenuItemCardProps>(
                   size="sm"
                   variant="ghost"
                   onClick={() => item.id && onUpdateQuantity(String(item.id), 1)}
-                  disabled={isOutOfStock || !canAddMore}
+                  disabled={isOutOfStock || isUnavailable || !canAddMore}
                   data-testid={`button-plus-${item.id}`}
                   className="h-5 sm:h-6 w-5 sm:w-6 p-0 text-xs"
                   title={!canAddMore ? `Maximum ${item.stockBalance} portions available` : ''}
@@ -125,12 +130,12 @@ export const MenuItemCard = memo<MenuItemCardProps>(
               <Button
                 size="sm"
                 onClick={() => onAddToCart(item)}
-                disabled={isOutOfStock}
+                disabled={isOutOfStock || isUnavailable}
                 data-testid={`button-add-${item.id}`}
                 className="text-xs px-2 py-1.5"
               >
                 <Plus className="w-2.5 h-2.5 mr-1" />
-                {!isOutOfStock ? 'Add' : 'SOLD OUT'}
+                {isUnavailable ? 'UNAVAILABLE' : !isOutOfStock ? 'Add' : 'SOLD OUT'}
               </Button>
             )}
           </div>
