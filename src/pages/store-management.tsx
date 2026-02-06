@@ -30,6 +30,19 @@ interface StoreItem {
   totalOut: number
 }
 
+interface MenuItem {
+  id: number
+  itemCode: string
+  name: string
+  description: string
+  price: string
+  category: string
+  imageUrl: string
+  available: boolean
+  stockBalance: number
+  unit?: string
+}
+
 interface Category {
   name: string
 }
@@ -39,81 +52,33 @@ interface WebSocketMessage {
   data: any;
 }
 
-const initialFormState = {
-  itemCode: "",
-  name: "",
-  description: "",
-  currentBalance: 0,
-  unit: "pcs",
-  costPrice: 0,
-  category: "",
-  imageUrl: "",
+const initialStockFormState = {
+  selectedItemId: "",
+  quantity: 0,
+  operationType: 'add' as 'add' | 'remove',
+  notes: "",
 }
 
-type FormState = typeof initialFormState
+type StockFormState = typeof initialStockFormState
 
 export default function StoreManagement() {
   const { user } = useAuth()
   const [items, setItems] = useState<StoreItem[]>([])
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingCategories, setLoadingCategories] = useState(false)
-  const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [selectedItemForEdit, setSelectedItemForEdit] = useState<StoreItem | null>(null)
-  const [selectedItemForDelete, setSelectedItemForDelete] = useState<StoreItem | null>(null)
-  const [showRestockDialog, setShowRestockDialog] = useState(false)
+  const [loadingMenuItems, setLoadingMenuItems] = useState(false)
+  const [showAddStockDialog, setShowAddStockDialog] = useState(false)
   const [selectedItemForRestock, setSelectedItemForRestock] = useState<StoreItem | null>(null)
-  const [restockQuantity, setRestockQuantity] = useState(0)
-  const [stockOperationType, setStockOperationType] = useState<'add' | 'remove'>('add')
-  const [formData, setFormData] = useState<FormState>(initialFormState)
-  const [nextItemCode, setNextItemCode] = useState("")
-  const [generatingCode, setGeneratingCode] = useState(false)
+  const [stockFormData, setStockFormData] = useState<StockFormState>(initialStockFormState)
   const [showTransactionsDialog, setShowTransactionsDialog] = useState(false)
   const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
-  const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState("")
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const wsRef = useRef<WebSocket | null>(null);
 
   // Check if user is kitchen staff (not admin)
   const isKitchenStaff = user?.role !== 'admin'
-
-  const fetchNextItemCode = useCallback(async () => {
-    try {
-      setGeneratingCode(true)
-      const response = await apiRequest("GET", "/api/store/items/next-code")
-      const data = await response.json()
-      const code = data.code ?? ""
-      setNextItemCode(code)
-      setFormData((prev) => ({ ...prev, itemCode: code }))
-    } catch (error) {
-      console.error("Error generating item code:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to generate item code",
-      })
-    } finally {
-      setGeneratingCode(false)
-    }
-  }, [toast])
-
-  const resetFormFields = useCallback(() => {
-    setFormData(initialFormState)
-    // Reset image states
-    setImageFile(null)
-    setImagePreviewUrl(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }, [])
 
   // Set up WebSocket to receive real-time updates for store items
   useEffect(() => {
@@ -169,41 +134,25 @@ export default function StoreManagement() {
 
   useEffect(() => {
     fetchItems()
-    fetchInventoryCategories()
+    fetchMenuItems()
   }, [])
 
-  const fetchInventoryCategories = async () => {
+  const fetchMenuItems = async () => {
     try {
-      setLoadingCategories(true)
-      // Fetch menu categories for Main Kitchen (store items)
-      const response = await apiRequest("GET", "/api/menu/categories")
+      setLoadingMenuItems(true)
+      const response = await apiRequest("GET", "/api/menu/all")
       const data = await response.json()
-      console.log('Main Kitchen - Fetched menu categories:', data)
-      
-      // Extract category names from the response data
-      if (Array.isArray(data)) {
-        setCategories(data)
-        console.log('Main Kitchen - Categories set:', data)
-      } else if (data.data && Array.isArray(data.data)) {
-        const categoryNames = data.data.map((cat: any) => cat.name || cat)
-        setCategories(categoryNames)
-        console.log('Main Kitchen - Categories set:', categoryNames)
-      } else {
-        console.error('Main Kitchen - Unexpected categories format:', data)
-        // Fallback to defaults
-        setCategories(["Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"])
-      }
+      setMenuItems(data)
+      console.log('Fetched menu items for stock management:', data.length)
     } catch (error) {
-      console.error("Error fetching menu categories:", error)
+      console.error("Error fetching menu items:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to fetch menu categories",
+        description: "Failed to fetch menu items",
       })
-      // Fallback to defaults
-      setCategories(["Main Course", "Appetizer", "Dessert", "Drinks", "Snacks"])
     } finally {
-      setLoadingCategories(false)
+      setLoadingMenuItems(false)
     }
   }
 
@@ -225,122 +174,76 @@ export default function StoreManagement() {
     }
   }
 
-  const onImageFileChange = async (file: File) => {
-    setImageFile(file)
-    setIsUploading(true)
-    
-    // Upload image to CDN via backend
-    try {
-      const uploadFormData = new FormData()
-      uploadFormData.append("file", file)
-
-      // Upload to CDN via backend endpoint
-      const BACKEND_URL =  'https://server.brainstorm.ng/nibbleskitchen' ; //|| import.meta.env.VITE_BACKEND_URL ;
-      const response = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
-        method: "POST",
-        headers: {
-          // Authorization header will be added by axios interceptor if using axios
-          // For fetch, you may need to add it manually
-          ...(localStorage.getItem('token') && {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }),
-        },
-        body: uploadFormData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || "Failed to upload image to CDN")
-      }
-
-      const result = await response.json()
-      const cdnUrl = result.url // Get the CDN URL from response
-      
-      // Update the form's imageUrl field
-      setFormData((prev) => ({ ...prev, imageUrl: cdnUrl }))
-      
-      // Create a preview URL for the selected image
-      setImagePreviewUrl(cdnUrl)
-      
-      toast({
-        title: "Success",
-        description: "Image uploaded to CDN successfully.",
-      })
-    } catch (error: any) {
-      console.error("Error uploading image to CDN:", error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to upload image to CDN. Please try again.",
-        variant: "destructive",
-      })
-      // Clear the imageUrl if upload failed
-      setFormData({ ...formData, imageUrl: "" })
-      setImageFile(null)
-      setImagePreviewUrl(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleStockSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Don't submit if still uploading
-    if (isUploading) {
+    
+    if (!stockFormData.selectedItemId) {
       toast({
-        title: "Please wait",
-        description: "Image is still uploading to Cloudinary...",
         variant: "destructive",
-      })
-      return
-    }
-
-    // Check if image is uploaded
-    if (!formData.imageUrl) {
-      toast({
         title: "Error",
-        description: "Please select and upload an image.",
-        variant: "destructive",
+        description: "Please select an item",
       })
       return
     }
-
+    
+    if (stockFormData.quantity <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a valid quantity",
+      })
+      return
+    }
+    
+    const selectedMenuItem = menuItems.find(item => item.id.toString() === stockFormData.selectedItemId)
+    if (!selectedMenuItem) return
+    
+    // Find the store item by itemCode
+    const storeItem = items.find(item => item.itemCode === selectedMenuItem.itemCode)
+    
+    if (!storeItem) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Store item not found",
+      })
+      return
+    }
+    
+    // Check if removing more than available
+    if (stockFormData.operationType === 'remove' && stockFormData.quantity > storeItem.currentBalance) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Cannot remove ${stockFormData.quantity}. Only ${storeItem.currentBalance} available.`,
+      })
+      return
+    }
+    
     try {
-      // Create MenuItem directly (like menu-management) instead of StoreItem
-      // The backend will automatically create the linked StoreItem
-      const menuItemData = {
-        name: formData.name,
-        description: formData.description || "",
-        price: formData.costPrice.toString(), // Convert costPrice to price string
-        category: formData.category,
-        imageUrl: formData.imageUrl,
-        available: true, // Default to available
-        quantity: formData.currentBalance > 0 ? formData.currentBalance : undefined, // Use currentBalance as quantity
-      }
-
-      await apiRequest("POST", "/api/menu", menuItemData)
+      // Use the stock movement endpoint
+      await apiRequest("POST", `/api/store/movements`, {
+        storeItemId: storeItem.id,
+        type: stockFormData.operationType === 'add' ? "IN" : "OUT",
+        quantity: stockFormData.quantity,
+        reference: stockFormData.operationType === 'add' ? "restock" : "stock removal",
+        notes: stockFormData.notes || `${stockFormData.operationType === 'add' ? 'Added' : 'Removed'} ${stockFormData.quantity} portions`,
+      })
+      
       toast({
         title: "Success",
-        description: "Menu item created successfully",
+        description: `${stockFormData.operationType === 'add' ? 'Added' : 'Removed'} ${stockFormData.quantity} portions ${stockFormData.operationType === 'add' ? 'to' : 'from'} ${selectedMenuItem.name}`,
       })
-      setShowAddDialog(false)
+      
+      setShowAddStockDialog(false)
+      setStockFormData(initialStockFormState)
       fetchItems()
-      resetFormFields()
-      // Reset image states
-      setImageFile(null)
-      setImagePreviewUrl(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
     } catch (error) {
-      console.error("Error creating item:", error)
+      console.error("Error updating stock:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create store item",
+        description: "Failed to update stock",
       })
     }
   }
@@ -362,133 +265,6 @@ export default function StoreManagement() {
   const criticalStockItems = items.filter((item) => item.currentBalance < 5)
   const totalValue = items.reduce((sum, item) => sum + item.currentBalance * item.costPrice, 0)
 
-  const handleRestockClick = (item: StoreItem) => {
-    setSelectedItemForRestock(item)
-    setRestockQuantity(0)
-    setStockOperationType('add')
-    setShowRestockDialog(true)
-  }
-
-  const handleRestockSubmit = async () => {
-    if (!selectedItemForRestock || restockQuantity <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Please enter a valid quantity to ${stockOperationType === 'add' ? 'add' : 'remove'}`,
-      })
-      return
-    }
-
-    // Check if removing more than available
-    if (stockOperationType === 'remove' && restockQuantity > selectedItemForRestock.currentBalance) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Cannot remove ${restockQuantity} ${selectedItemForRestock.unit}. Only ${selectedItemForRestock.currentBalance} ${selectedItemForRestock.unit} available.`,
-      })
-      return
-    }
-
-    try {
-      // Use the stock movement endpoint to properly log the stock change
-      await apiRequest("POST", `/api/store/movements`, {
-        storeItemId: selectedItemForRestock.id,
-        type: stockOperationType === 'add' ? "IN" : "OUT",
-        quantity: restockQuantity,
-        reference: stockOperationType === 'add' ? "restock" : "stock removal",
-        notes: `${stockOperationType === 'add' ? 'Restocked' : 'Removed'} ${restockQuantity} ${selectedItemForRestock.unit} of ${selectedItemForRestock.name}`,
-      })
-      
-      toast({
-        title: "Success",
-        description: `${stockOperationType === 'add' ? 'Added' : 'Removed'} ${restockQuantity} ${selectedItemForRestock.unit} ${stockOperationType === 'add' ? 'to' : 'from'} ${selectedItemForRestock.name}`,
-      })
-      setShowRestockDialog(false)
-      setSelectedItemForRestock(null)
-      setRestockQuantity(0)
-      setStockOperationType('add')
-      fetchItems()
-    } catch (error) {
-      console.error("Error updating stock:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to ${stockOperationType === 'add' ? 'add' : 'remove'} stock`,
-      })
-    }
-  }
-
-  const handleEditClick = (item: StoreItem) => {
-    setSelectedItemForEdit(item)
-    setFormData({
-      itemCode: item.itemCode,
-      name: item.name,
-      description: item.description,
-      currentBalance: item.currentBalance,
-      unit: item.unit,
-      costPrice: item.costPrice,
-      category: item.category,
-      imageUrl: item.imageUrl || "",
-    })
-    // Set image preview if item has image
-    setImagePreviewUrl(item.imageUrl || null)
-    setImageFile(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-    setShowEditDialog(true)
-  }
-
-  const handleEditSubmit = async () => {
-    if (!selectedItemForEdit) return
-
-    try {
-      await apiRequest("PUT", `/api/store/items/${selectedItemForEdit.id}`, formData)
-      toast({
-        title: "Success",
-        description: "Item updated successfully",
-      })
-      setShowEditDialog(false)
-      setSelectedItemForEdit(null)
-      resetFormFields()
-      fetchItems()
-    } catch (error) {
-      console.error("Error updating item:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update item",
-      })
-    }
-  }
-
-  const handleDeleteClick = (item: StoreItem) => {
-    setSelectedItemForDelete(item)
-    setShowDeleteDialog(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!selectedItemForDelete) return
-
-    try {
-      await apiRequest("DELETE", `/api/store/items/${selectedItemForDelete.id}`)
-      toast({
-        title: "Success",
-        description: "Item deleted successfully",
-      })
-      setShowDeleteDialog(false)
-      setSelectedItemForDelete(null)
-      fetchItems()
-    } catch (error) {
-      console.error("Error deleting item:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete item",
-      })
-    }
-  }
-
   const handleViewItemTransactions = async (item: StoreItem) => {
     try {
       setTransactionsLoading(true);
@@ -509,40 +285,6 @@ export default function StoreManagement() {
     } finally {
       setTransactionsLoading(false);
     }
-  }
-
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please enter a category name",
-      });
-      return;
-    }
-
-    try {
-      // Post to menu categories endpoint for Main Kitchen
-      await apiRequest("POST", "/api/menu/categories", {
-        name: newCategoryName.trim(),
-      });
-
-      toast({
-        title: "Success",
-        description: "Category created successfully",
-      });
-
-      setShowAddCategoryDialog(false);
-      setNewCategoryName("");
-      fetchInventoryCategories(); // Refresh the categories list
-    } catch (error) {
-      console.error("Error creating category:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to create category",
-      });
-    }
   };
 
   return (
@@ -558,145 +300,159 @@ export default function StoreManagement() {
             </div>
             <p className="text-gray-600 mt-2">Manage inventory and optimize stock movements</p>
           </div>
-          <Dialog open={showAddDialog} onOpenChange={(open) => {
-            setShowAddDialog(open)
+          <Dialog open={showAddStockDialog} onOpenChange={(open) => {
+            setShowAddStockDialog(open)
             if (!open) {
-              resetFormFields()
+              setStockFormData(initialStockFormState)
             }
           }}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all">
                 <Plus className="w-5 h-5 mr-2" />
-                Add Item
+                Add/Remove Stock
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl bg-white border-slate-200">
               <DialogHeader>
-                <DialogTitle className="text-xl text-gray-900">Add New Item</DialogTitle>
+                <DialogTitle className="text-xl text-gray-900">Add or Remove Stock</DialogTitle>
+                <DialogDescription className="text-gray-600">
+                  Select an existing menu item and adjust its stock quantity
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleStockSubmit} className="space-y-5">
+                {/* Select Menu Item */}
                 <div>
-                  <Label className="text-gray-700 font-semibold">Item Name *</Label>
+                  <Label className="text-gray-700 font-semibold">Select Item *</Label>
+                  {loadingMenuItems ? (
+                    <Input
+                      value="Loading items..."
+                      disabled
+                      className="bg-gray-100 border-slate-300 text-gray-500 mt-1"
+                    />
+                  ) : (
+                    <select
+                      value={stockFormData.selectedItemId}
+                      onChange={(e) => setStockFormData({ ...stockFormData, selectedItemId: e.target.value })}
+                      required
+                      className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+                    >
+                      <option value="">Select a menu item</option>
+                      {menuItems.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} ({item.itemCode}) - Current: {item.stockBalance || 0} portions
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                
+                {/* Selected Item Info Display */}
+                {stockFormData.selectedItemId && (() => {
+                  const selectedMenuItem = menuItems.find(item => item.id.toString() === stockFormData.selectedItemId);
+                  const storeItem = items.find(item => item.itemCode === selectedMenuItem?.itemCode);
+                  return storeItem ? (
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <h3 className="font-semibold text-gray-900 text-lg">{storeItem.name}</h3>
+                      {storeItem.description && (
+                        <p className="text-sm text-gray-600 mt-1">{storeItem.description}</p>
+                      )}
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Current Stock:</span>
+                        <span className="font-semibold text-gray-900">
+                          {storeItem.currentBalance} {storeItem.unit}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+                
+                {/* Operation Type Tabs */}
+                <div>
+                  <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setStockFormData({ ...stockFormData, operationType: 'add' })}
+                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                        stockFormData.operationType === 'add'
+                          ? 'bg-white text-green-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Add Stock
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStockFormData({ ...stockFormData, operationType: 'remove' })}
+                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                        stockFormData.operationType === 'remove'
+                          ? 'bg-white text-red-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Remove Stock
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Quantity */}
+                <div>
+                  <Label className="text-gray-700 font-semibold">Quantity *</Label>
                   <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Jollof Rice"
+                    type="number"
+                    min="1"
+                    value={stockFormData.quantity || ""}
+                    onChange={(e) => setStockFormData({ ...stockFormData, quantity: parseInt(e.target.value) || 0 })}
+                    placeholder="Enter quantity"
                     required
                     className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
                   />
                 </div>
-                <div>
-                  <Label className="text-gray-700 font-semibold">Description</Label>
-                  <Input
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe the dish..."
-                    className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-gray-700 font-semibold">Price (₦) *</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.costPrice}
-                      onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })}
-                      placeholder="0.00"
-                      required
-                      className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-gray-700 font-semibold">Initial Quantity</Label>
-                    <Input
-                      type="number"
-                      step="1"
-                      value={formData.currentBalance}
-                      onChange={(e) =>
-                        setFormData({ ...formData, currentBalance: Number.parseInt(e.target.value) || 0 })
-                      }
-                      placeholder="20"
-                      className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-gray-700 font-semibold">Category *</Label>
-                    {loadingCategories ? (
-                      <Input
-                        value="Loading categories..."
-                        disabled
-                        className="bg-gray-100 border-slate-300 text-gray-500 mt-1"
-                      />
-                    ) : (
-                      <select
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        required
-                        className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
-                      >
-                        <option value="">Select a category</option>
-                        {categories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-gray-700 font-semibold">Upload Image</Label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    ref={fileInputRef}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        onImageFileChange(file)
-                      }
-                    }}
-                    disabled={isUploading}
-                    className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-                  />
-                  {isUploading && (
-                    <p className="text-xs text-gray-500 mt-1">Uploading image...</p>
-                  )}
-                  {(imagePreviewUrl || formData.imageUrl) && (
-                    <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-slate-200">
-                      <img
-                        src={imagePreviewUrl || formData.imageUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
+                
+                {/* New Stock Level Preview */}
+                {stockFormData.quantity > 0 && stockFormData.selectedItemId && (() => {
+                  const selectedMenuItem = menuItems.find(item => item.id.toString() === stockFormData.selectedItemId);
+                  const storeItem = items.find(item => item.itemCode === selectedMenuItem?.itemCode);
+                  if (!storeItem) return null;
+                  
+                  const newBalance = stockFormData.operationType === 'add'
+                    ? storeItem.currentBalance + stockFormData.quantity
+                    : storeItem.currentBalance - stockFormData.quantity;
+                  
+                  return (
+                    <div className={`p-4 rounded-lg border ${
+                      stockFormData.operationType === 'add'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">New Stock Level:</span>
+                        <span className={`font-bold ${
+                          stockFormData.operationType === 'add' ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {newBalance} {storeItem.unit}
+                        </span>
+                      </div>
                     </div>
-                  )}
+                  );
+                })()}
+                
+                {/* Notes */}
+                <div>
+                  <Label className="text-gray-700 font-semibold">Notes (Optional)</Label>
+                  <Input
+                    value={stockFormData.notes}
+                    onChange={(e) => setStockFormData({ ...stockFormData, notes: e.target.value })}
+                    placeholder="Add any notes..."
+                    className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
+                  />
                 </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="text-base font-semibold text-gray-700">
-                      Available for Order
-                    </Label>
-                    <p className="text-sm text-gray-500">
-                      Customers can order this item
-                    </p>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={true}
-                      readOnly
-                      className="w-5 h-5 text-[#50BAA8] border-gray-300 rounded focus:ring-[#50BAA8]"
-                    />
-                  </div>
-                </div>
+                
+                {/* Submit Button */}
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold mt-6"
-                  disabled={isUploading}
                 >
-                  {isUploading ? "Uploading image..." : "Create Item"}
+                  {stockFormData.operationType === 'add' ? 'Add Stock' : 'Remove Stock'}
                 </Button>
               </form>
             </DialogContent>
@@ -814,7 +570,19 @@ export default function StoreManagement() {
                     return (
                       <TableRow
                         key={item.id}
-                        onClick={() => handleRestockClick(item)}
+                        onClick={() => {
+                          // Find the corresponding menu item
+                          const menuItem = menuItems.find(mi => mi.itemCode === item.itemCode);
+                          if (menuItem) {
+                            setStockFormData({
+                              selectedItemId: menuItem.id.toString(),
+                              quantity: 0,
+                              operationType: 'add',
+                              notes: '',
+                            });
+                            setShowAddStockDialog(true);
+                          }
+                        }}
                         className="border-slate-200 hover:bg-slate-100 cursor-pointer transition-colors"
                       >
                         <TableCell>
@@ -842,39 +610,17 @@ export default function StoreManagement() {
                           </TableCell>
                         )}
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {/* {!isKitchenStaff && (
-                              <>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditClick(item);
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800 hover:underline"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(item);
-                                  }}
-                                  className="text-red-600 hover:text-red-800 hover:underline"
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )} */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewItemTransactions(item);
-                              }}
-                              className="text-green-600 hover:text-green-800 hover:underline"
-                            >
-                              View
-                            </button>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewItemTransactions(item);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                          >
+                            View History
+                          </Button>
                         </TableCell>
                       </TableRow>
                     )
@@ -886,420 +632,73 @@ export default function StoreManagement() {
         </CardContent>
       </Card>
 
-      {/* Restock Dialog */}
-      <Dialog open={showRestockDialog} onOpenChange={setShowRestockDialog}>
-        <DialogContent className="max-w-md bg-white border-slate-200">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-gray-900">
-              {stockOperationType === 'add' ? 'Add Stock' : 'Remove Stock'}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedItemForRestock && (
-            <div className="space-y-4">
-              {/* Operation Type Tabs */}
-              <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
-                <button
-                  onClick={() => setStockOperationType('add')}
-                  className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                    stockOperationType === 'add'
-                      ? 'bg-white text-green-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Add Stock
-                </button>
-                <button
-                  onClick={() => setStockOperationType('remove')}
-                  className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                    stockOperationType === 'remove'
-                      ? 'bg-white text-red-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Remove Stock
-                </button>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-900 text-lg">{selectedItemForRestock.name}</h3>
-                {selectedItemForRestock.description && (
-                  <p className="text-sm text-gray-600 mt-1">{selectedItemForRestock.description}</p>
-                )}
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Current Stock:</span>
-                  <span className="font-semibold text-gray-900">
-                    {selectedItemForRestock.currentBalance} {selectedItemForRestock.unit}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <Label className="text-gray-700 font-semibold">
-                  Quantity to {stockOperationType === 'add' ? 'Add' : 'Remove'} *
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={restockQuantity}
-                  onChange={(e) => setRestockQuantity(Number.parseFloat(e.target.value) || 0)}
-                  placeholder={`Enter quantity to ${stockOperationType === 'add' ? 'add' : 'remove'}`}
-                  className="bg-white border-slate-300 text-gray-900 mt-1"
-                  autoFocus
-                />
-              </div>
-              {restockQuantity > 0 && (
-                <div className={`p-4 rounded-lg border ${
-                  stockOperationType === 'add'
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">New Stock Level:</span>
-                    <span className={`font-bold ${
-                      stockOperationType === 'add' ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {stockOperationType === 'add'
-                        ? selectedItemForRestock.currentBalance + restockQuantity
-                        : selectedItemForRestock.currentBalance - restockQuantity
-                      } {selectedItemForRestock.unit}
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowRestockDialog(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleRestockSubmit}
-                  className={`flex-1 font-semibold text-white ${
-                    stockOperationType === 'add'
-                      ? 'bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700'
-                      : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
-                  }`}
-                  disabled={restockQuantity <= 0}
-                >
-                  {stockOperationType === 'add' ? 'Add Stock' : 'Remove Stock'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-gray-900">Edit Item</DialogTitle>
-            <DialogDescription>
-              Update the details of this store item
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-700 font-semibold">Item Code</Label>
-                <Input
-                  value={formData.itemCode}
-                  disabled
-                  className="bg-gray-100"
-                />
-              </div>
-              <div>
-                <Label className="text-gray-700 font-semibold">Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Item name"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="text-gray-700 font-semibold">Description</Label>
-              <Input
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Item description"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="text-gray-700 font-semibold">Current Balance *</Label>
-                <Input
-                  type="number"
-                  value={formData.currentBalance}
-                  onChange={(e) => setFormData({ ...formData, currentBalance: Number.parseFloat(e.target.value) })}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label className="text-gray-700 font-semibold">Unit *</Label>
-                <Input
-                  value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  placeholder="pcs, kg, liters"
-                />
-              </div>
-              <div>
-                <Label className="text-gray-700 font-semibold">Cost Price *</Label>
-                <Input
-                  type="number"
-                  value={formData.costPrice}
-                  onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) })}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="text-gray-700 font-semibold">Category *</Label>
-              {loadingCategories ? (
-                <Input
-                  value="Loading categories..."
-                  disabled
-                  className="bg-gray-100"
-                />
-              ) : (
-                <div className="flex gap-2">
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">Select a category</option>
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setShowAddCategoryDialog(true);
-                    }}
-                  >
-                    Add
-                  </Button>
-                </div>
-              )}
-            </div>
-            <div>
-              <Label className="text-gray-700 font-semibold">Upload Image</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    onImageFileChange(file)
-                  }
-                }}
-                disabled={isUploading}
-                className="bg-white border-slate-300 text-gray-900 placeholder-gray-500 mt-1"
-              />
-              {isUploading && (
-                <p className="text-xs text-gray-500 mt-1">Uploading image...</p>
-              )}
-              {(imagePreviewUrl || formData.imageUrl) && (
-                <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-slate-200">
-                  <img
-                    src={imagePreviewUrl || formData.imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowEditDialog(false)
-                  setSelectedItemForEdit(null)
-                  resetFormFields()
-                }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleEditSubmit}
-                className="flex-1 bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold"
-              >
-                Update Item
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-gray-900">Delete Item</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this item? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedItemForDelete && (
-            <div className="space-y-4">
-              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                <p className="font-semibold text-gray-900 text-lg">{selectedItemForDelete.name}</p>
-                {selectedItemForDelete.description && (
-                  <p className="text-sm text-gray-600 mt-1">{selectedItemForDelete.description}</p>
-                )}
-                <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Current Stock:</span>
-                  <span className="font-semibold text-gray-900">
-                    {selectedItemForDelete.currentBalance} {selectedItemForDelete.unit}
-                  </span>
-                </div>
-              </div>
-              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ Warning: All transaction history for this item will be preserved, but the item will no longer be available for new transactions.
-                </p>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowDeleteDialog(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleDeleteConfirm}
-                  className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold"
-                >
-                  Delete Item
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Transactions Dialog */}
       <Dialog open={showTransactionsDialog} onOpenChange={setShowTransactionsDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Item Transactions</DialogTitle>
+            <DialogTitle>Item Transaction History</DialogTitle>
             <DialogDescription>
-              All transactions for the selected item
+              All stock movements and transactions for this item
             </DialogDescription>
           </DialogHeader>
 
           {transactionsLoading ? (
             <div className="flex flex-col items-center justify-center py-10">
               <Loader className="h-10 w-10 animate-spin text-[#50BAA8]" />
-              <p className="mt-3 text-sm text-gray-600">Loading transactions...</p>
+              <p className="mt-3 text-gray-600">Loading transactions...</p>
             </div>
           ) : selectedItemTransactions.length === 0 ? (
-            <div className="py-10 text-center text-gray-500">
-              No transactions found for this item
+            <div className="text-center py-10">
+              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">No transactions found for this item</p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-semibold border-b pb-2">
-                <div>Date</div>
-                <div>Type</div>
-                <div>Quantity</div>
-                <div>Status</div>
-              </div>
-
-              {selectedItemTransactions.map((transaction, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b pb-2 text-sm"
-                >
-                  <div className="text-gray-600">
-                    {new Date(transaction.date).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <Badge variant="outline" className="capitalize">
-                      {transaction.source} → {transaction.destination}
-                    </Badge>
-                  </div>
-                  <div>
-                    <span className={transaction.qtyIn > 0 ? "text-green-600" : "text-red-600"}>
-                      {transaction.qtyIn > 0 ? `+${transaction.qtyIn}` : `-${transaction.qtyOut}`}
-                      {transaction.unit && ` ${transaction.unit}`}
-                    </span>
-                  </div>
-                  <div>
-                    <Badge variant="outline">
-                      {transaction.referenceType}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Qty In</TableHead>
+                    <TableHead className="text-right">Qty Out</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Performed By</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedItemTransactions.map((transaction: any, index: number) => (
+                    <TableRow key={index}>
+                      <TableCell className="text-sm">
+                        {new Date(transaction.date).toLocaleDateString()}
+                        <div className="text-xs text-gray-500">
+                          {new Date(transaction.date).toLocaleTimeString()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={transaction.qtyIn > 0 ? "default" : "destructive"}>
+                          {transaction.qtyIn > 0 ? 'IN' : 'OUT'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-green-600 font-semibold">
+                        {transaction.qtyIn || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-red-600 font-semibold">
+                        {transaction.qtyOut || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm">{transaction.source || '-'}</TableCell>
+                      <TableCell className="text-sm">{transaction.destination || '-'}</TableCell>
+                      <TableCell className="text-sm">{transaction.performedBy || '-'}</TableCell>
+                      <TableCell className="text-sm">{transaction.notes || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Category Dialog */}
-      <Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-gray-900">Add New Category</DialogTitle>
-            <DialogDescription>
-              Create a new category for store inventory items
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-gray-700 font-semibold">Category Name *</Label>
-              <Input
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="Enter category name"
-                autoFocus
-                className="mt-1"
-              />
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowAddCategoryDialog(false);
-                  setNewCategoryName("");
-                }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleAddCategory}
-                className="flex-1 bg-gradient-to-r from-[#50BAA8] to-teal-600 hover:from-[#3da896] hover:to-teal-700 text-white font-semibold"
-              >
-                Add Category
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
-

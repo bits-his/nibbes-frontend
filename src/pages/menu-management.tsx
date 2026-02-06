@@ -4,6 +4,7 @@ import { Plus, Edit, Trash2 } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -39,6 +40,7 @@ import { z } from "zod";
 import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
+import { getWebSocketUrl } from "@/lib/websocket";
 
 type MenuFormValues = z.infer<typeof menuItemFormSchema>;
 
@@ -55,6 +57,11 @@ export default function MenuManagement() {
   const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedFormCategory, setSelectedFormCategory] = useState<string>("");
+  const [previewItemCode, setPreviewItemCode] = useState<string>("");
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [editingPriceValue, setEditingPriceValue] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Network status for adaptive loading
@@ -62,12 +69,13 @@ export default function MenuManagement() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+    const wsUrl = getWebSocketUrl();
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
       console.log("Menu Management WebSocket connected");
     };
+    
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -145,10 +153,9 @@ export default function MenuManagement() {
       name: "",
       description: "",
       price: "",
-      category: "Main Course",
+      category: "",
       imageUrl: "",
       available: true,
-      quantity: undefined,
     },
   });
 
@@ -254,31 +261,83 @@ export default function MenuManagement() {
     },
   });
 
+  // Generate preview of item code (without incrementing counter)
+  const generatePreviewItemCode = async (category: string) => {
+    if (!category || editingItem) return;
+    
+    try {
+      setIsGeneratingPreview(true);
+      // Call backend to get preview of next code (without incrementing)
+      const response = await apiRequest("POST", "/api/menu/preview-code", { category });
+      const data = await response.json();
+      const previewCode = data.code;
+      
+      setPreviewItemCode(previewCode);
+      console.log(`Preview item code: ${previewCode} for category: ${category}`);
+    } catch (error) {
+      console.error("Error generating preview code:", error);
+      // Fallback to simple format if API fails
+      const categoryUpper = category.toUpperCase().replace(/\s+/g, '_');
+      const prefix = categoryUpper.substring(0, 10);
+      const fallbackCode = `${prefix}-????`;
+      setPreviewItemCode(fallbackCode);
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
+
+  // Generate actual item code (increments counter)
+  const generateItemCodeForCategory = async (category: string): Promise<string> => {
+    try {
+      // Call backend to generate code based on category (this WILL increment)
+      const response = await apiRequest("POST", "/api/menu/generate-code", { category });
+      const data = await response.json();
+      const code = data.code;
+      
+      console.log(`Generated actual item code: ${code} for category: ${category}`);
+      return code;
+    } catch (error) {
+      console.error("Error generating item code:", error);
+      // Fallback to simple format if API fails
+      const categoryUpper = category.toUpperCase().replace(/\s+/g, '_');
+      const prefix = categoryUpper.substring(0, 10);
+      const fallbackCode = `${prefix}-0001`;
+      toast({
+        title: "Warning",
+        description: "Using fallback item code generation",
+        variant: "default",
+      });
+      return fallbackCode;
+    }
+  };
+
   const handleOpenDialog = (item?: MenuItem) => {
     if (item) {
       setEditingItem(item);
+      setSelectedFormCategory(item.category);
+      setPreviewItemCode(item.itemCode || "");
       form.reset({
         name: item.name,
         description: item.description,
         price: item.price,
         category: item.category,
-        imageUrl: item.imageUrl || "", // For existing items, we have an image URL
+        imageUrl: item.imageUrl || "",
         available: item.available,
-        quantity: undefined, // Don't set quantity when editing - it's read-only and tracked via store entries
       });
       // Reset image states when editing an existing item
       setImageFile(null);
       setImagePreviewUrl(item.imageUrl || null);
     } else {
       setEditingItem(null);
+      setSelectedFormCategory("");
+      setPreviewItemCode("");
       form.reset({
         name: "",
         description: "",
         price: "",
-        category: "Main Course",
-        imageUrl: "", // Empty string for new items
+        category: "",
+        imageUrl: "",
         available: true,
-        quantity: undefined,
       });
       // Reset image states for new item
       setImageFile(null);
@@ -295,6 +354,8 @@ export default function MenuManagement() {
     setEditingItem(null);
     setImageFile(null);
     setImagePreviewUrl(null);
+    setSelectedFormCategory("");
+    setPreviewItemCode("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -311,7 +372,7 @@ export default function MenuManagement() {
       formData.append("file", file);
 
       // Upload to CDN via backend endpoint
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen';
+      const BACKEND_URL =  'https://server.brainstorm.ng/nibbleskitchen';
       const response = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
         method: "POST",
         headers: {
@@ -384,25 +445,40 @@ export default function MenuManagement() {
       return;
     }
 
-    // Create or update menu item with the image URL from Cloudinary
+    // Validate category is selected for new items
+    if (!editingItem && !values.category) {
+      toast({
+        title: "Category Required",
+        description: "Please select a category for the menu item.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create or update menu item with the image URL from CDN
     let finalValues: any = {
       ...values,
       imageUrl: currentImageUrl, // Use the uploaded image URL
     };
     
-    // When editing, remove the quantity field as it's read-only and tracked via store entries
     if (editingItem && editingItem.id !== undefined) {
-      // Remove quantity from the update payload
-      delete finalValues.quantity;
-      console.log('Update values being sent (quantity excluded):', JSON.stringify(finalValues));
+      console.log('Update values being sent:', JSON.stringify(finalValues));
       updateMutation.mutate({ id: String(editingItem.id), data: finalValues });
     } else {
-      // When creating, ensure quantity is a valid number or undefined
-      if (finalValues.quantity === null || finalValues.quantity === '' || isNaN(finalValues.quantity)) {
-        finalValues.quantity = undefined;
+      // Generate item code NOW (only when actually creating the item)
+      try {
+        const itemCode = await generateItemCodeForCategory(values.category);
+        finalValues.itemCode = itemCode;
+        console.log('Create values being sent:', JSON.stringify(finalValues));
+        console.log('Generated item code:', itemCode);
+        createMutation.mutate(finalValues);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to generate item code. Please try again.",
+          variant: "destructive",
+        });
       }
-      console.log('Create values being sent:', JSON.stringify(finalValues));
-      createMutation.mutate(finalValues);
     }
   };
 
@@ -488,129 +564,272 @@ export default function MenuManagement() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="aspect-square bg-muted animate-pulse" />
-                <CardContent className="p-6">
-                  <div className="h-6 bg-muted rounded animate-pulse mb-2" />
-                  <div className="h-4 bg-muted rounded animate-pulse" />
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex justify-center py-12">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(visibleItems || []).map((item) => (
-              <Card
-                key={item.id}
-                className="overflow-hidden"
-                data-testid={`card-menu-item-${item.id}`}
-              >
-                <div className="aspect-square overflow-hidden relative">
-                  <ImageWithSkeleton
-                    src={item.imageUrl || ''}
-                    alt={item.name}
-                    containerClassName="w-full h-full"
-                  />
-                  {/* Show SOLD OUT badge if stockBalance is 0 */}
-                  {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 && (
-                    <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
-                      <Badge variant="default" className="text-base font-bold bg-primary text-white">
-                        SOLD OUT
-                      </Badge>
-                    </div>
-                  )}
-                  {/* Show Unavailable badge if item is manually set unavailable */}
-                  {!item.available && item.stockBalance !== 0 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                      <Badge variant="secondary" className="text-base">
-                        Unavailable
-                      </Badge>
-                    </div>
-                  )}
+            <Card className="bg-white border-slate-200">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="w-[80px]">Image</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Stock</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-center">Available</TableHead>
+                        <TableHead className="text-center">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(visibleItems || []).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                            No menu items found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        (visibleItems || []).map((item) => (
+                          <TableRow
+                            key={item.id}
+                            className="hover:bg-slate-50 transition-colors"
+                            data-testid={`row-menu-item-${item.id}`}
+                          >
+                            {/* Image */}
+                            <TableCell>
+                              <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200">
+                                <ImageWithSkeleton
+                                  src={item.imageUrl || ''}
+                                  alt={item.name}
+                                  containerClassName="w-full h-full"
+                                />
+                              </div>
+                            </TableCell>
+                            
+                            {/* Item Name & Description */}
+                            <TableCell>
+                              <div>
+                                <div className="font-semibold text-gray-900">{item.name}</div>
+                                <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
+                                  {item.description}
+                                </p>
+                              </div>
+                            </TableCell>
+                            
+                            {/* Item Code */}
+                            <TableCell>
+                              <code className="text-xs bg-slate-100 px-2 py-1 rounded">
+                                {item.itemCode || 'N/A'}
+                              </code>
+                            </TableCell>
+                            
+                            {/* Category */}
+                            <TableCell>
+                              <Badge variant="outline">{item.category}</Badge>
+                            </TableCell>
+                            
+                            {/* Price - Display Only */}
+                            <TableCell className="text-right">
+                              {editingPriceId === item.id ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={editingPriceValue}
+                                    onChange={(e) => setEditingPriceValue(e.target.value)}
+                                    className="w-28 h-9 text-right font-semibold"
+                                    autoFocus
+                                    onKeyDown={async (e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        try {
+                                          const newPrice = parseFloat(editingPriceValue);
+                                          if (isNaN(newPrice) || newPrice < 0) {
+                                            toast({
+                                              variant: "destructive",
+                                              title: "Invalid Price",
+                                              description: "Please enter a valid positive number",
+                                            });
+                                            return;
+                                          }
+                                          await apiRequest("PUT", `/api/menu/${item.id}`, {
+                                            ...item,
+                                            costPrice: newPrice
+                                          });
+                                          toast({
+                                            title: "Success",
+                                            description: `Price updated to ₦${newPrice.toLocaleString()}`,
+                                          });
+                                          queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+                                          setEditingPriceId(null);
+                                        } catch (error) {
+                                          console.error("Error updating price:", error);
+                                          toast({
+                                            variant: "destructive",
+                                            title: "Error",
+                                            description: "Failed to update price",
+                                          });
+                                        }
+                                      } else if (e.key === 'Escape') {
+                                        setEditingPriceId(null);
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-9 w-9 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    onClick={async () => {
+                                      try {
+                                        const newPrice = parseFloat(editingPriceValue);
+                                        if (isNaN(newPrice) || newPrice < 0) {
+                                          toast({
+                                            variant: "destructive",
+                                            title: "Invalid Price",
+                                            description: "Please enter a valid positive number",
+                                          });
+                                          return;
+                                        }
+                                        await apiRequest("PUT", `/api/menu/${item.id}`, {
+                                          ...item,
+                                          costPrice: newPrice
+                                        });
+                                        toast({
+                                          title: "Success",
+                                          description: `Price updated to ₦${newPrice.toLocaleString()}`,
+                                        });
+                                        queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+                                        setEditingPriceId(null);
+                                      } catch (error) {
+                                        console.error("Error updating price:", error);
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Error",
+                                          description: "Failed to update price",
+                                        });
+                                      }
+                                    }}
+                                    title="Save"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => setEditingPriceId(null)}
+                                    title="Cancel"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="font-semibold text-gray-900">
+                                  ₦{parseFloat(item.price).toLocaleString()}
+                                </div>
+                              )}
+                            </TableCell>
+                            
+                            {/* Stock Balance */}
+                            <TableCell className="text-right">
+                              <div className="flex flex-col items-end">
+                                <span className={`text-sm font-semibold ${
+                                  (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 0)
+                                    ? 'text-red-700 font-bold'
+                                    : (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance === 0) 
+                                    ? 'text-red-600' 
+                                    : (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 5) 
+                                    ? 'text-orange-600' 
+                                    : (item.stockBalance !== null && item.stockBalance !== undefined)
+                                    ? 'text-green-600'
+                                    : 'text-gray-500'
+                                }`}>
+                                  {item.stockBalance !== null && item.stockBalance !== undefined
+                                    ? item.stockBalance < 0
+                                      ? `${item.stockBalance} ⚠️`
+                                      : item.stockBalance === 0
+                                      ? 'SOLD OUT'
+                                      : `${item.stockBalance} portions`
+                                    : 'Not tracked'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            
+                            {/* Status Badge */}
+                            <TableCell className="text-center">
+                              {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 ? (
+                                <Badge variant="destructive" className="font-semibold">
+                                  SOLD OUT
+                                </Badge>
+                              ) : !item.available ? (
+                                <Badge variant="secondary">
+                                  Unavailable
+                                </Badge>
+                              ) : (
+                                <Badge variant="default" className="bg-green-600">
+                                  Available
+                                </Badge>
+                              )}
+                            </TableCell>
+                            
+                            {/* Availability Toggle */}
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={item.available}
+                                onCheckedChange={async (checked) => {
+                                  try {
+                                    await apiRequest("PUT", `/api/menu/${item.id}`, {
+                                      ...item,
+                                      available: checked
+                                    });
+                                    toast({
+                                      title: "Success",
+                                      description: `${item.name} is now ${checked ? 'available' : 'unavailable'}`,
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+                                  } catch (error) {
+                                    console.error("Error updating availability:", error);
+                                    toast({
+                                      variant: "destructive",
+                                      title: "Error",
+                                      description: "Failed to update availability",
+                                    });
+                                  }
+                                }}
+                                className="data-[state=checked]:bg-green-600"
+                              />
+                            </TableCell>
+                            
+                            {/* Actions */}
+                            <TableCell className="text-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8"
+                                onClick={() => {
+                                  setEditingPriceId(item.id);
+                                  setEditingPriceValue(item.price);
+                                }}
+                                title="Edit Price"
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit Price
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-                <CardContent className="p-6 space-y-4">
-                  <div>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="text-lg font-semibold flex-1">
-                        {item.name}
-                      </h3>
-                      <Badge variant="outline">{item.category}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {item.description}
-                    </p>
-                  </div>
-                  
-                  {/* Stock Balance Display */}
-                  <div className="flex items-center justify-between border-t pt-3">
-                    <div className="flex flex-col">
-                      <span className="text-xs text-muted-foreground">Stock Balance</span>
-                      <span className={`text-sm font-semibold ${
-                        (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 0)
-                          ? 'text-red-700 font-bold' // Negative = Critical error
-                          : (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance === 0) 
-                          ? 'text-red-600' 
-                          : (item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 5) 
-                          ? 'text-orange-600' 
-                          : (item.stockBalance !== null && item.stockBalance !== undefined)
-                          ? 'text-green-600'
-                          : 'text-gray-500'
-                      }`}>
-                        {item.stockBalance !== null && item.stockBalance !== undefined
-                          ? item.stockBalance < 0
-                            ? `${item.stockBalance} portions (⚠️ Oversold)`
-                            : item.stockBalance === 0
-                            ? 'SOLD OUT'
-                            : `${item.stockBalance} portions`
-                          : 'Not tracked'}
-                      </span>
-                      {item.itemCode && (
-                        <span className="text-xs text-muted-foreground mt-1">
-                          Code: {item.itemCode}
-                        </span>
-                      )}
-                      {/* Warning for negative stock */}
-                      {(item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance < 0) && (
-                        <span className="text-xs text-red-700 mt-1 font-medium">
-                          ⚠️ Stock discrepancy - needs restock
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold">
-                      ₦{parseFloat(item.price).toLocaleString()}
-                    </span>
-                    <div className="flex gap-2">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleOpenDialog(item)}
-                        data-testid={`button-edit-${item.id}`}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        onClick={() => {
-                          setItemToDelete(item);
-                          setDeleteDialogOpen(true);
-                        }}
-                        data-testid={`button-delete-${item.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
             
             {/* Infinite Scroll Sentinel and Load More */}
             {hasMore && (
@@ -651,6 +870,59 @@ export default function MenuManagement() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Category Field - Now First */}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category *</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedFormCategory(value);
+                        // Generate preview code (doesn't increment counter)
+                        if (!editingItem) {
+                          generatePreviewItemCode(value);
+                        }
+                      }}
+                      value={field.value}
+                      disabled={!!editingItem}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!editingItem && isGeneratingPreview && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Loading preview...
+                      </p>
+                    )}
+                    {!editingItem && previewItemCode && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Preview Code: <span className="font-semibold">{previewItemCode}</span>
+                        <span className="text-muted-foreground ml-2">(will be finalized on save)</span>
+                      </p>
+                    )}
+                    {editingItem && previewItemCode && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Item Code: <span className="font-semibold">{previewItemCode}</span>
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="name"
@@ -688,89 +960,26 @@ export default function MenuManagement() {
                 )}
               />
 
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price (₦)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...field}
-                          data-testid="input-price"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Initial Quantity
-                        {editingItem && (
-                          <span className="text-xs text-muted-foreground ml-2">
-                            (Read-only)
-                          </span>
-                        )}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="text"
-                          placeholder="20"
-                          value={editingItem ? (editingItem.stockBalance ?? "N/A") : (field.value ?? "")}
-                          onChange={(e) => !editingItem && field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                          disabled={!!editingItem}
-                          className={editingItem ? "bg-gray-100 cursor-not-allowed" : ""}
-                          data-testid="input-quantity"
-                        />
-                      </FormControl>
-                      {editingItem && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Stock is tracked via store entries. To adjust stock, use Store Management.
-                        </p>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-category">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              {cat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Price Field - Now Full Width */}
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price (₦)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormItem>
                 <FormLabel>Upload Image</FormLabel>

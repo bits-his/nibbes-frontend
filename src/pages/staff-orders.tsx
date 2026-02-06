@@ -24,6 +24,7 @@ import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { getWebSocketUrl } from "@/lib/websocket";
 
 // Service Charge interface
 interface ServiceCharge {
@@ -112,13 +113,16 @@ const MenuItemCard = memo<MenuItemCardProps>(({
   onUpdateQuantity,
   kitchenOpen 
 }) => {
-  // Determine if item is SOLD OUT
+  // Determine if item is SOLD OUT or UNAVAILABLE
   const isOutOfStock = (item.stockBalance !== null && item.stockBalance !== undefined)
     ? item.stockBalance <= 0
     : !item.available;
   
+  // Check if item is manually disabled
+  const isUnavailable = !item.available;
+  
   const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
-  const canAddMore = !isOutOfStock && (item.stockBalance === null || item.stockBalance === undefined || cartQuantity < item.stockBalance);
+  const canAddMore = !isOutOfStock && !isUnavailable && (item.stockBalance === null || item.stockBalance === undefined || cartQuantity < item.stockBalance);
   
   const handleClick = useCallback(() => {
     if (canAddMore && kitchenOpen) {
@@ -142,7 +146,7 @@ const MenuItemCard = memo<MenuItemCardProps>(({
   
   return (
     <Card
-      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''} ${isOutOfStock ? 'opacity-75' : ''}`}
+      className={`overflow-hidden hover-elevate cursor-pointer transition-all ${isInCart ? 'ring-2 ring-primary' : ''} ${(isOutOfStock || isUnavailable) ? 'opacity-75' : ''}`}
       onClick={handleClick}
       data-testid={`card-menu-item-${item.id}`}
     >
@@ -157,14 +161,23 @@ const MenuItemCard = memo<MenuItemCardProps>(({
             <Plus className="w-3 h-3 md:w-4 md:h-4" />
           </div>
         )}
-        {isOutOfStock && (
+        {/* Show UNAVAILABLE if manually disabled */}
+        {isUnavailable && (
+          <div className="absolute inset-0 bg-gray-900/90 flex items-center justify-center z-10">
+            <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-gray-800/70 shadow-lg border-2 border-white">
+              UNAVAILABLE
+            </span>
+          </div>
+        )}
+        {/* Show SOLD OUT if no stock */}
+        {!isUnavailable && isOutOfStock && (
           <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
             <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
               SOLD OUT
             </span>
           </div>
         )}
-        {!isOutOfStock && isLowStock && (
+        {!isOutOfStock && !isUnavailable && isLowStock && (
           <div className="absolute top-2 left-2 z-10">
             <Badge variant="destructive" className="text-xs font-semibold shadow-md">
               Only {item.stockBalance} left!
@@ -264,10 +277,10 @@ export default function StaffOrders() {
   // PERFORMANCE FIX: Fetch menu items with better caching and no unnecessary refetches
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
-    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    staleTime: 0, // Always consider data stale for real-time updates
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    refetchOnWindowFocus: false, // ✅ NEW: Don't refetch on window focus
-    refetchOnMount: false,        // ✅ NEW: Don't refetch on component mount
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: true,        // Refetch on component mount
   });
 
   // Fetch categories from API
@@ -510,11 +523,6 @@ export default function StaffOrders() {
       })
       return
     }
-
-    toast({
-      title: "Proceeding to Payment",
-      description: "Please confirm payment method...",
-    });
     
     localStorage.setItem('pendingWalkInOrder', JSON.stringify({
       customerName: form.getValues('customerName'),
@@ -532,7 +540,7 @@ export default function StaffOrders() {
     setCart([]);
     form.reset({ customerName: "Nibbles Kitchen", customerPhone: "" });
     setLocation('/staff/checkout');
-  }, [kitchenStatus.isOpen, form, calculateTotal, cart, toast, setLocation]);
+  }, [kitchenStatus.isOpen, form, calculateTotal, cart, setLocation]);
 
   // F1 keyboard shortcut
   useEffect(() => {
@@ -590,7 +598,7 @@ export default function StaffOrders() {
 
   // PERFORMANCE FIX: Optimized WebSocket connection - only invalidate when necessary
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://server.brainstorm.ng/nibbleskitchen/ws';
+    const wsUrl = getWebSocketUrl();
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
@@ -599,11 +607,14 @@ export default function StaffOrders() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('📨 [Staff Orders] WebSocket message received:', data.type, data);
       
       // PERFORMANCE FIX: Only invalidate menu when menu items actually change
-      if (data.type === "menu_item_update") {
-        console.log("🔄 Menu item updated - refreshing menu");
+      if (data.type === "menu_item_update" || data.type === "inventory_update" || data.type === "stock_movement") {
+        console.log("🔄 Menu/Stock updated - refreshing menu items");
+        // Force refetch by invalidating and refetching immediately
         queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+        queryClient.refetchQueries({ queryKey: ["/api/menu/all"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
       } 
       // ✅ FIXED: Don't invalidate menu on order updates (orders don't affect menu)
