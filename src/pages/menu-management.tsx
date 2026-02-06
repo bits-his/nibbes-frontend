@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowUpDown } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,7 @@ import { apiRequest, queryClient, BACKEND_URL } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 import { ImageWithSkeleton } from "@/components/ImageWithSkeleton";
 import { getWebSocketUrl } from "@/lib/websocket";
+import { MenuOrdering } from "@/components/MenuOrdering";
 
 type MenuFormValues = z.infer<typeof menuItemFormSchema>;
 
@@ -49,6 +50,7 @@ export default function MenuManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [orderingDialogOpen, setOrderingDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -162,7 +164,7 @@ export default function MenuManagement() {
   // PERFORMANCE: Fetch menu items with caching (reduces network payload)
   const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
-    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    staleTime: 0, // Always refetch when invalidated for real-time updates
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
@@ -554,6 +556,13 @@ export default function MenuManagement() {
               Add Category
             </Button>
             <Button
+              variant="outline"
+              onClick={() => setOrderingDialogOpen(true)}
+            >
+              <ArrowUpDown className="w-4 h-4 mr-2" />
+              Arrange Menu
+            </Button>
+            <Button
               onClick={() => handleOpenDialog()}
               data-testid="button-add-item"
             >
@@ -635,7 +644,7 @@ export default function MenuManagement() {
                             
                             {/* Price - Display Only */}
                             <TableCell className="text-right">
-                              {editingPriceId === item.id ? (
+                              {editingPriceId === String(item.id) ? (
                                 <div className="flex items-center justify-end gap-2">
                                   <Input
                                     type="number"
@@ -763,13 +772,13 @@ export default function MenuManagement() {
                             
                             {/* Status Badge */}
                             <TableCell className="text-center">
-                              {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 ? (
-                                <Badge variant="destructive" className="font-semibold">
-                                  SOLD OUT
-                                </Badge>
-                              ) : !item.available ? (
+                              {!item.available ? (
                                 <Badge variant="secondary">
                                   Unavailable
+                                </Badge>
+                              ) : item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0 ? (
+                                <Badge variant="destructive" className="font-semibold">
+                                  SOLD OUT
                                 </Badge>
                               ) : (
                                 <Badge variant="default" className="bg-green-600">
@@ -792,7 +801,9 @@ export default function MenuManagement() {
                                       title: "Success",
                                       description: `${item.name} is now ${checked ? 'available' : 'unavailable'}`,
                                     });
+                                    // Force immediate refetch
                                     queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] });
+                                    queryClient.refetchQueries({ queryKey: ["/api/menu/all"] });
                                   } catch (error) {
                                     console.error("Error updating availability:", error);
                                     toast({
@@ -813,7 +824,7 @@ export default function MenuManagement() {
                                 variant="outline"
                                 className="h-8"
                                 onClick={() => {
-                                  setEditingPriceId(item.id);
+                                  setEditingPriceId(String(item.id));
                                   setEditingPriceValue(item.price);
                                 }}
                                 title="Edit Price"
@@ -1159,6 +1170,16 @@ export default function MenuManagement() {
               ))}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Menu Ordering Dialog */}
+      <Dialog open={orderingDialogOpen} onOpenChange={setOrderingDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          <MenuOrdering
+            items={menuItems || []}
+            onClose={() => setOrderingDialogOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

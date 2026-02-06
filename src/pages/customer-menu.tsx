@@ -234,42 +234,19 @@ export default function CustomerMenu() {
     }
   }, [menuError, toast]);
 
-  // Helper function to sort items by specific item priority
-  const sortByItemPriority = (items: any[]) => {
-    // Define item priority order (lower number = appears first)
-    // Using lowercase for case-insensitive matching
-    const itemPriority: { [key: string]: number } = {
-      'beef philadelphia': 1,
-      'chicken philadelphia': 2,
-      'beef loaded fries': 3,
-      'chicken loaded fries': 4,
-      'beef shawarma': 5,
-      'chicken shawarma': 6,
-      'beef burger': 7,
-      'chicken burger': 8,
-      'oriental rice, charcoal grilled chicken and coleslaw': 9,
-      'signature rice, charcoal grilled chicken and coleslaw': 10,
-      'smokey jollof rice, charcoal grilled chicken and coleslaw': 11,
-      'creamy wings': 12, // "Wings & fries" = "Creamy Wings" in database
-      'beef kofta wrap': 13,
-      'chicken kofta wrap': 14,
-      'meat pie': 15,
-      'french fries and ketchup': 16,
-      // Everything else gets priority 999 (appears last)
-    };
-    
+  // Helper function to sort items by displayOrder (from database)
+  const sortByDisplayOrder = (items: any[]) => {
     return [...items].sort((a, b) => {
-      const aName = a.name.toLowerCase().trim();
-      const bName = b.name.toLowerCase().trim();
-      const aPriority = itemPriority[aName] || 999;
-      const bPriority = itemPriority[bName] || 999;
+      // Sort by displayOrder first (lower number appears first)
+      const aOrder = a.displayOrder ?? 999;
+      const bOrder = b.displayOrder ?? 999;
       
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority; // Sort by priority
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
       }
       
-      // If same priority, keep original order
-      return 0;
+      // If same displayOrder, sort alphabetically by name
+      return a.name.localeCompare(b.name);
     });
   };
 
@@ -295,10 +272,10 @@ export default function CustomerMenu() {
       }
     );
 
-    // Sort: Priority items first (only when viewing "All" categories)
-    // To disable this sorting, comment out the next line and uncomment the line after
-    return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
-    // return filtered; // Uncomment this to disable priority sorting
+    // Sort: Use displayOrder from database (set via Menu Management)
+    // Items are sorted by displayOrder (lower number appears first)
+    // If displayOrder is the same, items are sorted alphabetically
+    return sortByDisplayOrder(filtered);
   }, [menuItems, selectedCategory, searchQuery, user?.role]);
 
   // Infinite scroll for pagination (reduces initial payload)

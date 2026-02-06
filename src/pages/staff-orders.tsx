@@ -59,39 +59,19 @@ const useDebouncedValue = <T,>(value: T, delay: number): T => {
   return debouncedValue;
 };
 
-// PERFORMANCE FIX: Move priority map outside component (created only once)
-const ITEM_PRIORITY_MAP = new Map<string, number>([
-  ['beef philadelphia', 1],
-  ['chicken philadelphia', 2],
-  ['beef loaded fries', 3],
-  ['chicken loaded fries', 4],
-  ['beef shawarma', 5],
-  ['chicken shawarma', 6],
-  ['beef burger', 7],
-  ['chicken burger', 8],
-  ['oriental rice, charcoal grilled chicken and coleslaw', 9],
-  ['signature rice, charcoal grilled chicken and coleslaw', 10],
-  ['smokey jollof rice, charcoal grilled chicken and coleslaw', 11],
-  ['creamy wings', 12],
-  ['beef kofta wrap', 13],
-  ['chicken kofta wrap', 14],
-  ['meat pie', 15],
-  ['french fries and ketchup', 16],
-]);
-
-// PERFORMANCE FIX: Optimized sorting function (O(n log n) instead of O(n²))
-const sortByItemPriority = (items: MenuItem[]): MenuItem[] => {
+// PERFORMANCE FIX: Optimized sorting function using displayOrder from database
+const sortByDisplayOrder = (items: MenuItem[]): MenuItem[] => {
   return [...items].sort((a, b) => {
-    const aName = a.name.toLowerCase().trim();
-    const bName = b.name.toLowerCase().trim();
-    const aPriority = ITEM_PRIORITY_MAP.get(aName) ?? 999;
-    const bPriority = ITEM_PRIORITY_MAP.get(bName) ?? 999;
+    // Sort by displayOrder first (lower number appears first)
+    const aOrder = a.displayOrder ?? 999;
+    const bOrder = b.displayOrder ?? 999;
     
-    if (aPriority !== bPriority) {
-      return aPriority - bPriority;
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
     }
     
-    return 0;
+    // If same displayOrder, sort alphabetically by name
+    return a.name.localeCompare(b.name);
   });
 };
 
@@ -311,8 +291,10 @@ export default function StaffOrders() {
       }
     );
 
-    // Sort: Priority items first (only when viewing "All" categories)
-    return selectedCategory === "All" ? sortByItemPriority(filtered) : filtered;
+    // Sort: Use displayOrder from database (set via Menu Management)
+    // Items are sorted by displayOrder (lower number appears first)
+    // If displayOrder is the same, items are sorted alphabetically
+    return sortByDisplayOrder(filtered);
   }, [menuItems, selectedCategory, debouncedSearchQuery]);
 
   // PERFORMANCE FIX: Infinite scroll with increased items per load for desktop
@@ -524,10 +506,15 @@ export default function StaffOrders() {
       return
     }
     
+    // Generate idempotency key once when order is created
+    // This prevents duplicate orders if user retries after network timeout
+    const idempotencyKey = `WALK-IN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     localStorage.setItem('pendingWalkInOrder', JSON.stringify({
       customerName: form.getValues('customerName'),
       customerPhone: form.getValues('customerPhone'),
       total: calculateTotal(),
+      idempotencyKey, // Store idempotency key with order
       items: cart.map((item) => ({
         menuItemId: item.menuItem.id,
         quantity: item.quantity,

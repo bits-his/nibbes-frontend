@@ -1281,10 +1281,9 @@ export default function Checkout() {
         return
       }
 
-      // Generate idempotency key to prevent duplicate orders on retry
-      const idempotencyKey = `IDEMPOTENCY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
       // For cash/POS/transfer payments, create order directly with paid status
+      // Use idempotency key from walkInOrder (generated when order was first created)
+      // This prevents duplicate orders if user retries after network timeout
       const orderData = {
         customerName: walkInOrder.customerName,
         customerPhone: walkInOrder.customerPhone || "N/A",
@@ -1295,7 +1294,7 @@ export default function Checkout() {
         paymentStatus: "paid",
         items: walkInOrder.items,
         totalAmount: calculateTotal(), // Include total with all charges
-        idempotencyKey, // Include idempotency key to prevent duplicates
+        idempotencyKey: walkInOrder.idempotencyKey, // Use existing idempotency key from order creation
         // Add payment splits info if multi-payment is enabled
         ...(multiPaymentEnabled && {
           paymentSplits: paymentSplits.map(split => ({

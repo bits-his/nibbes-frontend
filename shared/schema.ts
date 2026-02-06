@@ -13,6 +13,7 @@ export const menuItemSchema = z.object({
   stockBalance: z.number().nullable().optional(), // Stock balance from store entries
   itemCode: z.string().nullable().optional(), // Item code for tracking
   menuId: z.string().nullable().optional(), // Auto-generated menu ID (e.g., FOOD-0001)
+  displayOrder: z.number().optional(), // Display order for menu arrangement
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
