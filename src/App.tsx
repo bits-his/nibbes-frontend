@@ -29,6 +29,7 @@ const Checkout = lazy(() => import("@/pages/checkout"));
 const CheckoutAlt = lazy(() => import("@/pages/checkout-alt"));
 const OrderStatus = lazy(() => import("@/pages/order-status"));
 const StaffOrders = lazy(() => import("@/pages/staff-orders"));
+const RefundManagement = lazy(() => import("@/pages/refund-management"));
 const KitchenDisplay = lazy(() => import("@/pages/kitchen-display"));
 const OrderManagement = lazy(() => import("@/pages/order-management"));
 const MenuManagement = lazy(() => import("@/pages/menu-management"));
@@ -469,6 +470,14 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["walk_in_orders"]}>
             <StaffOrders />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/refund-management"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["refund_management"]}>
+            <RefundManagement />
           </ProtectedRoute>
         )}
       />

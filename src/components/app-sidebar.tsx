@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Settings,
   Eye,
+  DollarSign,
 } from "lucide-react";
 import {
   Sidebar,
@@ -188,6 +189,13 @@ const menuItems: MenuItem[] = [
     icon: Users,
     roles: ["admin"],
     permissions: ["user_management"],
+  },
+  {
+    title: "Refund Management",
+    url: "/refund-management",
+    icon: DollarSign,
+    roles: ["admin"],
+    permissions: ["refund_management"],
   },
   {
     title: "Settings",
