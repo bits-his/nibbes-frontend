@@ -644,7 +644,7 @@ export default function MenuManagement() {
                             
                             {/* Price - Display Only */}
                             <TableCell className="text-right">
-                              {editingPriceId === String(item.id) ? (
+                              {editingPriceId === item.id ? (
                                 <div className="flex items-center justify-end gap-2">
                                   <Input
                                     type="number"
@@ -824,8 +824,10 @@ export default function MenuManagement() {
                                 variant="outline"
                                 className="h-8"
                                 onClick={() => {
-                                  setEditingPriceId(String(item.id));
-                                  setEditingPriceValue(item.price);
+                                  if (item.id !== undefined) {
+                                    setEditingPriceId(item.id);
+                                    setEditingPriceValue(item.price);
+                                  }
                                 }}
                                 title="Edit Price"
                               >
