@@ -193,7 +193,7 @@ const menuItems: MenuItem[] = [
   {
     title: "Refund Management",
     url: "/refund-management",
-    icon: DollarSign,
+    icon: ClipboardList,
     roles: ["admin"],
     permissions: ["refund_management"],
   },

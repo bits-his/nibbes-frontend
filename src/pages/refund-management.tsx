@@ -1,1 +1,797 @@
-import { useState, useEffect, useMemo } from \"react\";\nimport { useQuery } from \"@tanstack/react-query\";\nimport { Search, RefreshCw, DollarSign, CheckCircle, XCircle, Clock, AlertCircle } from \"lucide-react\";\nimport { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";\nimport { Button } from \"@/components/ui/button\";\nimport { Input } from \"@/components/ui/input\";\nimport { Badge } from \"@/components/ui/badge\";\nimport {\n  Dialog,\n  DialogContent,\n  DialogHeader,\n  DialogTitle,\n  DialogDescription,\n  DialogFooter,\n} from \"@/components/ui/dialog\";\nimport {\n  Table,\n  TableBody,\n  TableCell,\n  TableHead,\n  TableHeader,\n  TableRow,\n} from \"@/components/ui/table\";\nimport { Textarea } from \"@/components/ui/textarea\";\nimport { useToast } from \"@/hooks/use-toast\";\nimport { apiRequest, queryClient } from \"@/lib/queryClient\";\nimport { useAuth } from \"@/hooks/useAuth\";\nimport { getWebSocketUrl } from \"@/lib/websocket\";\n\ninterface Order {\n  id: number;\n  orderNumber: number;\n  customerName: string;\n  customerPhone: string;\n  orderType: string;\n  paymentMethod: string;\n  paymentStatus: string;\n  status: string;\n  total: string;\n  createdAt: string;\n  items: OrderItem[];\n}\n\ninterface OrderItem {\n  id: number;\n  menuItemId: number;\n  quantity: number;\n  price: string;\n  specialInstructions?: string;\n  menuItem: {\n    name: string;\n    imageUrl?: string;\n  };\n}\n\ninterface Refund {\n  id: number;\n  orderId: number;\n  orderNumber: number;\n  amount: string;\n  reason: string;\n  status: 'pending' | 'approved' | 'rejected' | 'completed';\n  requestedBy: string;\n  processedBy?: string;\n  createdAt: string;\n  updatedAt: string;\n  order?: Order;\n}\n\nexport default function RefundManagement() {\n  const { toast } = useToast();\n  const { user } = useAuth();\n  const [searchQuery, setSearchQuery] = useState<string>(\"\");\n  const [selectedStatus, setSelectedStatus] = useState<string>(\"All\");\n  const [selectedRefund, setSelectedRefund] = useState<Refund | null>(null);\n  const [showRefundDialog, setShowRefundDialog] = useState(false);\n  const [refundReason, setRefundReason] = useState(\"\");\n  const [processingRefund, setProcessingRefund] = useState(false);\n\n  // Fetch refunds\n  const { data: refunds, isLoading, refetch } = useQuery<Refund[]>({\n    queryKey: [\"/api/refunds\"],\n    staleTime: 0,\n    refetchOnWindowFocus: false,\n    refetchOnMount: true,\n  });\n\n  // Status filter options\n  const statusFilters = [\"All\", \"Pending\", \"Approved\", \"Rejected\", \"Completed\"];\n\n  // Filter refunds based on search and status\n  const filteredRefunds = useMemo(() => {\n    if (!refunds) return [];\n    \n    return refunds.filter((refund) => {\n      const matchesStatus = selectedStatus === \"All\" || refund.status.toLowerCase() === selectedStatus.toLowerCase();\n      const matchesSearch = searchQuery === \"\" || \n        refund.orderNumber.toString().includes(searchQuery) ||\n        refund.order?.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||\n        refund.order?.customerPhone.includes(searchQuery);\n      \n      return matchesStatus && matchesSearch;\n    });\n  }, [refunds, selectedStatus, searchQuery]);\n\n  // Handle refund approval\n  const handleApproveRefund = async (refundId: number) => {\n    try {\n      setProcessingRefund(true);\n      const response = await apiRequest(\"POST\", `/api/refunds/${refundId}/approve`, {});\n      \n      if (!response.ok) {\n        throw new Error(\"Failed to approve refund\");\n      }\n      \n      toast({\n        title: \"Refund Approved\",\n        description: \"The refund has been approved successfully.\",\n      });\n      \n      refetch();\n      setShowRefundDialog(false);\n      setSelectedRefund(null);\n    } catch (error) {\n      toast({\n        title: \"Error\",\n        description: \"Failed to approve refund. Please try again.\",\n        variant: \"destructive\",\n      });\n    } finally {\n      setProcessingRefund(false);\n    }\n  };\n\n  // Handle refund rejection\n  const handleRejectRefund = async (refundId: number, reason: string) => {\n    if (!reason.trim()) {\n      toast({\n        title: \"Reason Required\",\n        description: \"Please provide a reason for rejecting the refund.\",\n        variant: \"destructive\",\n      });\n      return;\n    }\n    \n    try {\n      setProcessingRefund(true);\n      const response = await apiRequest(\"POST\", `/api/refunds/${refundId}/reject`, {\n        reason: reason,\n      });\n      \n      if (!response.ok) {\n        throw new Error(\"Failed to reject refund\");\n      }\n      \n      toast({\n        title: \"Refund Rejected\",\n        description: \"The refund has been rejected.\",\n      });\n      \n      refetch();\n      setShowRefundDialog(false);\n      setSelectedRefund(null);\n      setRefundReason(\"\");\n    } catch (error) {\n      toast({\n        title: \"Error\",\n        description: \"Failed to reject refund. Please try again.\",\n        variant: \"destructive\",\n      });\n    } finally {\n      setProcessingRefund(false);\n    }\n  };\n\n  // WebSocket connection for real-time updates\n  useEffect(() => {\n    const wsUrl = getWebSocketUrl();\n    const socket = new WebSocket(wsUrl);\n\n    socket.onopen = () => {\n      console.log(\"✅ Refund Management WebSocket connected\");\n    };\n\n    socket.onmessage = (event) => {\n      const data = JSON.parse(event.data);\n      console.log('📨 [Refund Management] WebSocket message:', data.type);\n      \n      if (data.type === \"refund_update\" || data.type === \"new_refund\") {\n        console.log(\"🔄 Refund updated - refreshing list\");\n        queryClient.invalidateQueries({ queryKey: [\"/api/refunds\"] });\n        refetch();\n      }\n    };\n\n    socket.onerror = (error) => {\n      console.error(\"❌ Refund Management WebSocket error:\", error);\n    };\n\n    socket.onclose = () => {\n      console.log(\"🔌 Refund Management WebSocket disconnected\");\n    };\n\n    return () => {\n      socket.close();\n    };\n  }, [refetch]);\n\n  // Get status badge variant\n  const getStatusBadge = (status: string) => {\n    switch (status.toLowerCase()) {\n      case 'pending':\n        return <Badge variant=\"secondary\" className=\"bg-yellow-100 text-yellow-800\"><Clock className=\"w-3 h-3 mr-1\" />Pending</Badge>;\n      case 'approved':\n        return <Badge variant=\"secondary\" className=\"bg-blue-100 text-blue-800\"><CheckCircle className=\"w-3 h-3 mr-1\" />Approved</Badge>;\n      case 'completed':\n        return <Badge variant=\"secondary\" className=\"bg-green-100 text-green-800\"><CheckCircle className=\"w-3 h-3 mr-1\" />Completed</Badge>;\n      case 'rejected':\n        return <Badge variant=\"destructive\"><XCircle className=\"w-3 h-3 mr-1\" />Rejected</Badge>;\n      default:\n        return <Badge variant=\"outline\">{status}</Badge>;\n    }\n  };\n\n  return (\n    <div className=\"min-h-screen bg-background\">\n      <div className=\"flex flex-col h-screen overflow-hidden\">\n        {/* Header Section */}\n        <div className=\"p-4 md:p-6 border-b bg-card\">\n          <div className=\"flex items-center justify-between mb-4\">\n            <div className=\"flex items-center gap-3\">\n              <DollarSign className=\"w-8 h-8 text-primary\" />\n              <div>\n                <h1 className=\"font-serif text-2xl md:text-3xl font-bold\">Refund Management</h1>\n                <p className=\"text-sm text-muted-foreground\">Manage customer refund requests</p>\n              </div>\n            </div>\n            <Button\n              variant=\"outline\"\n              size=\"sm\"\n              onClick={() => refetch()}\n              className=\"gap-2\"\n            >\n              <RefreshCw className=\"w-4 h-4\" />\n              Refresh\n            </Button>\n          </div>\n          \n          {/* Search Bar */}\n          <div className=\"mb-4\">\n            <div className=\"relative\">\n              <Search className=\"absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground\" />\n              <Input\n                type=\"text\"\n                placeholder=\"Search by order number, customer name, or phone...\"\n                value={searchQuery}\n                onChange={(e) => setSearchQuery(e.target.value)}\n                className=\"pl-10 w-full\"\n              />\n            </div>\n          </div>\n          \n          {/* Status Filters */}\n          <div className=\"flex gap-2 overflow-x-auto pb-2\">\n            {statusFilters.map((status) => (\n              <Badge\n                key={status}\n                variant={selectedStatus === status ? \"default\" : \"secondary\"}\n                className=\"cursor-pointer whitespace-nowrap px-3 py-1.5 text-xs md:px-4 md:py-2 md:text-sm hover-elevate flex-shrink-0\"\n                onClick={() => setSelectedStatus(status)}\n              >\n                {status}\n              </Badge>\n            ))}\n          </div>\n        </div>\n\n        {/* Refunds Table */}\n        <div className=\"flex-1 overflow-y-auto p-4 md:p-6\">\n          {isLoading ? (\n            <div className=\"space-y-4\">\n              {[1, 2, 3].map((i) => (\n                <Card key={i} className=\"overflow-hidden\">\n                  <CardContent className=\"p-4\">\n                    <div className=\"h-6 bg-muted rounded animate-pulse mb-2\" />\n                    <div className=\"h-4 bg-muted rounded animate-pulse\" />\n                  </CardContent>\n                </Card>\n              ))}\n            </div>\n          ) : filteredRefunds.length === 0 ? (\n            <Card>\n              <CardContent className=\"p-12 text-center\">\n                <AlertCircle className=\"w-12 h-12 text-muted-foreground mx-auto mb-4\" />\n                <h3 className=\"text-lg font-semibold mb-2\">No Refunds Found</h3>\n                <p className=\"text-muted-foreground\">\n                  {searchQuery || selectedStatus !== \"All\" \n                    ? \"No refunds match your search criteria.\"\n                    : \"No refund requests at the moment.\"}\n                </p>\n              </CardContent>\n            </Card>\n          ) : (\n            <Card>\n              <Table>\n                <TableHeader>\n                  <TableRow>\n                    <TableHead>Order #</TableHead>\n                    <TableHead>Customer</TableHead>\n                    <TableHead>Phone</TableHead>\n                    <TableHead className=\"text-right\">Amount</TableHead>\n                    <TableHead>Reason</TableHead>\n                    <TableHead>Status</TableHead>\n                    <TableHead>Requested</TableHead>\n                    <TableHead className=\"text-center\">Actions</TableHead>\n                  </TableRow>\n                </TableHeader>\n                <TableBody>\n                  {filteredRefunds.map((refund) => (\n                    <TableRow key={refund.id} className=\"cursor-pointer hover:bg-muted/50\">\n                      <TableCell className=\"font-medium\">\n                        #{refund.orderNumber}\n                      </TableCell>\n                      <TableCell>{refund.order?.customerName || 'N/A'}</TableCell>\n                      <TableCell>{refund.order?.customerPhone || 'N/A'}</TableCell>\n                      <TableCell className=\"text-right font-semibold\">\n                        ₦{parseFloat(refund.amount).toLocaleString()}\n                      </TableCell>\n                      <TableCell className=\"max-w-xs truncate\">\n                        {refund.reason}\n                      </TableCell>\n                      <TableCell>{getStatusBadge(refund.status)}</TableCell>\n                      <TableCell className=\"text-sm text-muted-foreground\">\n                        {new Date(refund.createdAt).toLocaleDateString()}\n                      </TableCell>\n                      <TableCell className=\"text-center\">\n                        <Button\n                          size=\"sm\"\n                          variant=\"outline\"\n                          onClick={() => {\n                            setSelectedRefund(refund);\n                            setShowRefundDialog(true);\n                          }}\n                        >\n                          View Details\n                        </Button>\n                      </TableCell>\n                    </TableRow>\n                  ))}\n                </TableBody>\n              </Table>\n            </Card>\n          )}\n        </div>\n      </div>\n\n      {/* Refund Detail Dialog */}\n      <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>\n        <DialogContent className=\"max-w-2xl\">\n          {selectedRefund && (\n            <>\n              <DialogHeader>\n                <DialogTitle className=\"flex items-center gap-2\">\n                  <DollarSign className=\"w-5 h-5 text-primary\" />\n                  Refund Request - Order #{selectedRefund.orderNumber}\n                </DialogTitle>\n                <DialogDescription>\n                  Review and process this refund request\n                </DialogDescription>\n              </DialogHeader>\n\n              <div className=\"space-y-4\">\n                {/* Refund Information */}\n                <Card>\n                  <CardHeader>\n                    <CardTitle className=\"text-base\">Refund Information</CardTitle>\n                  </CardHeader>\n                  <CardContent className=\"space-y-3\">\n                    <div className=\"grid grid-cols-2 gap-4\">\n                      <div>\n                        <p className=\"text-sm text-muted-foreground\">Amount</p>\n                        <p className=\"text-lg font-bold text-primary\">\n                          ₦{parseFloat(selectedRefund.amount).toLocaleString()}\n                        </p>\n                      </div>\n                      <div>\n                        <p className=\"text-sm text-muted-foreground\">Status</p>\n                        <div className=\"mt-1\">{getStatusBadge(selectedRefund.status)}</div>\n                      </div>\n                      <div>\n                        <p className=\"text-sm text-muted-foreground\">Requested By</p>\n                        <p className=\"font-medium\">{selectedRefund.requestedBy}</p>\n                      </div>\n                      <div>\n                        <p className=\"text-sm text-muted-foreground\">Requested On</p>\n                        <p className=\"font-medium\">\n                          {new Date(selectedRefund.createdAt).toLocaleString()}\n                        </p>\n                      </div>\n                    </div>\n                    <div>\n                      <p className=\"text-sm text-muted-foreground mb-1\">Reason</p>\n                      <p className=\"text-sm bg-muted p-3 rounded-lg\">{selectedRefund.reason}</p>\n                    </div>\n                    {selectedRefund.processedBy && (\n                      <div>\n                        <p className=\"text-sm text-muted-foreground\">Processed By</p>\n                        <p className=\"font-medium\">{selectedRefund.processedBy}</p>\n                      </div>\n                    )}\n                  </CardContent>\n                </Card>\n\n                {/* Order Information */}\n                {selectedRefund.order && (\n                  <Card>\n                    <CardHeader>\n                      <CardTitle className=\"text-base\">Order Details</CardTitle>\n                    </CardHeader>\n                    <CardContent className=\"space-y-3\">\n                      <div className=\"grid grid-cols-2 gap-4\">\n                        <div>\n                          <p className=\"text-sm text-muted-foreground\">Customer</p>\n                          <p className=\"font-medium\">{selectedRefund.order.customerName}</p>\n                        </div>\n                        <div>\n                          <p className=\"text-sm text-muted-foreground\">Phone</p>\n                          <p className=\"font-medium\">{selectedRefund.order.customerPhone}</p>\n                        </div>\n                        <div>\n                          <p className=\"text-sm text-muted-foreground\">Order Type</p>\n                          <p className=\"font-medium capitalize\">{selectedRefund.order.orderType}</p>\n                        </div>\n                        <div>\n                          <p className=\"text-sm text-muted-foreground\">Payment Method</p>\n                          <p className=\"font-medium capitalize\">{selectedRefund.order.paymentMethod}</p>\n                        </div>\n                      </div>\n                      \n                      {/* Order Items */}\n                      <div>\n                        <p className=\"text-sm text-muted-foreground mb-2\">Items</p>\n                        <div className=\"space-y-2\">\n                          {selectedRefund.order.items.map((item) => (\n                            <div key={item.id} className=\"flex justify-between items-center bg-muted p-2 rounded\">\n                              <div>\n                                <p className=\"font-medium text-sm\">{item.menuItem.name}</p>\n                                <p className=\"text-xs text-muted-foreground\">Qty: {item.quantity}</p>\n                              </div>\n                              <p className=\"font-semibold\">\n                                ₦{(parseFloat(item.price) * item.quantity).toLocaleString()}\n                              </p>\n                            </div>\n                          ))}\n                        </div>\n                      </div>\n                    </CardContent>\n                  </Card>\n                )}\n\n                {/* Action Section - Only show for pending refunds */}\n                {selectedRefund.status === 'pending' && (\n                  <Card className=\"border-primary/20\">\n                    <CardHeader>\n                      <CardTitle className=\"text-base\">Process Refund</CardTitle>\n                    </CardHeader>\n                    <CardContent className=\"space-y-4\">\n                      <div>\n                        <label className=\"text-sm font-medium mb-2 block\">\n                          Rejection Reason (if rejecting)\n                        </label>\n                        <Textarea\n                          placeholder=\"Enter reason for rejection...\"\n                          value={refundReason}\n                          onChange={(e) => setRefundReason(e.target.value)}\n                          className=\"resize-none\"\n                          rows={3}\n                        />\n                      </div>\n                      \n                      <div className=\"flex gap-3\">\n                        <Button\n                          variant=\"default\"\n                          className=\"flex-1 bg-green-600 hover:bg-green-700\"\n                          onClick={() => handleApproveRefund(selectedRefund.id)}\n                          disabled={processingRefund}\n                        >\n                          <CheckCircle className=\"w-4 h-4 mr-2\" />\n                          {processingRefund ? \"Processing...\" : \"Approve Refund\"}\n                        </Button>\n                        <Button\n                          variant=\"destructive\"\n                          className=\"flex-1\"\n                          onClick={() => handleRejectRefund(selectedRefund.id, refundReason)}\n                          disabled={processingRefund || !refundReason.trim()}\n                        >\n                          <XCircle className=\"w-4 h-4 mr-2\" />\n                          {processingRefund ? \"Processing...\" : \"Reject Refund\"}\n                        </Button>\n                      </div>\n                    </CardContent>\n                  </Card>\n                )}\n              </div>\n\n              <DialogFooter>\n                <Button\n                  variant=\"outline\"\n                  onClick={() => {\n                    setShowRefundDialog(false);\n                    setSelectedRefund(null);\n                    setRefundReason(\"\");\n                  }}\n                >\n                  Close\n                </Button>\n              </DialogFooter>\n            </>\n          )}\n        </DialogContent>\n      </Dialog>\n    </div>\n  );\n}\n
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Search, ShoppingCart, Trash2, Plus, Minus, AlertCircle, CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+
+interface MenuItem {
+  id: string;
+  name: string;
+  price: string;
+  imageUrl?: string;
+  category: string;
+  available: boolean;
+  stockBalance?: number;
+}
+
+interface CartItem {
+  menuItem: MenuItem;
+  quantity: number;
+}
+
+interface Order {
+  id: string;
+  orderNumber: number;
+  customerName: string;
+  customerPhone: string;
+  orderType: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  status: string;
+  totalAmount: string;
+  createdAt: string;
+  orderItems: OrderItem[];
+}
+
+interface OrderItem {
+  id: string;
+  menuItemId: string;
+  quantity: number;
+  price: string;
+  menuItemName: string;
+  menuItem?: {
+    id: string;
+    name: string;
+    price: string;
+    imageUrl?: string;
+  };
+}
+
+export default function RefundManagement() {
+  const { toast } = useToast();
+  const [orderNumber, setOrderNumber] = useState('');
+  const [orderDate, setOrderDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [loading, setLoading] = useState(false);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [originalItems, setOriginalItems] = useState<CartItem[]>([]);
+  const [replacementCart, setReplacementCart] = useState<CartItem[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [successData, setSuccessData] = useState<{ orderNumber: number; refundAmount: number } | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [processingRefund, setProcessingRefund] = useState(false);
+
+  // Fetch menu items using useQuery (same as staff-orders)
+  const { data: menuItemsData, isLoading: menuLoading } = useQuery<MenuItem[]>({
+    queryKey: ['/api/menu/all'],
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+  });
+
+  // Update menuItems when data is fetched
+  useEffect(() => {
+    if (menuItemsData) {
+      setMenuItems(menuItemsData);
+    }
+  }, [menuItemsData]);
+
+  // Fetch order by order number and date
+  const fetchOrder = async () => {
+    if (!orderNumber.trim()) {
+      toast({
+        title: 'Order Number Required',
+        description: 'Please enter an order number',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await apiRequest('GET', `/api/orders/search?orderNumber=${orderNumber}&date=${orderDate}`);
+      
+      if (!response.ok) {
+        throw new Error('Order not found');
+      }
+
+      const data = await response.json();
+      
+      // Check if order has already been refunded
+      if (data.status === 'refunded') {
+        toast({
+          title: 'Order Already Refunded',
+          description: `Order #${data.orderNumber} has already been refunded. Cannot refund the same order twice.`,
+          variant: 'destructive',
+          duration: 7000,
+        });
+        setOrder(null);
+        setOriginalItems([]);
+        setReplacementCart([]);
+        setLoading(false);
+        return;
+      }
+      
+      setOrder(data);
+
+      // Initialize originalItems with original order items (read-only display)
+      const initialOriginalItems: CartItem[] = data.orderItems.map((item: OrderItem) => ({
+        menuItem: {
+          id: item.menuItemId,
+          name: item.menuItemName || item.menuItem?.name || 'Unknown Item',
+          price: item.price,
+          imageUrl: item.menuItem?.imageUrl,
+          category: '',
+          available: true,
+        },
+        quantity: item.quantity,
+      }));
+      setOriginalItems(initialOriginalItems);
+      
+      // Start with empty replacement cart
+      setReplacementCart([]);
+
+      toast({
+        title: 'Order Found',
+        description: `Order #${data.orderNumber} loaded successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch order',
+        variant: 'destructive',
+      });
+      setOrder(null);
+      setOriginalItems([]);
+      setReplacementCart([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate totals
+  const originalTotal = order ? parseFloat(order.totalAmount) : 0;
+  const originalCartTotal = originalItems.reduce((sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity, 0);
+  const replacementTotal = replacementCart.reduce((sum, item) => sum + parseFloat(item.menuItem.price) * item.quantity, 0);
+  const refundAmount = originalTotal - replacementTotal;
+  
+  // Helper function to check if an item can be added
+  const canAddItem = (itemPrice: number) => {
+    return (replacementTotal + itemPrice) <= originalTotal;
+  };
+
+  // Add item to cart
+  const addToCart = (menuItem: MenuItem) => {
+    if (!order) {
+      toast({
+        title: 'No Order Loaded',
+        description: 'Please fetch an order first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const itemPrice = parseFloat(menuItem.price);
+    const newTotal = replacementTotal + itemPrice;
+
+    if (newTotal > originalTotal) {
+      toast({
+        title: 'Budget Exceeded',
+        description: `Adding this item would exceed the original order amount of ₦${originalTotal.toLocaleString()}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const existingItem = replacementCart.find(item => item.menuItem.id === menuItem.id);
+    
+    if (existingItem) {
+      updateQuantity(menuItem.id, existingItem.quantity + 1);
+    } else {
+      setReplacementCart([...replacementCart, { menuItem, quantity: 1 }]);
+    }
+  };
+
+  // Update quantity
+  const updateQuantity = (menuItemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(menuItemId);
+      return;
+    }
+
+    const updatedCart = replacementCart.map(item => {
+      if (item.menuItem.id === menuItemId) {
+        const newItemTotal = parseFloat(item.menuItem.price) * newQuantity;
+        const otherItemsTotal = replacementCart
+          .filter(i => i.menuItem.id !== menuItemId)
+          .reduce((sum, i) => sum + parseFloat(i.menuItem.price) * i.quantity, 0);
+        
+        if (newItemTotal + otherItemsTotal > originalTotal) {
+          toast({
+            title: 'Budget Exceeded',
+            description: `Cannot increase quantity. Would exceed original order amount.`,
+            variant: 'destructive',
+          });
+          return item;
+        }
+        
+        return { ...item, quantity: newQuantity };
+      }
+      return item;
+    });
+
+    setReplacementCart(updatedCart);
+  };
+
+  // Remove from cart
+  const removeFromCart = (menuItemId: string) => {
+    setReplacementCart(replacementCart.filter(item => item.menuItem.id !== menuItemId));
+  };
+
+  // Clear cart
+  const clearCart = () => {
+    setReplacementCart([]);
+    toast({
+      title: 'Cart Cleared',
+      description: 'Replacement cart has been cleared',
+    });
+  };
+
+  // Process refund
+  const processRefund = async () => {
+    if (!order) return;
+
+    if (!refundReason.trim()) {
+      toast({
+        title: 'Reason Required',
+        description: 'Please provide a reason for the refund',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setProcessingRefund(true);
+
+      const refundAmountValue = originalTotal - replacementTotal;
+      const replacementItems = replacementCart.map(item => ({
+        menuItemId: item.menuItem.id,
+        quantity: item.quantity,
+        price: item.menuItem.price,
+      }));
+
+      const response = await apiRequest('POST', '/api/refunds/create', {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        refundAmount: refundAmountValue.toFixed(2),
+        reason: refundReason,
+        replacementItems: replacementItems,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to process refund');
+      }
+
+      const data = await response.json();
+      const newOrderNumber = data.refundOrder?.orderNumber;
+
+      // Show success dialog with new order number
+      setSuccessData({
+        orderNumber: newOrderNumber,
+        refundAmount: refundAmountValue
+      });
+      setShowSuccessDialog(true);
+
+      // Also show toast
+      toast({
+        title: 'Refund Processed Successfully',
+        description: `New order #${newOrderNumber} created for replacement items.`,
+        duration: 5000,
+      });
+
+      // Reset form
+      setShowRefundDialog(false);
+      setRefundReason('');
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to process refund',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingRefund(false);
+    }
+  };
+
+  // Filter menu items
+  const categories = ['All', ...Array.from(new Set(menuItems.map(item => item.category)))];
+  const filteredMenuItems = menuItems.filter(item => {
+    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+    const matchesSearch = searchQuery === '' || 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch && item.available;
+  });
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="mb-6">
+          <h1 className="font-serif text-2xl md:text-3xl font-bold">Refund Management</h1>
+          <p className="text-sm text-muted-foreground">Process refunds and item replacements</p>
+        </div>
+
+        {/* Order Search Section */}
+        {!order && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Find Order</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="orderNumber">Order Number</Label>
+                  <Input
+                    id="orderNumber"
+                    type="text"
+                    placeholder="Enter order number"
+                    value={orderNumber}
+                    onChange={(e) => setOrderNumber(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && fetchOrder()}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orderDate">Order Date</Label>
+                  <Input
+                    id="orderDate"
+                    type="date"
+                    value={orderDate}
+                    onChange={(e) => setOrderDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    onClick={fetchOrder}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    {loading ? 'Searching...' : 'Find Order'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Order Details and Cart */}
+        {order && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Menu Items Section */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Replacement Items</CardTitle>
+                  <div className="mt-4">
+                    <Input
+                      type="text"
+                      placeholder="Search items..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="mb-4"
+                    />
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {categories.map((category) => (
+                        <Badge
+                          key={category}
+                          variant={selectedCategory === category ? 'default' : 'secondary'}
+                          className="cursor-pointer whitespace-nowrap"
+                          onClick={() => setSelectedCategory(category)}
+                        >
+                          {category}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto">
+                    {filteredMenuItems.map((item) => {
+                      const isInCart = replacementCart.some(cartItem => cartItem.menuItem.id === item.id);
+                      const cartItem = replacementCart.find(cartItem => cartItem.menuItem.id === item.id);
+                      const cartQuantity = cartItem ? cartItem.quantity : 0;
+                      const isOutOfStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 0;
+                      const isUnavailable = !item.available;
+                      const isLowStock = item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance > 0 && item.stockBalance <= 3;
+                      const canAddMore = canAddItem(parseFloat(item.price));
+                      
+                      return (
+                        <Card
+                          key={item.id}
+                          className={`overflow-hidden hover-elevate cursor-pointer transition-all ${
+                            isInCart ? 'ring-2 ring-primary' : ''
+                          } ${(isOutOfStock || isUnavailable) ? 'opacity-75' : ''}`}
+                          onClick={() => canAddMore && !isOutOfStock && !isUnavailable && addToCart(item)}
+                        >
+                          <div className="aspect-video overflow-hidden relative">
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-muted flex items-center justify-center">
+                                <span className="text-muted-foreground">No image</span>
+                              </div>
+                            )}
+                            {isInCart && (
+                              <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5 md:p-1 z-10">
+                                <Plus className="w-3 h-3 md:w-4 md:h-4" />
+                              </div>
+                            )}
+                            {isUnavailable && (
+                              <div className="absolute inset-0 bg-gray-900/90 flex items-center justify-center z-10">
+                                <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-gray-800/70 shadow-lg border-2 border-white">
+                                  UNAVAILABLE
+                                </span>
+                              </div>
+                            )}
+                            {!isUnavailable && isOutOfStock && (
+                              <div className="absolute inset-0 bg-primary/90 flex items-center justify-center z-10">
+                                <span className="text-white font-bold text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 rounded-lg bg-primary/70 shadow-lg border-2 border-white">
+                                  SOLD OUT
+                                </span>
+                              </div>
+                            )}
+                            {!isOutOfStock && !isUnavailable && isLowStock && (
+                              <div className="absolute top-2 left-2 z-10">
+                                <Badge variant="destructive" className="text-xs font-semibold shadow-md">
+                                  Only {item.stockBalance} left!
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                          <CardContent className="p-3 md:p-4">
+                            <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{item.name}</h3>
+                            <p className="text-base md:text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
+                            {item.stockBalance !== null && item.stockBalance !== undefined ? (
+                              <div className="flex items-center gap-1 mt-2">
+                                <span className="text-xs text-muted-foreground">Stock:</span>
+                                <span className={`text-xs font-semibold ${
+                                  item.stockBalance <= 0 ? 'text-red-600' :
+                                  item.stockBalance <= 3 ? 'text-orange-500' :
+                                  'text-green-600'
+                                }`}>
+                                  {item.stockBalance} portions
+                                </span>
+                              </div>
+                            ) : (
+                              <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
+                            )}
+                            
+                            {isInCart && cartQuantity > 0 && (
+                              <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 w-8 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateQuantity(item.id, cartQuantity - 1);
+                                  }}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="font-semibold text-base min-w-[2rem] text-center">
+                                  {cartQuantity}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 w-8 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateQuantity(item.id, cartQuantity + 1);
+                                  }}
+                                  disabled={!canAddItem(parseFloat(item.price))}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cart Section */}
+            <div>
+              <Card className="sticky top-4">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5" />
+                      Replacement Cart
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearCart}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Order Info */}
+                  <div className="mb-4 p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-semibold">Order #{order.orderNumber}</p>
+                    <p className="text-xs text-muted-foreground">{order.customerName}</p>
+                    <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+                  </div>
+
+                  {/* Original Order Items */}
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      Original Order Items
+                    </h3>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto p-2 bg-red-50 border border-red-200 rounded">
+                      {originalItems.map((item) => (
+                        <div key={item.menuItem.id} className="flex items-center justify-between p-2 bg-white rounded">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.menuItem.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              ₦{parseFloat(item.menuItem.price).toLocaleString()} × {item.quantity}
+                            </p>
+                          </div>
+                          <p className="font-semibold text-sm">
+                            ₦{(parseFloat(item.menuItem.price) * item.quantity).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Replacement Cart Items */}
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4" />
+                      Replacement Items
+                    </h3>
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto p-2 bg-green-50 border border-green-200 rounded">
+                      {replacementCart.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No replacement items</p>
+                          <p className="text-xs">Full refund will be processed</p>
+                        </div>
+                      ) : (
+                        replacementCart.map((item) => (
+                          <div key={item.menuItem.id} className="flex items-center gap-2 p-2 bg-white rounded">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{item.menuItem.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                ₦{parseFloat(item.menuItem.price).toLocaleString()} each
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateQuantity(item.menuItem.id, item.quantity - 1)}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateQuantity(item.menuItem.id, item.quantity + 1)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeFromCart(item.menuItem.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Budget Summary */}
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="text-sm font-semibold mb-2">Refund Summary</h3>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Original Amount:</span>
+                      <span className="font-semibold">₦{originalTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Replacement Total:</span>
+                      <span className="font-semibold">₦{replacementTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t pt-1 mt-1">
+                      <span>Refund Amount:</span>
+                      <span className={refundAmount >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        ₦{Math.abs(refundAmount).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="space-y-2">
+                    {refundAmount < 0 && (
+                      <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Cart exceeds original order amount</span>
+                      </div>
+                    )}
+                    <Button
+                      className="w-full"
+                      onClick={() => setShowRefundDialog(true)}
+                      disabled={refundAmount < 0}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Process Refund
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setOrder(null);
+                        setOriginalItems([]);
+                        setReplacementCart([]);
+                        setOrderNumber('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Refund Confirmation Dialog */}
+      <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Refund</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for this refund and replacement
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="refundReason">Refund Reason</Label>
+              <Textarea
+                id="refundReason"
+                placeholder="Enter reason for refund..."
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm font-semibold mb-2">Summary:</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Original Amount:</span>
+                  <span>₦{originalTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Replacement Items:</span>
+                  <span>₦{replacementTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-bold border-t pt-1 mt-1">
+                  <span>Refund Amount:</span>
+                  <span className="text-green-600">₦{refundAmount.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRefundDialog(false)}
+              disabled={processingRefund}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={processRefund}
+              disabled={processingRefund || !refundReason.trim()}
+            >
+              {processingRefund ? 'Processing...' : 'Confirm Refund'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="w-6 h-6" />
+              Refund Processed Successfully!
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="text-center">
+              <div className="mb-4 p-6 bg-green-50 border-2 border-green-200 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">New Refund Order Created</p>
+                <p className="text-4xl font-bold text-green-600">#{successData?.orderNumber}</p>
+              </div>
+              
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Refund Amount</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  ₦{successData?.refundAmount.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-sm text-muted-foreground text-center">
+              <p>The replacement order has been sent to the kitchen.</p>
+              <p>Stock has been deducted for replacement items.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              className="w-full"
+              onClick={() => {
+                setShowSuccessDialog(false);
+                setSuccessData(null);
+                setOrder(null);
+                setOriginalItems([]);
+                setReplacementCart([]);
+                setOrderNumber('');
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

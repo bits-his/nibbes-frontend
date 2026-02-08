@@ -142,6 +142,8 @@ export default function OrderManagement() {
     todayRevenue: number;
     pendingOrders: number;
     completedOrders: number;
+    refundedOrders?: number;
+    refundedAmount?: number;
   }>({
     queryKey: ["/api/orders/stats", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
@@ -288,7 +290,7 @@ const getStatusBadge = (status: string) => {
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         <h1 className="font-serif text-4xl font-bold mb-8">Order Management</h1>
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="text-sm text-muted-foreground mb-1">Today's Orders</div>
@@ -324,6 +326,21 @@ const getStatusBadge = (status: string) => {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-sm text-muted-foreground mb-1">Refunded</div>
+              <div className="text-2xl font-bold text-orange-600" data-testid="stat-refunded">
+                {(() => {
+                  const refundedOrders = orders?.filter(o => o.status === 'refunded') || [];
+                  const refundAmount = refundedOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
+                  return `₦${refundAmount.toLocaleString()}`;
+                })()}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {orders?.filter(o => o.status === 'refunded').length || 0} orders
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters */}
@@ -356,6 +373,7 @@ const getStatusBadge = (status: string) => {
                   <SelectItem value="ready">Ready</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -552,6 +570,7 @@ const getStatusBadge = (status: string) => {
                                 <SelectItem value="ready">Ready</SelectItem>
                                 <SelectItem value="completed">Completed</SelectItem>
                                 <SelectItem value="cancelled">Cancelled</SelectItem>
+                                <SelectItem value="refunded">Refunded</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

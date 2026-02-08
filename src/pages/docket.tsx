@@ -634,10 +634,8 @@ const getStatusCardColor = (status: string) => {
         {/* Connection Status Banner */}
         {!isWsConnected && (
           <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded-lg flex items-center gap-2">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-            <p className="text-sm text-yellow-800">
-              Reconnecting to live updates... Orders will refresh automatically every 5 seconds.
-            </p>
+            <Clock className="w-5 h-5 text-yellow-700" />
+            <span className="text-sm text-yellow-700">Reconnecting to live updates...</span>
           </div>
         )}
 

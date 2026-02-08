@@ -874,7 +874,8 @@ const getStatusBadge = (status: string) => {
                           <div className="font-semibold text-base sm:text-lg">
                             {item.quantity}x {itemName}
                           </div>
-                          {item.specialInstructions && (
+                          {/* Hide special instructions for refund orders */}
+                          {item.specialInstructions && order.orderType !== 'refund' && (
                             <div className="text-xs sm:text-sm text-muted-foreground italic mt-1">
                               Note: {item.specialInstructions}
                             </div>
@@ -929,15 +930,18 @@ const getStatusBadge = (status: string) => {
                           {updatingOrderId === String(order.id) ? "Updating..." : "Collected ✅"}
                         </Button>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 flex items-center justify-center gap-2"
-                        onClick={() => handlePrintPreview(order)}
-                      >
-                        <Printer className="w-4 h-4" />
-                        Print Ticket
-                      </Button>
+                      {/* Hide print ticket button for refunded orders */}
+                      {order.status !== "refunded" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 flex items-center justify-center gap-2"
+                          onClick={() => handlePrintPreview(order)}
+                        >
+                          <Printer className="w-4 h-4" />
+                          Print Ticket
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
