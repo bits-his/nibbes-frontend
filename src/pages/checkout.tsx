@@ -34,10 +34,24 @@ interface ServiceCharge {
   status: 'active' | 'inactive'
 }
 
+// ============================================
+// Interswitch (DISABLED)
+// ============================================
+/*
 // Extend Window interface for Interswitch
 declare global {
   interface Window {
     webpayCheckout: (config: any) => void;
+  }
+}
+*/
+
+// ============================================
+// Paystack (ACTIVE)
+// ============================================
+declare global {
+  interface Window {
+    PaystackPop: any;
   }
 }
 

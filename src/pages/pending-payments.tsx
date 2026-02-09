@@ -106,8 +106,9 @@ const PendingPayments: React.FC = () => {
       
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`${backendUrl}/api/payments/verify/${transactionRef}`, {
-        method: 'POST',
+      // Use Paystack verification endpoint
+      const response = await fetch(`${backendUrl}/api/paystack/verify/${transactionRef}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -119,16 +120,14 @@ const PendingPayments: React.FC = () => {
       if (data.success) {
         toast({
           title: "Payment Verified! ✅",
-          description: data.message || "Payment has been successfully verified and marked as paid.",
+          description: "Payment has been successfully verified and marked as paid.",
         });
         
         // Remove the payment from the list since it's now paid
         setPayments(prev => prev.filter(p => p.transactionRef !== transactionRef));
       } else {
         // Show error with suggestion
-        const description = data.suggestion 
-          ? `${data.message}. ${data.suggestion}`
-          : data.message || "Payment could not be verified as successful.";
+        const description = data.message || "Payment could not be verified as successful.";
           
         toast({
           title: "Verification Failed",

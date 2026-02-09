@@ -759,6 +759,10 @@ export default function CustomerMenu() {
         })
       );
 
+      // ============================================
+      // Interswitch (DISABLED)
+      // ============================================
+      /*
       // Check if Interswitch script is loaded
       if (typeof (window as any).webpayCheckout === "undefined") {
         toast({
@@ -791,109 +795,121 @@ export default function CustomerMenu() {
         mode: "LIVE",
         payment_channels: ["card", "bank"],
         onComplete: async function (response: any) {
-          console.log("🔔 Payment completed:", response);
-          
-          // For transfers, Interswitch returns success immediately even if not paid
-          // We need to verify with their API first
-          try {
-            const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`;
-            const verifyResponse = await fetch(verifyUrl, {
-              method: "GET",
-              headers: { "Content-Type": "application/json" },
-            });
-            const verifyData = await verifyResponse.json();
-            
-            console.log("🔍 Interswitch verification response:", verifyData);
-
-            // CRITICAL: Only accept ResponseCode "00" (Approved)
-            // "Z0" = Transaction Not Completed (no money transferred yet)
-            // Must have PaymentId to confirm payment was actually made
-            const isSuccess = verifyData.ResponseCode === "00" && verifyData.PaymentId;
-            
-            if (isSuccess) {
-              // Clear cart and show success message
-              clearCart();
-              toast({
-                title: "Payment Successful! 🎉",
-                description: `Order #${createdOrder.orderNumber} has been paid.`,
-              });
-              
-              // Navigate to docket
-              startTransition(() => {
-                setLocation("/docket");
-              });
-
-              // Call backend callback
-              const backendUrl =
-                import.meta.env.VITE_BACKEND_URL ||
-                "https://server.brainstorm.ng/nibbleskitchen";
-              
-              try {
-                const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    txnref: txnRef,
-                    resp: "00",
-                    amount: amount,
-                    orderId: createdOrder.id,
-                    interswitchResponse: verifyData,
-                  }),
-                });
-                const callbackData = await callbackRes.json();
-                console.log("✅ Backend callback response:", callbackData);
-              } catch (err) {
-                console.error("❌ Backend callback failed:", err);
-              }
-            } else {
-              // Payment not yet confirmed - show pending message
-              toast({
-                title: "Payment Pending",
-                description: "Your transfer is being confirmed. Order will appear in 5-10 minutes.",
-              });
-              
-              // Navigate to home
-              startTransition(() => {
-                setLocation("/");
-              });
-            }
-          } catch (error) {
-            console.error("❌ Error verifying payment:", error);
-            toast({
-              title: "Payment Verification Failed",
-              description: "Please contact support if money was deducted.",
-              variant: "destructive",
-            });
-          }
+          // ... OLD INTERSWITCH CODE ...
         },
         onClose: function () {
-          console.log("Payment modal closed by user");
-          toast({
-            title: "Payment Cancelled",
-            description: "Redirecting to home page...",
-          });
-          startTransition(() => {
-            setTimeout(() => {
-              setLocation("/");
-            }, 1000);
-          });
+          // ... OLD INTERSWITCH CODE ...
         },
         onError: function (error: any) {
-          console.error("Payment error:", error);
-          toast({
-            title: "Payment Error",
-            description: "An error occurred. Redirecting to home page...",
-            variant: "destructive",
-          });
-          startTransition(() => {
-            setTimeout(() => {
-              setLocation("/");
-            }, 2000);
-          });
+          // ... OLD INTERSWITCH CODE ...
         },
       };
 
       (window as any).webpayCheckout(paymentConfig);
+      */
+      // ============================================
+      // End Interswitch (DISABLED)
+      // ============================================
+
+      // ============================================
+      // PAYSTACK PAYMENT (ACTIVE)
+      // ============================================
+      
+      // Check if Paystack script is loaded
+      if (typeof (window as any).PaystackPop === "undefined") {
+        toast({
+          title: "Payment System Unavailable",
+          description: "Please refresh the page and try again.",
+          variant: "destructive",
+        });
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      // Initialize Paystack
+      const handler = (window as any).PaystackPop.setup({
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+        email: guestSession?.guestEmail || user?.email || "customer@nibbleskitchen.com",
+        amount: amount, // Amount in kobo
+        ref: txnRef,
+        currency: "NGN",
+        metadata: {
+          orderId: createdOrder.id,
+          orderNumber: createdOrder.orderNumber,
+          customerName: orderData.customerName,
+          custom_fields: [
+            {
+              display_name: "Order Number",
+              variable_name: "order_number",
+              value: createdOrder.orderNumber.toString(),
+            },
+          ],
+        },
+        callback: function (response: any) {
+          console.log("✅ Paystack payment successful:", response);
+
+          // Handle verification asynchronously
+          (async () => {
+            try {
+              // Verify payment with backend
+              const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5050";
+              const token = localStorage.getItem("token");
+              
+              const verifyResponse = await fetch(
+                `${backendUrl}/api/paystack/verify/${response.reference}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+
+              const verifyData = await verifyResponse.json();
+
+              if (verifyData.success) {
+                clearCart();
+                toast({
+                  title: "Payment Successful! 🎉",
+                  description: `Order #${createdOrder.orderNumber} has been paid.`,
+                });
+                startTransition(() => {
+                  setLocation("/docket");
+                });
+              } else {
+                toast({
+                  title: "Payment Verification Failed",
+                  description: "Please contact support if money was deducted.",
+                  variant: "destructive",
+                });
+              }
+            } catch (error) {
+              console.error("❌ Verification error:", error);
+              toast({
+                title: "Verification Error",
+                description: "Please contact support.",
+                variant: "destructive",
+              });
+            }
+
+            setIsProcessingPayment(false);
+          })();
+        },
+        onClose: function () {
+          console.log("Payment window closed");
+          setIsProcessingPayment(false);
+          toast({
+            title: "Payment Cancelled",
+            description: "You closed the payment window.",
+          });
+        },
+      });
+
+      handler.openIframe();
+      
+      // ============================================
+      // End Paystack (ACTIVE)
+      // ============================================
+      
     } catch (error: any) {
       console.error("Order creation error:", error);
       toast({
