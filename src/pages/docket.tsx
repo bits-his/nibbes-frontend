@@ -23,6 +23,60 @@ export default function DocketPage() {
   const { toast } = useToast();
   const guestSession = getGuestSession();
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [isAutoVerifying, setIsAutoVerifying] = useState(false);
+
+  // AUTO-VERIFY: When customer comes back after closing browser
+  useEffect(() => {
+    const autoVerifyPendingPayments = async () => {
+      if (!user || isAutoVerifying) return;
+      
+      setIsAutoVerifying(true);
+      console.log('🔄 Auto-verifying pending payments on docket load...');
+      
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+        const token = localStorage.getItem('token');
+        
+        const response = await fetch(`${backendUrl}/api/payments/user/pending/verify`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        console.log('✅ Auto-verify result:', data);
+        
+        if (data.verified > 0) {
+          toast({
+            title: "Payment Verified! 🎉",
+            description: `${data.verified} pending payment(s) confirmed. Your order is ready!`,
+            duration: 5000,
+          });
+          // Refetch orders to show the newly verified ones
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/orders/active/customer"] });
+          }, 1000);
+        } else if (data.pending > 0) {
+          // Show info about pending payments
+          toast({
+            title: "Payment Processing",
+            description: `You have ${data.pending} payment(s) still being processed. Please wait a few minutes.`,
+            variant: "default",
+            duration: 7000,
+          });
+        }
+      } catch (err) {
+        console.error('❌ Auto-verify error:', err);
+      } finally {
+        setIsAutoVerifying(false);
+      }
+    };
+
+    // Run auto-verify after 2 seconds (give time for page to load)
+    const timer = setTimeout(autoVerifyPendingPayments, 2000);
+    return () => clearTimeout(timer);
+  }, [user, toast]);
   const [lookupPhone, setLookupPhone] = useState("");
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);

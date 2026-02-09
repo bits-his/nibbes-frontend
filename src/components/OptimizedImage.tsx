@@ -48,6 +48,17 @@ export function OptimizedImage({
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
+
+  // Don't render if src is empty or invalid
+  if (!src || src.trim() === '') {
+    return (
+      <div className={`relative overflow-hidden bg-muted ${className}`}>
+        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+          No image
+        </div>
+      </div>
+    );
+  }
   const isLoadedRef = useRef<boolean>(false); // Track loaded state with ref to avoid stale closures
   const loadedImageSrcRef = useRef<string>(''); // Track the src that was successfully loaded
   const networkStatus = useNetworkStatus();

@@ -81,6 +81,9 @@ export default function InterswitchPayButton({
 
       onComplete: async (response: any) => {
         console.log("🔔 Interswitch onComplete triggered:", response)
+        console.log("📋 Transaction Ref:", transactionRef)
+        console.log("📋 Order ID:", orderId)
+        console.log("📋 Order Number:", orderNumber)
         const respCode = response.resp || response.responseCode
         console.log("📋 Response code:", respCode)
 
@@ -98,6 +101,8 @@ export default function InterswitchPayButton({
         
         try {
           console.log("🔄 Calling verify-with-retry endpoint...")
+          console.log("🔄 Backend URL:", backendUrl)
+          console.log("🔄 Request body:", { transactionRef, orderId })
           
           const verifyResponse = await fetch(`${backendUrl}/api/payments/verify-with-retry`, {
             method: "POST",
@@ -107,6 +112,9 @@ export default function InterswitchPayButton({
               orderId: orderId,
             }),
           })
+          
+          console.log("📡 Response status:", verifyResponse.status)
+          console.log("📡 Response ok:", verifyResponse.ok)
           
           const verifyData = await verifyResponse.json()
           console.log("✅ Verification response:", verifyData)

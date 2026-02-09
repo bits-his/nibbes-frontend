@@ -678,9 +678,10 @@ export default function CustomerMenu() {
     }
 
     const customerName = user?.username || guestSession?.guestName;
-    const customerPhone = user?.phone || guestSession?.guestPhone;
+    const customerPhone = user?.phoneNumber || user?.phone || guestSession?.guestPhone;
 
-    if (!customerName || !customerPhone) {
+    // Only require guest info for non-authenticated users
+    if (!user && (!customerName || !customerPhone)) {
       toast({
         title: "Missing Information",
         description: "Please provide your name and phone number.",
@@ -791,67 +792,76 @@ export default function CustomerMenu() {
         payment_channels: ["card", "bank"],
         onComplete: async function (response: any) {
           console.log("🔔 Payment completed:", response);
-          if (response.desc === "Approved by Financial Institution") {
-            // Clear cart and show success message immediately
-            clearCart();
-            toast({
-              title: "Payment Successful! 🎉",
-              description: `Order #${createdOrder.orderNumber} has been paid.`,
+          
+          // For transfers, Interswitch returns success immediately even if not paid
+          // We need to verify with their API first
+          try {
+            const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`;
+            const verifyResponse = await fetch(verifyUrl, {
+              method: "GET",
+              headers: { "Content-Type": "application/json" },
             });
+            const verifyData = await verifyResponse.json();
             
-            // Navigate immediately to docket
-            startTransition(() => {
-              setLocation("/docket");
-            });
+            console.log("🔍 Interswitch verification response:", verifyData);
 
-            // Verify payment and call backend callback in the background (non-blocking)
-            try {
-              const verifyUrl = `https://webpay.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode=MX169500&transactionreference=${txnRef}&amount=${amount}`;
-              const verifyResponse = await fetch(verifyUrl, {
-                method: "GET",
-                headers: { "Content-Type": "application/json" },
+            // CRITICAL: Only accept ResponseCode "00" (Approved)
+            // "Z0" = Transaction Not Completed (no money transferred yet)
+            // Must have PaymentId to confirm payment was actually made
+            const isSuccess = verifyData.ResponseCode === "00" && verifyData.PaymentId;
+            
+            if (isSuccess) {
+              // Clear cart and show success message
+              clearCart();
+              toast({
+                title: "Payment Successful! 🎉",
+                description: `Order #${createdOrder.orderNumber} has been paid.`,
               });
-              const verifyData = await verifyResponse.json();
+              
+              // Navigate to docket
+              startTransition(() => {
+                setLocation("/docket");
+              });
 
-              if (verifyData.ResponseCode === "00") {
-                const backendUrl =
-                  import.meta.env.VITE_BACKEND_URL ||
-                  "https://server.brainstorm.ng/nibbleskitchen";
-                let callbackSuccess = false;
-
-                for (let attempt = 1; attempt <= 3 && !callbackSuccess; attempt++) {
-                  try {
-                    const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        txnref: txnRef,
-                        resp: "00",
-                        amount: amount,
-                        orderId: createdOrder.id,
-                        interswitchResponse: verifyData,
-                      }),
-                    });
-                    const callbackData = await callbackRes.json();
-                    console.log("✅ Backend callback response:", callbackData);
-                    callbackSuccess = true;
-                  } catch (err) {
-                    console.error(`❌ Backend callback attempt ${attempt} failed:`, err);
-                    if (attempt < 3) await new Promise((r) => setTimeout(r, 1000));
-                  }
-                }
-              } else {
-                console.error("❌ Payment verification failed:", verifyData);
+              // Call backend callback
+              const backendUrl =
+                import.meta.env.VITE_BACKEND_URL ||
+                "https://server.brainstorm.ng/nibbleskitchen";
+              
+              try {
+                const callbackRes = await fetch(`${backendUrl}/api/payment/callback`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    txnref: txnRef,
+                    resp: "00",
+                    amount: amount,
+                    orderId: createdOrder.id,
+                    interswitchResponse: verifyData,
+                  }),
+                });
+                const callbackData = await callbackRes.json();
+                console.log("✅ Backend callback response:", callbackData);
+              } catch (err) {
+                console.error("❌ Backend callback failed:", err);
               }
-            } catch (error) {
-              console.error("❌ Error verifying payment:", error);
-              // Don't show error to user since they're already redirected
+            } else {
+              // Payment not yet confirmed - show pending message
+              toast({
+                title: "Payment Pending",
+                description: "Your transfer is being confirmed. Order will appear in 5-10 minutes.",
+              });
+              
+              // Navigate to home
+              startTransition(() => {
+                setLocation("/");
+              });
             }
-          } else {
-            // Payment was not approved by Interswitch
+          } catch (error) {
+            console.error("❌ Error verifying payment:", error);
             toast({
-              title: "Payment Failed",
-              description: response.desc || "Payment was not approved.",
+              title: "Payment Verification Failed",
+              description: "Please contact support if money was deducted.",
               variant: "destructive",
             });
           }
