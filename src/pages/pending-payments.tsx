@@ -13,6 +13,8 @@ interface PendingPayment {
   amount: string;
   paymentMethod: string;
   createdAt: string;
+  isArchived?: boolean;
+  status?: string;
   order: {
     id: string;
     orderNumber: number;
@@ -35,6 +37,7 @@ const PendingPayments: React.FC = () => {
   const [payments, setPayments] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifyingPayments, setVerifyingPayments] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(true);
   const [dateFrom, setDateFrom] = useState(() => {
     // Default to today
     const today = new Date();
@@ -97,7 +100,7 @@ const PendingPayments: React.FC = () => {
     }
   };
 
-  const verifyPayment = async (transactionRef: string, forceSuccess = false) => {
+  const verifyPayment = async (transactionRef: string) => {
     try {
       setVerifyingPayments(prev => new Set(prev).add(transactionRef));
       
@@ -108,8 +111,7 @@ const PendingPayments: React.FC = () => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ forceSuccess })
+        }
       });
 
       const data = await response.json();
@@ -123,7 +125,7 @@ const PendingPayments: React.FC = () => {
         // Remove the payment from the list since it's now paid
         setPayments(prev => prev.filter(p => p.transactionRef !== transactionRef));
       } else {
-        // Show error with suggestion for force verification
+        // Show error with suggestion
         const description = data.suggestion 
           ? `${data.message}. ${data.suggestion}`
           : data.message || "Payment could not be verified as successful.";
@@ -197,14 +199,23 @@ const PendingPayments: React.FC = () => {
             Review and verify payments that may have been debited but not confirmed
           </p>
         </div>
-        <Button 
-          onClick={() => fetchPendingPayments(pagination.page)}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowArchived(!showArchived)}
+            variant={showArchived ? "default" : "outline"}
+            className="flex items-center gap-2"
+          >
+            {showArchived ? "Hide Archived" : "Show Archived"}
+          </Button>
+          <Button 
+            onClick={() => fetchPendingPayments(pagination.page)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Date Range Filter */}
@@ -264,9 +275,39 @@ const PendingPayments: React.FC = () => {
         </Card>
       ) : (
         <>
+          {/* Summary Card */}
+          <Card className="mb-4 bg-blue-50 border-blue-200">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Pending</p>
+                    <p className="text-2xl font-bold text-blue-600">{payments.length}</p>
+                  </div>
+                  <div className="h-12 w-px bg-gray-300"></div>
+                  <div>
+                    <p className="text-sm text-gray-600">Active (&lt; 24hrs)</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {payments.filter(p => !p.isArchived).length}
+                    </p>
+                  </div>
+                  <div className="h-12 w-px bg-gray-300"></div>
+                  <div>
+                    <p className="text-sm text-gray-600">Archived (&gt; 24hrs)</p>
+                    <p className="text-2xl font-bold text-gray-600">
+                      {payments.filter(p => p.isArchived).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4">
-            {payments.map((payment) => (
-              <Card key={payment.id} className="border-l-4 border-l-yellow-500">
+            {payments
+              .filter(payment => showArchived || !payment.isArchived)
+              .map((payment) => (
+              <Card key={payment.id} className={`border-l-4 ${payment.isArchived ? 'border-l-gray-400 bg-gray-50' : 'border-l-yellow-500'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div>
@@ -285,6 +326,11 @@ const PendingPayments: React.FC = () => {
                           </>
                         )}
                         <span>{formatDate(payment.createdAt)}</span>
+                        {payment.isArchived && (
+                          <Badge variant="secondary" className="bg-gray-500 text-white">
+                            ARCHIVED
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -321,16 +367,6 @@ const PendingPayments: React.FC = () => {
                       )}
                       {verifyingPayments.has(payment.transactionRef) ? 'Verifying...' : 'Verify Payment'}
                     </Button>
-                    
-                    {/* <Button
-                      onClick={() => verifyPayment(payment.transactionRef, true)}
-                      disabled={verifyingPayments.has(payment.transactionRef)}
-                      variant="secondary"
-                      className="flex items-center gap-2"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Force Verify
-                    </Button> */}
                     
                     <Button
                       variant="outline"

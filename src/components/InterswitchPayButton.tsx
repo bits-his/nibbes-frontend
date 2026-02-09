@@ -82,49 +82,77 @@ export default function InterswitchPayButton({
       onComplete: async (response: any) => {
         console.log("🔔 Interswitch onComplete triggered:", response)
         const respCode = response.resp || response.responseCode
-        console.log("📝 Response code:", respCode)
+        console.log("📋 Response code:", respCode)
 
-        // Call backend callback
-        // For ngrok testing, use ngrok URL directly
-        const callbackUrl = `https://properly-sentinellike-stevie.ngrok-free.dev/api/payment/callback`
-        // const callbackUrl = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050'}/api/payment/callback`
-        console.log("🌐 Calling callback URL:", callbackUrl)
+        // Show verifying message
+        toast({
+          title: "Verifying Payment...",
+          description: "Please wait while we confirm your payment with the bank. This may take up to 2 minutes.",
+          duration: 120000, // 2 minutes
+        })
+
+        setIsProcessing(true)
+
+        // Call verify-with-retry endpoint - waits until payment is confirmed
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050'
         
         try {
-          const callbackResponse = await fetch(callbackUrl, {
+          console.log("🔄 Calling verify-with-retry endpoint...")
+          
+          const verifyResponse = await fetch(`${backendUrl}/api/payments/verify-with-retry`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              txnref: transactionRef,
-              resp: respCode,
-              amount: amountInKobo,
+              transactionRef: transactionRef,
+              orderId: orderId,
             }),
           })
-          console.log("✅ Callback response status:", callbackResponse.status)
-          const callbackData = await callbackResponse.text()
-          console.log("✅ Callback response data:", callbackData)
+          
+          const verifyData = await verifyResponse.json()
+          console.log("✅ Verification response:", verifyData)
+          
+          setIsProcessing(false)
+          
+          if (verifyData.success && verifyData.verified) {
+            // Payment confirmed!
+            console.log(`✅ Payment verified after ${verifyData.attempts} attempts`)
+            
+            toast({
+              title: "Payment Confirmed! 🎉",
+              description: orderNumber
+                ? `Order #${orderNumber} is confirmed and being prepared. Redirecting...`
+                : "Payment confirmed successfully. Redirecting...",
+              duration: 3000,
+            })
+            
+            onSuccess?.(response)
+            // Redirect to docket
+            setTimeout(() => setLocation("/docket?payment=success"), 2000)
+          } else {
+            // Payment not confirmed yet (timeout after 2 minutes)
+            toast({
+              title: "Payment Processing",
+              description: verifyData.message || "Your payment is still being processed. Please check your orders in a few minutes.",
+              variant: "default",
+              duration: 10000,
+            })
+            
+            // Still redirect to docket so they can check later
+            setTimeout(() => setLocation("/docket"), 3000)
+          }
         } catch (err) {
-          console.error("❌ Payment callback error:", err)
-        }
-
-        setIsProcessing(false)
-
-        if (respCode === "00") {
+          console.error("❌ Payment verification error:", err)
+          setIsProcessing(false)
+          
           toast({
-            title: "Payment Successful! 🎉",
-            description: orderNumber
-              ? `Order #${orderNumber} has been paid.`
-              : "Payment completed successfully.",
-          })
-          onSuccess?.(response)
-          setTimeout(() => setLocation("/docket"), 1500)
-        } else {
-          toast({
-            title: "Payment Failed",
-            description: response.desc || "Payment could not be completed.",
+            title: "Verification Error",
+            description: "Could not verify payment. Please check your orders page or contact support.",
             variant: "destructive",
+            duration: 7000,
           })
-          onError?.(response)
+          
+          // Redirect anyway so they can try manual verify
+          setTimeout(() => setLocation("/docket"), 3000)
         }
       },
 

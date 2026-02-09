@@ -49,8 +49,8 @@ export const orderSchema = z.object({
   tableNumber: z.number(),
   customerName: z.string(), // Added customer name field
   customerPhone: z.string().optional(), // Added customer phone field
-  orderType: z.enum(['online', 'walk-in', 'dine-in', 'delivery', 'pickup']), // Added order type field
-  status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']), // Updated status enum to match frontend usage
+  orderType: z.enum(['online', 'walk-in', 'dine-in', 'delivery', 'pickup', 'refund']), // Added 'refund' order type
+  status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled', 'refunded']), // Added 'refunded' status
   totalAmount: z.string(),
   paymentStatus: z.enum(['pending', 'paid', 'failed']).default('pending'), // Added payment status
   paymentMethod: z.string().optional(), // Added payment method
@@ -74,8 +74,8 @@ export const insertOrderSchema = z.object({
   tableNumber: z.number(),
   customerName: z.string(),
   customerPhone: z.string().optional(),
-  orderType: z.enum(['online', 'walk-in', 'dine-in']).default('online'),
-  status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']).default('pending'),
+  orderType: z.enum(['online', 'walk-in', 'dine-in', 'refund']).default('online'),
+  status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled', 'refunded']).default('pending'),
   totalAmount: z.string(),
   paymentStatus: z.enum(['pending', 'paid', 'failed']).default('pending'),
   paymentMethod: z.string().optional(),
