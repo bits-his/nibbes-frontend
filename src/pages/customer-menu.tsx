@@ -678,7 +678,7 @@ export default function CustomerMenu() {
     }
 
     const customerName = user?.username || guestSession?.guestName;
-    const customerPhone = user?.phoneNumber || user?.phone || guestSession?.guestPhone;
+    const customerPhone = user?.phone || guestSession?.guestPhone;
 
     // Only require guest info for non-authenticated users
     if (!user && (!customerName || !customerPhone)) {
