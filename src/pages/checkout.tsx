@@ -2385,14 +2385,14 @@ export default function Checkout() {
 
             <DialogFooter className="flex-col space-y-2">
               <div className="w-full">
-                {/* <Button
+                <Button
                   className="w-full bg-gradient-to-r from-[#4EB5A4] to-teal-600 text-white hover:from-[#3da896] hover:to-teal-700 text-sm sm:text-base"
                   onClick={handlePaymentConfirmation}
                   disabled={createOrderMutation.isPending || isProcessingPayment}
                 >
                   {isProcessingPayment ? "Processing..." : "Confirm Order"}
                   <Check className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
-                </Button> */}
+                </Button>
               </div>
             </DialogFooter>
           </DialogContent>

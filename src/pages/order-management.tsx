@@ -468,8 +468,13 @@ const getStatusBadge = (status: string) => {
 
         {/* Orders Table */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Orders</CardTitle>
+            <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Showing</div>
+              <div className="text-2xl font-bold text-primary">{filteredOrders?.length || 0}</div>
+              <div className="text-sm font-medium text-muted-foreground">orders</div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
