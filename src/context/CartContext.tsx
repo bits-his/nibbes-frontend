@@ -51,6 +51,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('User changed, loading cart for:', userId || 'guest');
       setCurrentUserId(userId);
       
+      // Check for pending checkout cart first (from signup flow)
+      const pendingCart = localStorage.getItem('pendingCheckoutCart');
+      if (pendingCart && userId) {
+        try {
+          const parsedCart = JSON.parse(pendingCart);
+          if (Array.isArray(parsedCart) && parsedCart.length > 0) {
+            console.log('Restoring pending checkout cart after signup:', parsedCart.length, 'items');
+            setCart(parsedCart);
+            // Save to user's cart
+            localStorage.setItem(cartKey, pendingCart);
+            // Clear pending cart
+            localStorage.removeItem('pendingCheckoutCart');
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to parse pending checkout cart', error);
+        }
+      }
+      
       const savedCart = localStorage.getItem(cartKey);
       if (savedCart) {
         try {

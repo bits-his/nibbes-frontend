@@ -249,19 +249,25 @@ export default function StaffOrders() {
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
-      customerName: "Nibbles Kitchen",
+      customerName: "Nibbles Fast Food",
       customerPhone: "",
     },
   });
 
   // PERFORMANCE FIX: Fetch menu items with better caching and no unnecessary refetches
-  const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
+  const { data: menuItems, isLoading, refetch } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu/all"],
     staleTime: 0, // Always consider data stale for real-time updates
-    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    refetchOnWindowFocus: false, // Don't refetch on window focus
+    gcTime: 0, // Don't cache - always fetch fresh data
+    refetchOnWindowFocus: true, // Refetch when window gains focus
     refetchOnMount: true,        // Refetch on component mount
+    refetchInterval: 5000, // Auto-refetch every 5 seconds to catch stock changes
   });
+
+  // Force refetch when component mounts to ensure fresh stock data
+  useEffect(() => {
+    refetch();
+  }, []);
 
   // Fetch categories from API
   const { data: categoriesData } = useQuery<string[]>({
@@ -525,7 +531,7 @@ export default function StaffOrders() {
     }));
     
     setCart([]);
-    form.reset({ customerName: "Nibbles Kitchen", customerPhone: "" });
+    form.reset({ customerName: "Nibbles Fast Food", customerPhone: "" });
     setLocation('/staff/checkout');
   }, [kitchenStatus.isOpen, form, calculateTotal, cart, setLocation]);
 

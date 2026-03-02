@@ -5,8 +5,8 @@ export default function AboutPage() {
     <>
       <SEO
         title="About Us - Authentic Nigerian Cuisine"
-        description="Learn about Nibbles Kitchen, your destination for authentic Nigerian food. We serve traditional dishes made with fresh ingredients and traditional recipes passed down through generations."
-        keywords="about Nibbles Kitchen, Nigerian restaurant story, authentic African cuisine, Nigerian food culture, restaurant about us"
+        description="Learn about Nibbles Fast Food, your destination for authentic Nigerian food. We serve traditional dishes made with fresh ingredients and traditional recipes passed down through generations."
+        keywords="about Nibbles Fast Food, Nigerian restaurant story, authentic African cuisine, Nigerian food culture, restaurant about us"
         ogUrl="https://nibblesfastfood.com/about"
         canonicalUrl="https://nibblesfastfood.com/about"
       />
@@ -15,7 +15,7 @@ export default function AboutPage() {
         {/* Hero Section */}
         <div className="bg-[#50BAA8] text-white py-16 px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">About Nibbles Kitchen</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">About Nibbles Fast Food</h1>
             <p className="text-xl md:text-2xl opacity-90">
               Bringing the authentic taste of Nigeria to your table
             </p>
@@ -29,7 +29,7 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold text-gray-800 mb-6">Our Story</h2>
             <div className="space-y-4 text-lg text-gray-700 leading-relaxed">
               <p>
-                Welcome to Nibbles Kitchen, where every dish tells a story of tradition,
+                Welcome to Nibbles Fast Food, where every dish tells a story of tradition,
                 culture, and the vibrant flavors of Nigeria. Founded with a passion for
                 authentic Nigerian cuisine, we bring you the taste of home-cooked meals
                 made with love and the finest ingredients.
@@ -83,7 +83,7 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold text-gray-800 mb-6">Our Commitment</h2>
             <div className="bg-[#50BAA8]/10 p-8 rounded-lg border border-[#50BAA8]/20">
               <p className="text-lg text-gray-700 leading-relaxed">
-                At Nibbles Kitchen, we're committed to providing you with an exceptional
+                At Nibbles Fast Food, we're committed to providing you with an exceptional
                 dining experience. Whether you're craving jollof rice, pounded yam with
                 egusi soup, or perfectly grilled suya, we ensure every meal meets our high
                 standards of quality and authenticity. Your satisfaction is our priority,

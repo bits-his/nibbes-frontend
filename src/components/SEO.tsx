@@ -25,7 +25,7 @@ export function SEO({
   type = 'website',
 }: SEOProps) {
   const [location] = useLocation();
-  const fullTitle = `${title} | Nibbles Kitchen`;
+  const fullTitle = `${title} | Nibbles Fast Food`;
   const finalOgTitle = ogTitle || title;
   const finalOgDescription = ogDescription || description;
   
@@ -49,7 +49,7 @@ export function SEO({
       <meta property="og:title" content={finalOgTitle} />
       <meta property="og:description" content={finalOgDescription} />
       <meta property="og:image" content={ogImage} />
-      <meta property="og:site_name" content="Nibbles Kitchen" />
+      <meta property="og:site_name" content="Nibbles Fast Food" />
       {ogUrl && <meta property="og:url" content={ogUrl} />}
 
       {/* Twitter */}

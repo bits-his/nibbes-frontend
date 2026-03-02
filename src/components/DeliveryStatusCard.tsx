@@ -34,7 +34,7 @@ interface DeliveryStatusData {
   statusHistory: Array<{
     status: string;
     timestamp: string;
-    notes?: string;
+    // notes?: string;
   }>;
   createdAt: string;
   updatedAt: string;
@@ -232,11 +232,11 @@ export function DeliveryStatusCard({ trackingNumber, requestNumber, orderType }:
                     <div className="text-muted-foreground mb-1">
                       {formatDistanceToNow(new Date(historyItem.timestamp), { addSuffix: true })}
                     </div>
-                    {historyItem.notes && (
+                    {/* {historyItem.notes && (
                       <div className="text-muted-foreground italic text-xs">
                         {historyItem.notes}
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </div>
               ))}

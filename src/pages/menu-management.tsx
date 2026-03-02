@@ -31,6 +31,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -819,21 +829,36 @@ export default function MenuManagement() {
                             
                             {/* Actions */}
                             <TableCell className="text-center">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8"
-                                onClick={() => {
-                                  if (item.id !== undefined) {
-                                    setEditingPriceId(item.id);
-                                    setEditingPriceValue(item.price);
-                                  }
-                                }}
-                                title="Edit Price"
-                              >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit Price
-                              </Button>
+                              <div className="flex gap-2 justify-center">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8"
+                                  onClick={() => {
+                                    if (item.id !== undefined) {
+                                      setEditingPriceId(item.id);
+                                      setEditingPriceValue(item.price);
+                                    }
+                                  }}
+                                  title="Edit Price"
+                                >
+                                  <Edit className="w-4 h-4 mr-1" />
+                                  Edit Price
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-8"
+                                  onClick={() => {
+                                    setItemToDelete(item);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  title="Delete Item"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -1184,6 +1209,34 @@ export default function MenuManagement() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Menu Item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{itemToDelete?.name}"? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (itemToDelete?.id) {
+                  deleteMutation.mutate(String(itemToDelete.id));
+                  setDeleteDialogOpen(false);
+                  setItemToDelete(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

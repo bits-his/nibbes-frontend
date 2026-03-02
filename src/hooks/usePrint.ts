@@ -303,6 +303,20 @@ export const usePrint = () => {
           .footer-name {
             font-weight: normal;
           }
+          .print-warning {
+            background: #fff3cd;
+            border: 2px solid #ff0000;
+            padding: 12px;
+            margin: 16px 0;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: #000;
+          }
+          .print-warning-icon {
+            font-size: 20px;
+            color: #ff0000;
+          }
           .print-actions {
             margin-top: 16px;
             text-align: center;
@@ -326,7 +340,7 @@ export const usePrint = () => {
             background: #f0f0f0;
           }
           @media print {
-            .print-actions {
+            .print-actions, .print-warning {
               display: none;
             }
           }
@@ -439,6 +453,13 @@ export const usePrint = () => {
           <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
         </div>
 
+        <!-- Print Warning -->
+        <div class="print-warning">
+          <div class="print-warning-icon">⚠️</div>
+          <div>PRINT ONLY 1 COPY</div>
+          <div style="font-size: 12px; margin-top: 4px;">Multiple copies are tracked and logged</div>
+        </div>
+
         <!-- Print Actions (hidden when printing) -->
         <div class="print-actions">
          <!-- <button onclick="window.print()">Print Again</button> -->
@@ -468,6 +489,7 @@ export const usePrint = () => {
       setTimeout(() => {
         printWindow.focus()
         printWindow.print()
+        // Logging handled by mark-printed API calls (kitchen/cashier)
         // Auto-close disabled - users can print multiple times and close manually when done
         // setTimeout(() => {
         //   printWindow.close()

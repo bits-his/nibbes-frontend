@@ -11,8 +11,9 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Plus, Package, AlertTriangle, Warehouse, Boxes, DollarSign, Loader } from "lucide-react"
+import { Plus, Package, AlertTriangle, Warehouse, Boxes, DollarSign, Loader, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface StoreItem {
   id: string
@@ -28,6 +29,7 @@ interface StoreItem {
   imageUrl?: string
   totalIn: number
   totalOut: number
+  yesterdayRemaining: number
 }
 
 interface MenuItem {
@@ -74,6 +76,8 @@ export default function StoreManagement() {
   const [showTransactionsDialog, setShowTransactionsDialog] = useState(false)
   const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const { toast } = useToast()
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -227,12 +231,12 @@ export default function StoreManagement() {
         type: stockFormData.operationType === 'add' ? "IN" : "OUT",
         quantity: stockFormData.quantity,
         reference: stockFormData.operationType === 'add' ? "restock" : "stock removal",
-        notes: stockFormData.notes || `${stockFormData.operationType === 'add' ? 'Added' : 'Removed'} ${stockFormData.quantity} portions`,
+        notes: stockFormData.notes || `${stockFormData.operationType === 'add' ? 'Added' : 'Removed'} ${stockFormData.quantity} ${storeItem.unit}`,
       })
       
       toast({
         title: "Success",
-        description: `${stockFormData.operationType === 'add' ? 'Added' : 'Removed'} ${stockFormData.quantity} portions ${stockFormData.operationType === 'add' ? 'to' : 'from'} ${selectedMenuItem.name}`,
+        description: `${stockFormData.operationType === 'add' ? 'Added' : 'Removed'} ${stockFormData.quantity} ${storeItem.unit} ${stockFormData.operationType === 'add' ? 'to' : 'from'} ${selectedMenuItem.name}`,
       })
       
       setShowAddStockDialog(false)
@@ -268,9 +272,9 @@ export default function StoreManagement() {
   const handleViewItemTransactions = async (item: StoreItem) => {
     try {
       setTransactionsLoading(true);
+      setSelectedItem(item);
       const response = await apiRequest("GET", `/api/store-entries/item-code/${item.itemCode}`);
       const data = await response.json();
-      // Extract entries from the data object
       const entries = data.data?.entries || data.entries || [];
       setSelectedItemTransactions(entries);
       setShowTransactionsDialog(true);
@@ -285,6 +289,35 @@ export default function StoreManagement() {
     } finally {
       setTransactionsLoading(false);
     }
+  };
+
+  const filteredTransactions = selectedItemTransactions
+    .filter((t) => {
+      if (!dateRange.start && !dateRange.end) return true;
+      const tDate = new Date(t.date).toISOString().split('T')[0];
+      if (dateRange.start && dateRange.end) {
+        return tDate >= dateRange.start && tDate <= dateRange.end;
+      }
+      if (dateRange.start) return tDate >= dateRange.start;
+      if (dateRange.end) return tDate <= dateRange.end;
+      return true;
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Calculate opening balance (all transactions before start date)
+  const openingBalance = dateRange.start
+    ? selectedItemTransactions
+        .filter((t) => {
+          const tDate = new Date(t.date).toISOString().split('T')[0];
+          return tDate < dateRange.start;
+        })
+        .reduce((sum, t) => sum + parseFloat(t.qtyIn || 0) - parseFloat(t.qtyOut || 0), 0)
+    : 0;
+
+  const transactionSummary = {
+    totalIn: filteredTransactions.reduce((sum, t) => sum + parseFloat(t.qtyIn || 0), 0),
+    totalOut: filteredTransactions.reduce((sum, t) => sum + parseFloat(t.qtyOut || 0), 0),
+    get balance() { return openingBalance + this.totalIn - this.totalOut; }
   };
 
   return (
@@ -337,11 +370,16 @@ export default function StoreManagement() {
                       className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#50BAA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
                     >
                       <option value="">Select a menu item</option>
-                      {menuItems.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} ({item.itemCode}) - Current: {item.stockBalance || 0} portions
-                        </option>
-                      ))}
+                      {menuItems.map((item) => {
+                        const balance = item.stockBalance || 0;
+                        const unit = item.unit || 'units';
+                        const displayUnit = balance === 1 ? unit : (unit === 'portion' ? 'portions' : unit);
+                        return (
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.itemCode}) - Current: {balance} {displayUnit}
+                          </option>
+                        );
+                      })}
                     </select>
                   )}
                 </div>
@@ -557,6 +595,9 @@ export default function StoreManagement() {
                     <TableHead className="text-gray-700">Name</TableHead>
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Quantity</TableHead>}
                     <TableHead className="text-gray-700 text-right">Remaining</TableHead>
+                    <TableHead className="text-gray-700 text-right">
+                      Yesterday ({new Date(new Date().setHours(5, 0, 0, 0) - 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+                    </TableHead>
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Used/Sold</TableHead>}
                     {!isKitchenStaff && <TableHead className="text-gray-700 text-right">Total Value</TableHead>}
                     <TableHead className="text-right text-gray-700">Actions</TableHead>
@@ -599,6 +640,9 @@ export default function StoreManagement() {
                         <TableCell className="text-right text-green-600 font-semibold">
                           {item.currentBalance} {item.unit}
                         </TableCell>
+                        <TableCell className="text-right text-gray-600 font-medium">
+                          {item.yesterdayRemaining} {item.unit}
+                        </TableCell>
                         {!isKitchenStaff && (
                           <TableCell className="text-right text-red-600 font-semibold">
                             {quantityUsed} {item.unit}
@@ -634,68 +678,148 @@ export default function StoreManagement() {
 
       {/* Transactions Dialog */}
       <Dialog open={showTransactionsDialog} onOpenChange={setShowTransactionsDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Item Transaction History</DialogTitle>
+            <DialogTitle>Item History — {selectedItem?.itemCode}</DialogTitle>
             <DialogDescription>
-              All stock movements and transactions for this item
+              Complete audit trail of {selectedItem?.name}
             </DialogDescription>
           </DialogHeader>
 
           {transactionsLoading ? (
-            <div className="flex flex-col items-center justify-center py-10">
-              <Loader className="h-10 w-10 animate-spin text-[#50BAA8]" />
-              <p className="mt-3 text-gray-600">Loading transactions...</p>
-            </div>
-          ) : selectedItemTransactions.length === 0 ? (
-            <div className="text-center py-10">
-              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600">No transactions found for this item</p>
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader className="h-12 w-12 animate-spin text-[#50BAA8]" />
+              <p className="mt-4 text-gray-600">Loading transaction history...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Qty In</TableHead>
-                    <TableHead className="text-right">Qty Out</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Destination</TableHead>
-                    <TableHead>Performed By</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedItemTransactions.map((transaction: any, index: number) => (
-                    <TableRow key={index}>
-                      <TableCell className="text-sm">
-                        {new Date(transaction.date).toLocaleDateString()}
-                        <div className="text-xs text-gray-500">
-                          {new Date(transaction.date).toLocaleTimeString()}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={transaction.qtyIn > 0 ? "default" : "destructive"}>
-                          {transaction.qtyIn > 0 ? 'IN' : 'OUT'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-green-600 font-semibold">
-                        {transaction.qtyIn || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-red-600 font-semibold">
-                        {transaction.qtyOut || '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">{transaction.source || '-'}</TableCell>
-                      <TableCell className="text-sm">{transaction.destination || '-'}</TableCell>
-                      <TableCell className="text-sm">{transaction.performedBy || '-'}</TableCell>
-                      <TableCell className="text-sm">{transaction.notes || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              {/* Date Range Filter */}
+              <div className="flex gap-4 items-end bg-slate-50 p-4 rounded-lg">
+                <div className="flex-1">
+                  <Label>Start Date</Label>
+                  <Input 
+                    type="date" 
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label>End Date</Label>
+                  <Input 
+                    type="date" 
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                  />
+                </div>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setDateRange({ start: today, end: today });
+                  }}
+                >
+                  Today
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setDateRange({ start: '', end: '' })}
+                >
+                  Clear
+                </Button>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Total In</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-green-600">{transactionSummary.totalIn.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Total Out</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-red-600">{transactionSummary.totalOut.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Balance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-purple-600">{transactionSummary.balance.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {filteredTransactions.length === 0 ? (
+                <div className="text-center py-10">
+                  <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">No transactions found</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-96 pr-2">
+                  <div className="space-y-3">
+                    {filteredTransactions.map((transaction: any) => (
+                      <Card key={transaction.id} className="border border-gray-100 shadow-sm">
+                        <CardContent className="p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div>
+                              <p className="text-sm text-gray-500">
+                                {new Date(transaction.date).toLocaleDateString()} {new Date(transaction.date).toLocaleTimeString()}
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900">{transaction.description}</p>
+                            </div>
+                            <Badge variant={transaction.qtyIn > 0 ? "default" : "destructive"}>
+                              {transaction.qtyIn > 0 ? 'IN' : 'OUT'}
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <ArrowUpCircle className="w-4 h-4 text-green-600" />
+                              <span className="text-gray-500">Qty In:</span>
+                              <span className="font-semibold text-gray-900">
+                                {parseFloat(transaction.qtyIn || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <ArrowDownCircle className="w-4 h-4 text-red-600" />
+                              <span className="text-gray-500">Qty Out:</span>
+                              <span className="font-semibold text-gray-900">
+                                {parseFloat(transaction.qtyOut || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Source:</span>
+                              <p className="font-semibold">{transaction.source || '-'}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Destination:</span>
+                              <p className="font-semibold">{transaction.destination || '-'}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Performed By:</span>
+                              <p className="font-semibold">{transaction.performedBy || 'System'}</p>
+                            </div>
+                            {transaction.notes && (
+                              <div className="md:col-span-2">
+                                <span className="text-gray-500">Notes:</span>
+                                <p className="font-medium text-gray-800">{transaction.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>

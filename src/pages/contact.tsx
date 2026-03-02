@@ -6,8 +6,8 @@ export default function ContactPage() {
     <>
       <SEO
         title="Contact Us - Get in Touch"
-        description="Contact Nibbles Kitchen for orders, inquiries, or feedback. Find our location, phone number, email, and business hours. We're here to serve you authentic Nigerian cuisine."
-        keywords="contact Nibbles Kitchen, restaurant contact, Nigerian restaurant location, food ordering contact, customer service, restaurant hours"
+        description="Contact Nibbles Fast Food for orders, inquiries, or feedback. Find our location, phone number, email, and business hours. We're here to serve you authentic Nigerian cuisine."
+        keywords="contact Nibbles Fast Food, restaurant contact, Nigerian restaurant location, food ordering contact, customer service, restaurant hours"
         ogUrl="https://nibblesfastfood.com/contact"
         canonicalUrl="https://nibblesfastfood.com/contact"
       />

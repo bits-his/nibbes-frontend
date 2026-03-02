@@ -9,7 +9,7 @@ export default function QRCodePage() {
     <>
       <SEO
         title="Restaurant QR Code"
-        description="Download the Nibbles Kitchen QR code for your restaurant. Customers can scan to access our menu and place orders online."
+        description="Download the Nibbles Fast Food QR code for your restaurant. Customers can scan to access our menu and place orders online."
         keywords="restaurant QR code, menu QR code, scan to order, contactless menu"
         ogUrl={`${baseUrl}/qr-code`}
       />

@@ -56,6 +56,15 @@ export default function Login() {
       // Proceed with normal login
       login(data.user, data.token)
 
+      // Check if there's a pending cart from checkout
+      const pendingCart = localStorage.getItem("pendingCheckoutCart")
+      if (pendingCart) {
+        // Cart will be restored by CartContext when user logs in
+        // Redirect to checkout to complete the order
+        setLocation("/checkout")
+        return
+      }
+
       switch (data.user.role) {
         case "admin":
           setLocation("/orders")

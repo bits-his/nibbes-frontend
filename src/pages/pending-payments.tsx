@@ -15,6 +15,7 @@ interface PendingPayment {
   createdAt: string;
   isArchived?: boolean;
   status?: string;
+  paystackStatus?: 'success' | 'failed' | 'abandoned' | 'ongoing' | 'pending';
   order: {
     id: string;
     orderNumber: number;
@@ -83,7 +84,35 @@ const PendingPayments: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        setPayments(data.data.payments);
+        // Fetch Paystack status for each payment
+        const paymentsWithStatus = await Promise.all(
+          data.data.payments.map(async (payment: PendingPayment) => {
+            try {
+              const statusResponse = await fetch(`${backendUrl}/api/paystack/verify/${payment.transactionRef}`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              const statusData = await statusResponse.json();
+              
+              console.log(`Status for ${payment.transactionRef}:`, statusData);
+              
+              // Extract status from Paystack response
+              const paystackStatus = statusData.paystackStatus || statusData.paystackData?.status || 'pending';
+              
+              return {
+                ...payment,
+                paystackStatus: paystackStatus
+              };
+            } catch (error) {
+              console.error(`Error fetching status for ${payment.transactionRef}:`, error);
+              return { ...payment, paystackStatus: 'pending' };
+            }
+          })
+        );
+        
+        setPayments(paymentsWithStatus);
         setPagination(data.data.pagination);
       } else {
         throw new Error(data.message || 'Failed to fetch payments');
@@ -262,6 +291,48 @@ const PendingPayments: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Status Badges */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="text-2xl font-bold">{payments.length}</div>
+            <div className="text-sm text-gray-600">Total Pending</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="text-2xl font-bold text-blue-600">
+              {payments.filter(p => p.paystackStatus === 'ongoing').length}
+            </div>
+            <div className="text-sm text-gray-600">🔄 Ongoing</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="text-2xl font-bold text-yellow-600">
+              {payments.filter(p => p.paystackStatus === 'pending').length}
+            </div>
+            <div className="text-sm text-gray-600">⏳ Pending</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="text-2xl font-bold text-red-600">
+              {payments.filter(p => p.paystackStatus === 'abandoned').length}
+            </div>
+            <div className="text-sm text-gray-600">🚫 Abandoned</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <div className="text-2xl font-bold text-gray-600">
+              {payments.filter(p => p.paystackStatus === 'failed').length}
+            </div>
+            <div className="text-sm text-gray-600">❌ Failed</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {payments.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -345,19 +416,49 @@ const PendingPayments: React.FC = () => {
                 
                 <CardContent>
                   <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                    <div className="text-sm">
-                      <strong>Transaction Reference:</strong>
-                      <code className="ml-2 bg-white px-2 py-1 rounded text-xs">
-                        {payment.transactionRef}
-                      </code>
+                    <div className="text-sm flex items-center justify-between">
+                      <div>
+                        <strong>Transaction Reference:</strong>
+                        <code className="ml-2 bg-white px-2 py-1 rounded text-xs">
+                          {payment.transactionRef}
+                        </code>
+                      </div>
+                      <div>
+                        {payment.paystackStatus === 'success' && (
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            ✅ Success
+                          </Badge>
+                        )}
+                        {payment.paystackStatus === 'failed' && (
+                          <Badge className="bg-red-100 text-red-800 border-red-200">
+                            ❌ Failed
+                          </Badge>
+                        )}
+                        {payment.paystackStatus === 'abandoned' && (
+                          <Badge className="bg-red-100 text-red-800 border-red-200">
+                            🚫 Abandoned
+                          </Badge>
+                        )}
+                        {payment.paystackStatus === 'ongoing' && (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                            🔄 Ongoing
+                          </Badge>
+                        )}
+                        {payment.paystackStatus === 'pending' && (
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            ⏳ Pending
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
                   <div className="flex gap-3">
                     <Button
                       onClick={() => verifyPayment(payment.transactionRef)}
-                      disabled={verifyingPayments.has(payment.transactionRef)}
+                      disabled={verifyingPayments.has(payment.transactionRef) || payment.paystackStatus === 'abandoned'}
                       className="flex items-center gap-2"
+                      variant={payment.paystackStatus === 'abandoned' ? 'destructive' : 'default'}
                     >
                       {verifyingPayments.has(payment.transactionRef) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

@@ -53,12 +53,13 @@ export default function CheckoutAlt() {
   useEffect(() => {
     if (loading) return
 
-    const guestSession = getGuestSession()
-    if (!user && !guestSession) {
+    // DISABLED: Guest checkout - require account creation
+    // const guestSession = getGuestSession()
+    if (!user) {
       if (cart.length > 0) {
         localStorage.setItem("pendingCheckoutCart", JSON.stringify(cart))
       }
-      setLocation("/guest-checkout")
+      setLocation("/signup")
       return
     }
 
@@ -69,10 +70,12 @@ export default function CheckoutAlt() {
 
     if (user) {
       setCustomerName(user.username || user.email || "")
-    } else if (guestSession) {
-      setCustomerName(guestSession.guestName)
-      setCustomerPhone(guestSession.guestPhone)
     }
+    // DISABLED: Guest checkout
+    // else if (guestSession) {
+    //   setCustomerName(guestSession.guestName)
+    //   setCustomerPhone(guestSession.guestPhone)
+    // }
   }, [user, loading, cart, setLocation])
 
   const subtotal = cart.reduce(

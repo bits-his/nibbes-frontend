@@ -32,6 +32,7 @@ const StaffOrders = lazy(() => import("@/pages/staff-orders"));
 const RefundManagement = lazy(() => import("@/pages/refund-management"));
 const KitchenDisplay = lazy(() => import("@/pages/kitchen-display"));
 const OrderManagement = lazy(() => import("@/pages/order-management"));
+const ActivityLogs = lazy(() => import("@/pages/activity-logs"));
 const MenuManagement = lazy(() => import("@/pages/menu-management"));
 const UserManagement = lazy(() => import("@/pages/user-management"));
 const DucketDisplay = lazy(() => import("@/pages/docket"));
@@ -50,6 +51,7 @@ const DocketPage = lazy(() => import("@/pages/docket"));
 const InventoryPage = lazy(() => import("@/pages/inventory"));
 const CustomerAnalyticsDashboard = lazy(() => import("@/pages/customer-analytics-enhanced"));
 const StoreManagement = lazy(() => import("@/pages/store-management"));
+const ReservedItems = lazy(() => import("@/pages/reserved-items"));
 const Supervisor = lazy(() => import("@/pages/supervisor"));
 const EMcard = lazy(() => import("@/pages/EMcard"));
 const ManagerReportsList = lazy(() => import("@/pages/ManagerReportsList"));
@@ -522,6 +524,14 @@ function Router() {
         )}
       />
       <Route
+        path="/activity-logs"
+        component={() => (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <ActivityLogs />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/docket"
         component={() => (
           <PublicRoute>
@@ -643,6 +653,15 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["main_kitchen"]}>
             <StoreManagement />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/reserved-items"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["reserved_items"]}>
+            <ReservedItems />
           </ProtectedRoute>
         )}
       />

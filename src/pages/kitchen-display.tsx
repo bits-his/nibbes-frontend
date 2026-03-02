@@ -712,11 +712,35 @@ const convertOrderForPrint = (order: OrderWithItems) => {
   };
   // Function to print kitchen ticket for a specific order
   // Print immediately and update status in parallel
-  const handlePrintPreview = (order: OrderWithItems) => {
+  const handlePrintPreview = async (order: OrderWithItems) => {
     const printData = convertOrderForPrint(order);
     
     // Print immediately - don't wait
     printInvoice(printData, 'receipt');
+    
+    // Mark as printed in database
+    try {
+      await apiRequest("PATCH", `/api/orders/${order.id}/mark-printed`, {});
+      
+      // Update local state to reflect printed status
+      queryClient.setQueryData(
+        ["/api/orders/active"],
+        (old: OrderWithItems[] = []) => {
+          return old.map(o => 
+            o.id === order.id 
+              ? { ...o, kitchenPrinted: true, kitchenPrintedAt: new Date().toISOString() }
+              : o
+          );
+        }
+      );
+      
+      toast({
+        title: "Receipt Printed",
+        description: `Order #${order.orderNumber} marked as printed`,
+      });
+    } catch (error) {
+      console.error("Failed to mark order as printed:", error);
+    }
     
     // Update status in parallel if order is pending
     if (order.status === 'pending') {
@@ -933,13 +957,14 @@ const getStatusBadge = (status: string) => {
                       {/* Hide print ticket button for refunded orders */}
                       {order.status !== "refunded" && (
                         <Button
-                          variant="outline"
+                          variant={order.kitchenPrinted ? "secondary" : "outline"}
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-2"
                           onClick={() => handlePrintPreview(order)}
+                          disabled={order.kitchenPrinted}
                         >
                           <Printer className="w-4 h-4" />
-                          Print Ticket
+                          {order.kitchenPrinted ? "Already Printed ✓" : "Print Ticket"}
                         </Button>
                       )}
                     </div>

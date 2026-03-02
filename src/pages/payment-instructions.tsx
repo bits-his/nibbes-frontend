@@ -85,12 +85,12 @@ export default function PaymentInstructions() {
                 <div className="flex justify-between items-center p-3 bg-muted rounded">
                   <div>
                     <p className="text-sm text-muted-foreground">Account Name</p>
-                    <p className="font-semibold">Nibbles Kitchen Ltd</p>
+                    <p className="font-semibold">Nibbles Fast Food Ltd</p>
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => copyToClipboard("Nibbles Kitchen Ltd", "Account name")}
+                    onClick={() => copyToClipboard("Nibbles Fast Food Ltd", "Account name")}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>

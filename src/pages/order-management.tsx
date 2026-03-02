@@ -208,6 +208,7 @@ export default function OrderManagement() {
   // Helper function to convert OrderWithItems to print format
   const convertOrderForPrint = (order: OrderWithItems) => {
     return {
+      id: order.id, // Add order ID for logging
       orderNumber: order.orderNumber.toString(),
       createdAt: order.createdAt,
       customerName: order.customerName,

@@ -76,6 +76,8 @@ export default function CustomerMenu() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [tempAddress, setTempAddress] = useState<string>("");
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [geoPricingId, setGeoPricingId] = useState<string | null>(null);
+  const [deliveryRoute, setDeliveryRoute] = useState<{from: string; to: string} | null>(null);
   const [isCalculatingDelivery, setIsCalculatingDelivery] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showGuestDataModal, setShowGuestDataModal] = useState(false);
@@ -508,6 +510,8 @@ export default function CustomerMenu() {
     const calculateDeliveryFee = async () => {
       if (orderType !== "delivery" || !locationData?.address) {
         setDeliveryFee(0);
+        setGeoPricingId(null);
+        setDeliveryRoute(null);
         return;
       }
 
@@ -521,15 +525,27 @@ export default function CustomerMenu() {
           const result = await response.json();
           if (result.success && result.data) {
             setDeliveryFee(result.data.price);
+            setGeoPricingId(result.data.geoPricingId);
+            setDeliveryRoute({
+              from: result.data.fromLocation || 'Nibbles Fast Food',
+              to: result.data.toLocation || locationData.address
+            });
+            console.log('✅ Delivery fee calculated:', result.data);
           } else {
             setDeliveryFee(0);
+            setGeoPricingId(null);
+            setDeliveryRoute(null);
           }
         } else {
           setDeliveryFee(0);
+          setGeoPricingId(null);
+          setDeliveryRoute(null);
         }
       } catch (error) {
         console.error('Error calculating delivery fee:', error);
         setDeliveryFee(0);
+        setGeoPricingId(null);
+        setDeliveryRoute(null);
       } finally {
         setIsCalculatingDelivery(false);
       }
@@ -584,11 +600,16 @@ export default function CustomerMenu() {
       return;
     }
 
-    // Check if user is logged in or has guest session
-    const guestSession = getGuestSession();
-    if (!user && !guestSession) {
-      // Show guest data capture modal first
-      setShowGuestDataModal(true);
+    // DISABLED: Guest checkout - require account creation
+    // Check if user is logged in
+    if (!user) {
+      // Redirect to signup page
+      toast({
+        title: "Account Required",
+        description: "Please create an account or sign in to continue.",
+        variant: "default",
+      });
+      setLocation("/signup");
       return;
     }
 
@@ -664,6 +685,69 @@ export default function CustomerMenu() {
   const handleConfirmOrder = async () => {
     if (isProcessingPayment) return;
 
+    // Validate stock availability before proceeding
+    try {
+      const stockCheckResponse = await apiRequest("GET", "/api/menu/all");
+      const currentMenu = await stockCheckResponse.json();
+      
+      const outOfStockItems: string[] = [];
+      const insufficientStockItems: { name: string; available: number; requested: number }[] = [];
+      
+      for (const cartItem of cart) {
+        const menuItem = currentMenu.find((m: any) => m.id === cartItem.menuItem.id);
+        
+        if (!menuItem) {
+          outOfStockItems.push(cartItem.menuItem.name);
+          continue;
+        }
+        
+        if (!menuItem.available) {
+          outOfStockItems.push(cartItem.menuItem.name);
+          continue;
+        }
+        
+        if (menuItem.stockBalance < cartItem.quantity) {
+          insufficientStockItems.push({
+            name: cartItem.menuItem.name,
+            available: menuItem.stockBalance,
+            requested: cartItem.quantity
+          });
+        }
+      }
+      
+      if (outOfStockItems.length > 0 || insufficientStockItems.length > 0) {
+        let errorMessage = "";
+        
+        if (outOfStockItems.length > 0) {
+          errorMessage += `Out of stock: ${outOfStockItems.join(", ")}. `;
+        }
+        
+        if (insufficientStockItems.length > 0) {
+          const details = insufficientStockItems.map(
+            item => `${item.name} (available: ${item.available}, requested: ${item.requested})`
+          ).join(", ");
+          errorMessage += `Insufficient stock: ${details}`;
+        }
+        
+        toast({
+          title: "Stock Unavailable",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        
+        setShowConfirmModal(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking stock:", error);
+      toast({
+        title: "Error",
+        description: "Failed to verify stock availability. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate that we have customer data
     const guestSession = getGuestSession();
     if (!user && !guestSession) {
@@ -717,6 +801,8 @@ export default function CustomerMenu() {
               address: locationData.address,
             },
             deliveryFee: deliveryFee,
+            geoPricingId: geoPricingId,
+            deliveryRoute: deliveryRoute ? `${deliveryRoute.from} → ${deliveryRoute.to}` : null,
           }),
         ...(guestSession && {
           guestId: guestSession.guestId,
@@ -790,7 +876,7 @@ export default function CustomerMenu() {
         cust_name: orderData.customerName,
         cust_email: guestSession?.guestEmail || user?.email || "customer@nibbleskitchen.com",
         cust_phone: orderData.customerPhone || "",
-        merchant_name: "Nibbles Kitchen",
+        merchant_name: "Nibbles Fast Food",
         logo_url: window.location.origin + "/nibbles.jpg",
         mode: "LIVE",
         payment_channels: ["card", "bank"],
@@ -848,6 +934,31 @@ export default function CustomerMenu() {
         callback: function (response: any) {
           console.log("✅ Paystack payment successful:", response);
 
+          // Log payment success immediately
+          (async () => {
+            try {
+              const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5050";
+              const token = localStorage.getItem("token");
+              
+              await fetch(`${backendUrl}/api/activity/log-payment-success`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': token ? `Bearer ${token}` : ''
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  orderId: createdOrder.id,
+                  amount: createdOrder.totalAmount,
+                  transactionRef: response.reference
+                })
+              });
+              console.log('✅ Payment success logged');
+            } catch (error) {
+              console.error('Failed to log payment success:', error);
+            }
+          })();
+
           // Handle verification asynchronously
           (async () => {
             try {
@@ -865,6 +976,13 @@ export default function CustomerMenu() {
               );
 
               const verifyData = await verifyResponse.json();
+              
+              console.log('🔍 Payment Verification Response:', {
+                status: verifyResponse.status,
+                statusText: verifyResponse.statusText,
+                data: verifyData
+              });
+              console.log('📋 Full Verification Data:', JSON.stringify(verifyData, null, 2));
 
               if (verifyData.success) {
                 clearCart();
@@ -895,8 +1013,40 @@ export default function CustomerMenu() {
           })();
         },
         onClose: function () {
-          console.log("Payment window closed");
+          console.log("Payment window closed - logging cancellation");
           setIsProcessingPayment(false);
+          
+          // Log payment cancellation
+          (async () => {
+            try {
+              const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5050";
+              const token = localStorage.getItem("token");
+              
+              console.log('Logging payment cancellation for order:', createdOrder.id);
+              
+              const response = await fetch(`${backendUrl}/api/activity/log-payment-cancelled`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': token ? `Bearer ${token}` : ''
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  orderId: createdOrder.id,
+                  amount: createdOrder.totalAmount || 0
+                })
+              });
+              
+              if (response.ok) {
+                console.log('✅ Payment cancellation logged successfully');
+              } else {
+                console.error('❌ Failed to log payment cancellation:', await response.text());
+              }
+            } catch (error) {
+              console.error('❌ Error logging payment cancellation:', error);
+            }
+          })();
+          
           toast({
             title: "Payment Cancelled",
             description: "You closed the payment window.",
@@ -924,7 +1074,7 @@ export default function CustomerMenu() {
   return (
     <>
       <SEO
-        title="Home - Order Authentic Nigerian Cuisine Online"
+        title="The Place You Eat Everyday"
         description="Browse our menu of delicious Nigerian dishes. Order jollof rice, suya, pounded yam, egusi soup, pepper soup, fried rice and more. Fast online ordering with pickup service. Fresh meals prepared daily."
         keywords="Nigerian food menu, order jollof rice online, suya delivery, Nigerian restaurant menu, African food online, pounded yam, egusi soup, order Nigerian food, online food ordering"
         ogUrl="https://nibblesfastfood.com/"
@@ -961,7 +1111,7 @@ export default function CustomerMenu() {
           {/* PERFORMANCE: Hero image from Cloudinary - automatically optimized via OptimizedImage */}
           <OptimizedImage
             src={heroImage}
-            alt="Nibbles Kitchen - Authentic Nigerian Cuisine"
+            alt="Nibbles Fast Food - Authentic Nigerian Cuisine"
             aspectRatio="auto"
             priority={true} // Load hero image immediately (critical for LCP)
             width={1920}
@@ -975,7 +1125,7 @@ export default function CustomerMenu() {
           <div className="space-y-3 sm:space-y-4 md:space-y-6 mb-6 sm:mb-8">
             {/* Main Tagline */}
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight drop-shadow-2xl">
-              <span className="block mb-2">The place you eat Everyday</span>
+              <span className="block mb-2">The Place You Eat Everyday</span>
             </h1>
             
             {/* Secondary Tagline */}
@@ -1934,7 +2084,7 @@ export default function CustomerMenu() {
                   <span className="break-words">Pickup Location</span>
                 </h4>
                 <p className="text-xs sm:text-sm text-gray-700 break-words">Lafiya Road Nasarawa GRA, Kano</p>
-                <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Kitchen</p>
+                <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Fast Food</p>
               </div>
             ) : locationData ? (
               <div className="rounded-lg bg-green-50 p-3 sm:p-4">

@@ -256,14 +256,15 @@ export default function Checkout() {
       }
     }
 
-    const guestSession = getGuestSession()
-    if (!user && !guestSession) {
+    // DISABLED: Guest checkout - require account creation
+    // const guestSession = getGuestSession()
+    if (!user) {
       // Save current cart to pending checkout before redirecting
       if (cartFromContext.length > 0) {
         localStorage.setItem("pendingCheckoutCart", JSON.stringify(cartFromContext))
       }
 
-      setLocation("/guest-checkout")
+      setLocation("/signup")
       return
     }
 
@@ -294,10 +295,12 @@ export default function Checkout() {
     if (user) {
       form.setValue("customerName", user.username || user.email)
       form.setValue("customerPhone", user.phone || "")
-    } else if (guestSession) {
-      form.setValue("customerName", guestSession.guestName)
-      form.setValue("customerPhone", guestSession.guestPhone)
     }
+    // DISABLED: Guest checkout
+    // else if (guestSession) {
+    //   form.setValue("customerName", guestSession.guestName)
+    //   form.setValue("customerPhone", guestSession.guestPhone)
+    // }
   }, [user, loading, setLocation, form, cartFromContext])
 
   // F2 keyboard shortcut to confirm payment for walk-in orders
@@ -328,7 +331,7 @@ export default function Checkout() {
             setDeliveryFee(result.data.price)
             setGeoPricingId(result.data.geoPricingId)
             setDeliveryRoute({
-              from: result.data.fromLocation || 'Nibbles Kitchen',
+              from: result.data.fromLocation || 'Nibbles Fast Food',
               to: result.data.toLocation || 'Your Location'
             })
             console.log('✅ Delivery fee calculated:', result.data)
@@ -652,7 +655,7 @@ export default function Checkout() {
         cust_phone: orderData.customerPhone || "",
         
         // Merchant information
-        merchant_name: "Nibbles Kitchen",
+        merchant_name: "Nibbles Fast Food",
         logo_url: window.location.origin + "/nibbles.jpg",
         
         // TEST MODE - Test payments (COMMENTED OUT)
@@ -951,6 +954,7 @@ export default function Checkout() {
   }
 
   const [completedOrder, setCompletedOrder] = useState<any>(null)
+  const [receiptPrinted, setReceiptPrinted] = useState(false)
 
   const createWalkInOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -963,15 +967,18 @@ export default function Checkout() {
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
+          console.log('❌ Order creation failed, error data:', errorData)
+          
           // Check if it's a stock error
           if (errorData.stockError) {
+            console.log('✅ Detected stock error, throwing with stockError flag')
             throw {
               stockError: true,
               message: errorData.error,
               details: errorData.details || []
             }
           }
-          throw new Error(errorData.message || `Server error: ${response.status}`)
+          throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
         }
         
         return await response.json()
@@ -1021,6 +1028,7 @@ export default function Checkout() {
       
       // Prepare order data for printing
       const orderDataForPrint = {
+        id: data.id, // Add order ID for logging
         orderNumber: data.orderNumber,
         createdAt: data.createdAt || new Date().toISOString(),
         customerName: walkInOrder?.customerName || data.customerName || 'N/A',
@@ -1041,16 +1049,8 @@ export default function Checkout() {
       // Store completed order for print confirmation screen
       setCompletedOrder(orderDataForPrint)
       
-      // Try to open print window immediately
-      const printOpened = printInvoice(orderDataForPrint, 'walk-in')
-      
-      if (!printOpened) {
-        toast({
-          title: "Print Window Blocked",
-          description: "Please allow popups to print receipts, or use the Print Receipt button below.",
-          variant: "destructive",
-        })
-      }
+      // REMOVED: Auto-print popup (cashier will use button on success screen)
+      // This prevents duplicate prints and gives cashier full control
       
       toast({
         title: data.isDuplicate ? "Order Found" : "Order Created Successfully!",
@@ -1225,7 +1225,7 @@ export default function Checkout() {
           site_redirect_url: `${window.location.origin}/docket`,
           
           // Merchant information
-          merchant_name: "Nibbles Kitchen",
+          merchant_name: "Nibbles Fast Food",
           logo_url: window.location.origin + "/nibbles.jpg",
           
           // Payment channels - Only show Card and Bank Transfer
@@ -1372,12 +1372,26 @@ export default function Checkout() {
                 <div className="flex flex-col gap-3">
                   <Button
                     size="lg"
-                    onClick={() => {
+                    onClick={async () => {
+                      if (receiptPrinted) return
+                      
                       printInvoice(completedOrder, 'walk-in')
+                      
+                      try {
+                        await apiRequest("PATCH", `/api/orders/${completedOrder.id}/mark-cashier-printed`, {})
+                        setReceiptPrinted(true)
+                        toast({
+                          title: "Receipt Printed",
+                          description: "Receipt has been printed successfully",
+                        })
+                      } catch (error) {
+                        console.error("Failed to mark order as printed:", error)
+                      }
                     }}
+                    disabled={receiptPrinted}
                     className="w-full"
                   >
-                    🖨️ Print Receipt
+                    {receiptPrinted ? "✓ Receipt Printed" : "🖨️ Print Receipt"}
                   </Button>
                   <Button
                     size="lg"
@@ -1385,6 +1399,7 @@ export default function Checkout() {
                     onClick={() => {
                       setCompletedOrder(null)
                       setWalkInOrder(null)
+                      setReceiptPrinted(false)
                       localStorage.removeItem("pendingWalkInOrder")
                       setLocation("/staff")
                     }}
@@ -1736,7 +1751,11 @@ export default function Checkout() {
                 {createWalkInOrderMutation.isError && (
                   <Alert variant="destructive" className="mb-4">
                     <AlertDescription className="flex items-center justify-between">
-                      <span>Payment failed. Please try again.</span>
+                      <span>
+                        {(createWalkInOrderMutation.error as any)?.stockError 
+                          ? `Stock Unavailable: ${(createWalkInOrderMutation.error as any)?.details?.[0] || (createWalkInOrderMutation.error as any)?.message}`
+                          : (createWalkInOrderMutation.error as any)?.message || 'Payment failed. Please try again.'}
+                      </span>
                       <Button
                         size="sm"
                         variant="outline"
@@ -2153,7 +2172,7 @@ export default function Checkout() {
                             <div className="space-y-1 text-sm">
                               <div><strong>Bank:</strong> Sadiq Bank</div>
                               <div><strong>Account Number:</strong> 1234567890</div>
-                              <div><strong>Account Name:</strong> Nibbles Kitchen</div>
+                              <div><strong>Account Name:</strong> Nibbles Fast Food</div>
                             </div>
                           </div>
                         </AlertDescription>
@@ -2359,7 +2378,7 @@ export default function Checkout() {
                     <span className="break-words">Pickup Location</span>
                   </h4>
                   <p className="text-xs sm:text-sm text-gray-700 break-words">Lafiya Road Nasarawa GRA, Kano</p>
-                  <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Kitchen</p>
+                  <p className="text-xs text-gray-500 mt-1 break-words">Nibbles Fast Food</p>
                 </div>
               )}
 

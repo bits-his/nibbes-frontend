@@ -60,6 +60,12 @@ export const orderSchema = z.object({
   deliveryFee: z.number().nullable().optional(), // Delivery fee amount
   trackingNumber: z.string().nullable().optional(), // Drops delivery tracking number
   deliveryRequestId: z.string().nullable().optional(), // Drops delivery request ID
+  kitchenPrinted: z.boolean().optional(), // Kitchen print tracking
+  kitchenPrintedAt: z.string().optional(), // When it was printed
+  kitchenPrintedBy: z.string().optional(), // Who printed it
+  cashierPrinted: z.boolean().optional(), // Cashier print tracking
+  cashierPrintedAt: z.string().optional(), // When it was printed
+  cashierPrintedBy: z.string().optional(), // Who printed it
   createdAt: z.string(),
   updatedAt: z.string(),
 });

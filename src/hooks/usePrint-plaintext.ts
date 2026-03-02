@@ -50,7 +50,7 @@ export const usePrint = () => {
     // Build plain text receipt
     let receiptText = `
 ================================
-    NIBBLES KITCHEN
+    Nibbles Fast Food
 ================================
 
 Order: #${orderData.orderNumber}

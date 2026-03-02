@@ -43,7 +43,7 @@ export function UpdateDialog({ open, version, onDismiss }: UpdateDialogProps) {
           </div>
         </DialogHeader>
         <DialogDescription className="text-base">
-          A new version of Nibbles Kitchen is available with the latest features and improvements. 
+          A new version of Nibbles Fast Food is available with the latest features and improvements. 
           Please update to continue using the app.
         </DialogDescription>
         <DialogFooter className="flex-col sm:flex-row gap-2">

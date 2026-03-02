@@ -787,7 +787,12 @@ const getStatusCardColor = (status: string) => {
                     <Badge variant="outline">{order.orderType}</Badge>
                     {order.paymentStatus === 'pending' && !user && (
                       <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                        Payment Pending
+                        ⏳ Payment Pending
+                      </Badge>
+                    )}
+                    {order.paymentStatus === 'pending' && (order as any).paymentAbandoned && (
+                      <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-300">
+                        ❌ Payment Abandoned - Please Try Again
                       </Badge>
                     )}
                     <span className="font-medium">{order.customerName}</span>

@@ -254,7 +254,7 @@ self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push received:', event);
 
   let notificationData = {
-    title: 'Nibbles Kitchen',
+    title: 'Nibbles Fast Food',
     body: 'New notification from Nibbles',
   };
 
@@ -280,7 +280,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(notificationData.title || 'Nibbles Kitchen', options)
+    self.registration.showNotification(notificationData.title || 'Nibbles Fast Food', options)
   );
 });
 

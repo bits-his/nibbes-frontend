@@ -158,7 +158,7 @@ export function RestaurantQRCode({
                 Your QR Code
               </CardTitle>
               <CardDescription>
-                Scan this code to visit Nibbles Kitchen
+                Scan this code to visit Nibbles Fast Food
               </CardDescription>
             </CardHeader>
             

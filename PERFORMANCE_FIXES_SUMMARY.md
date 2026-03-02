@@ -180,7 +180,7 @@
 
 1. **Title Optimization**
    - **Before**: "Nibbles Fast Food, Fast. Premium. Affordable."
-   - **After**: "Nibbles Kitchen - Fast, Premium, Affordable Nigerian Cuisine | Order Online"
+   - **After**: "Nibbles Fast Food - Fast, Premium, Affordable Nigerian Cuisine | Order Online"
    - **Impact**: Better search engine understanding, includes keywords
    - **Lighthouse Fix**: SEO score improvement
 

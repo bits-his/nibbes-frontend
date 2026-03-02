@@ -124,6 +124,13 @@ const menuItems: MenuItem[] = [
     permissions: ["main_kitchen"],
   },
   { 
+    title: "Reserved Items", 
+    url: "/reserved-items", 
+    icon: Package, 
+    roles: ["C - Suite", "admin"],
+    permissions: ["reserved_items"],
+  },
+  { 
     title: "Transactions", 
     url: "/transactions", 
     icon: CreditCard, 

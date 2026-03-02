@@ -38,7 +38,7 @@ export function SplashScreen({ isVisible }: SplashScreenProps) {
         <div className="relative animate-zoom-in-out">
           <img
             src="/nibbles.jpg"
-            alt="Nibbles Kitchen Logo"
+            alt="Nibbles Fast Food Logo"
             width="208"
             height="160"
             className="h-32 w-40 sm:h-40 sm:w-52 rounded-full object-cover shadow-2xl border-4 border-white/30"

@@ -74,7 +74,7 @@ export default function InterswitchPayButton({
       cust_name: customerName.replace("'", "&#x27;"),
       cust_email: customerEmail,
       cust_phone: customerPhone,
-      merchant_name: "Nibbles Kitchen",
+      merchant_name: "Nibbles Fast Food",
       logo_url: `${window.location.origin}/nibbles.jpg`,
       mode,
       payment_channels: ["card", "bank"],
