@@ -18,7 +18,7 @@ interface PendingPayment {
   paystackStatus?: 'success' | 'failed' | 'abandoned' | 'ongoing' | 'pending';
   order: {
     id: string;
-    orderNumber: number;
+    orderNumber: string;
     customerName: string;
     customerPhone: string;
     orderType: string;

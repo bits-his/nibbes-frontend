@@ -221,7 +221,11 @@ export function DeliveryStatusCard({ trackingNumber, requestNumber, orderType }:
               <span>Status History</span>
             </div>
             <div className="space-y-2 pl-6 border-l-2 border-blue-200">
-              {deliveryData.statusHistory.map((historyItem, index) => (
+              {deliveryData.statusHistory
+                .filter((historyItem) => 
+                  ['approved', 'riderassigned', 'delivered'].includes(historyItem.status.toLowerCase())
+                )
+                .map((historyItem, index) => (
                 <div key={index} className="relative">
                   <div className="absolute -left-[1.625rem] top-1 w-3 h-3 rounded-full bg-blue-400 border-2 border-white" />
                   <div className="text-xs">

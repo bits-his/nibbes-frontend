@@ -515,7 +515,7 @@ const ProfilePage: React.FC = () => {
 
                   <Separator />
 
-                  <div className="p-6 bg-red-50 rounded-lg border border-red-200">
+                  {/* <div className="p-6 bg-red-50 rounded-lg border border-red-200">
                     <h4 className="font-semibold text-red-800 mb-2 flex items-center">
                       <Trash2 className="h-4 w-4 mr-2" />
                       Danger Zone
@@ -526,7 +526,7 @@ const ProfilePage: React.FC = () => {
                     <Button variant="outline" className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white">
                       Delete Account
                     </Button>
-                  </div>
+                  </div> */}
                 </div>
               ) : (
                 <div className="space-y-6 max-w-2xl">

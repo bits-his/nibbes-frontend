@@ -35,7 +35,7 @@ interface CartItem {
 
 interface Order {
   id: string;
-  orderNumber: number;
+  orderNumber: string;
   customerName: string;
   customerPhone: string;
   orderType: string;
@@ -77,7 +77,7 @@ export default function RefundManagement() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [successData, setSuccessData] = useState<{ orderNumber: number; refundAmount: number } | null>(null);
+  const [successData, setSuccessData] = useState<{ orderNumber: string; refundAmount: number } | null>(null);
   const [refundReason, setRefundReason] = useState('');
   const [processingRefund, setProcessingRefund] = useState(false);
 
