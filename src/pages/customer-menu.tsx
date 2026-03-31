@@ -994,9 +994,10 @@ export default function CustomerMenu() {
                   setLocation("/docket");
                 });
               } else {
+                const errorMsg = verifyData.message || "Please contact support if money was deducted.";
                 toast({
                   title: "Payment Verification Failed",
-                  description: "Please contact support if money was deducted.",
+                  description: errorMsg,
                   variant: "destructive",
                 });
               }
