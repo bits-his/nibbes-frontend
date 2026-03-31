@@ -1,0 +1,208 @@
+
+You are a senior product analyst and systems designer for a POS and order management platform. Your responsibility is to break down, validate, and design a revised **Refund Management System** based on the client’s proposed workflow. Translate business rules into precise system logic, UI behavior, approval flow, accounting treatment, and data handling.
+
+---
+
+## 1. Refund Initiation Flow
+
+### 1.1 Order Lookup
+
+* Accept **Order Number** as the primary input.
+* On lookup, display:
+
+  * Order ID
+  * Order date & time
+  * Items (name, quantity, price)
+  * Total order value
+  * Original payment method
+  * Order source:
+
+    * Customer
+    * Cashier
+  * Staff involved (if cashier-created)
+
+---
+
+## 2. Issue Type Selection
+
+### 2.1 Issue Type (Checkbox – Multiple Allowed)
+
+* Order not delivered
+* Wrong item delivered
+* Missing item
+* Poor food quality
+* Delay in delivery/service
+* Repayment issue
+* Other (requires text input)
+
+### 2.2 Issue Description
+
+* Mandatory free-text field
+* Stored for audit, analytics, and reporting
+
+---
+
+## 3. Action Requested
+
+### 3.1 Action Options (Single Selection)
+
+* Full refund
+* Partial refund
+* Item replacement
+* Apology only
+* Store credit
+
+---
+
+## 4. Action-Specific Logic
+
+### 4.1 Full Refund
+
+* Classified as **Cash Refund**
+* Auto-fill refund amount = full order total
+* Refund payment methods:
+
+  * Cash
+  * Bank transfer
+  * POS reversal
+  * Store credit
+
+---
+
+### 4.2 Partial Refund
+
+* Classified as **Cash Refund**
+* Manual refund amount input (≤ order total)
+* Refund payment methods:
+
+  * Cash
+  * Bank transfer
+  * POS reversal
+  * Store credit
+
+---
+
+### 4.3 Item Replacement
+
+* Select item(s) from current order
+* Quantity validation (≤ original quantity)
+* Inventory adjusted accordingly
+* Fulfilled without monetary refund
+
+---
+
+### 4.4 Apology Only
+
+* No financial transaction
+* Mark all items as resolved
+* Automatically create a **zero-value order** for record integrity
+
+---
+
+### 4.5 Store Credit
+
+* Converts order value into store credit
+* Credit tied to customer identifier (account or phone number)
+* Balance updated immediately
+* Supports delayed collection use cases
+
+---
+
+## 5. Refund Classification
+
+* **Cash Refunds:** Full refund, Partial refund
+* **Non-Cash Refunds:** Item replacement, Apology only, Store credit
+
+System must enforce:
+
+* Different accounting treatments
+* Separate financial reporting logic
+
+---
+
+## 6. Approval Workflow
+
+### 6.1 Admin Review
+
+* All refund requests require admin approval
+* Admin sees:
+
+  * Order details
+  * Issue type(s) & description
+  * Requested action
+  * Financial impact
+
+### 6.2 Approval Metadata
+
+* Approval status
+* Approved by
+* Approval date & time
+* Internal management note (admin-only)
+
+---
+
+## 7. Loss Classification (Management Only)
+
+### 7.1 Loss Reason (Single Selection)
+
+* Loss due to staff negligence
+* Loss due to system issue
+* Loss due to external factors
+
+### 7.2 Staff Negligence Automation
+
+If **staff negligence** is selected:
+
+* Automatically generate an **Employee Misconduct (EM) Card**
+* Populate:
+
+  * Staff ID & name
+  * Related order
+  * Issue summary
+  * Financial loss value
+* Route to HR / management module
+
+---
+
+## 8. Audit & Reporting
+
+* Immutable audit trail:
+
+  * Initiator
+  * Approver
+  * Actions taken
+* Reports segmented by:
+
+  * Refund type
+  * Payment method
+  * Loss category
+  * Staff-related losses
+* Internal notes hidden from customer views
+
+---
+
+## 9. Validation & Safeguards
+
+* Refund amount cannot exceed order value
+* “Other” issue requires description
+* Approval mandatory before execution
+* Approved refunds are irreversible
+
+---
+
+## 10. REQUIRED OUTPUT FROM THE AI AGENT
+
+At the **end of your response**, you must present a **clear Implementation Plan**, including:
+
+* Phase breakdown (e.g., analysis, UI, backend, approval workflow, reporting)
+* Key database changes and new tables/fields
+* API or service layer responsibilities
+* Role-based access control considerations
+* Risk areas and mitigation strategies
+* Estimated implementation sequence (not timelines)
+
+show implementation plan before proceeding
+
+
+Approve Requests
+Review and approve pending refund requests
