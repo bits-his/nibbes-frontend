@@ -75,6 +75,9 @@ export default function CustomerMenu() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [tempAddress, setTempAddress] = useState<string>("");
+  const [deliveryLocations, setDeliveryLocations] = useState<string[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [geoPricingId, setGeoPricingId] = useState<string | null>(null);
   const [deliveryRoute, setDeliveryRoute] = useState<{from: string; to: string} | null>(null);
@@ -503,6 +506,30 @@ export default function CustomerMenu() {
         console.error("Error parsing saved location:", error);
       }
     }
+  }, []);
+
+  // Fetch available delivery locations from Drops geo pricing
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const res = await apiRequest("GET", "/api/delivery/geo-pricing");
+        if (res.ok) {
+          const data = await res.json();
+          const routes = data.data || data;
+          const locations: string[] = Array.from(
+            new Set(
+              routes
+                .filter((r: any) => r.isActive)
+                .map((r: any) => r.toLocation as string)
+            )
+          ).sort() as string[];
+          setDeliveryLocations(locations);
+        }
+      } catch (e) {
+        console.error("Failed to fetch delivery locations", e);
+      }
+    };
+    fetchLocations();
   }, []);
 
   // Calculate delivery fee when orderType is delivery and location is available
@@ -1537,56 +1564,67 @@ export default function CustomerMenu() {
                       )}
 
                       <div className="space-y-3">
-                        {/* Manual address input */}
+                        {/* Delivery location typeahead */}
                         <div>
                           <label className="text-sm font-semibold mb-2 block text-foreground">
                             Delivery Address
                           </label>
-                          <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="relative">
                             <Input
-                              placeholder="Enter your delivery address (e.g., Hadejia Road, Fagge C, Kano)"
+                              placeholder="Type your area (e.g., Badawa, Zoo Road...)"
                               value={tempAddress}
-                              onChange={(e) => setTempAddress(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && tempAddress.trim()) {
-                                  const newLocationData = {
-                                    address: tempAddress.trim(),
-                                    latitude: 0,
-                                    longitude: 0
-                                  };
-                                  setLocationData(newLocationData);
-                                  localStorage.setItem("location", JSON.stringify(newLocationData));
-                                  setLocationError(null);
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTempAddress(val);
+                                if (val.trim().length > 0) {
+                                  const filtered = deliveryLocations.filter(loc =>
+                                    loc.toLowerCase().includes(val.toLowerCase())
+                                  );
+                                  setLocationSuggestions(filtered);
+                                  setShowSuggestions(true);
+                                } else {
+                                  setShowSuggestions(false);
+                                  setLocationData(null);
                                 }
                               }}
-                              className="flex-1 min-w-0 text-sm sm:text-base"
+                              onFocus={() => {
+                                if (tempAddress.trim() && locationSuggestions.length > 0) {
+                                  setShowSuggestions(true);
+                                }
+                              }}
+                              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                              className="flex-1 text-sm"
                             />
-                            <Button
-                              type="button"
-                              onClick={() => {
-                                if (tempAddress.trim()) {
-                                  const newLocationData = {
-                                    address: tempAddress.trim(),
-                                    latitude: 0,
-                                    longitude: 0
-                                  };
-                                  setLocationData(newLocationData);
-                                  localStorage.setItem("location", JSON.stringify(newLocationData));
-                                  setLocationError(null);
-                                  toast({
-                                    title: "Address Set",
-                                    description: "Delivery address has been set successfully.",
-                                  });
-                                }
-                              }}
-                              disabled={!tempAddress.trim() || isCalculatingDelivery}
-                              className="bg-[#4EB5A4] hover:bg-[#4EB5A4]/90 text-sm sm:text-base whitespace-nowrap"
-                            >
-                              {isCalculatingDelivery ? "Calculating..." : "Set Address"}
-                            </Button>
+                            {showSuggestions && locationSuggestions.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                {locationSuggestions.map((loc) => (
+                                  <button
+                                    key={loc}
+                                    type="button"
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-[#4EB5A4]/10 hover:text-[#4EB5A4] transition-colors"
+                                    onMouseDown={() => {
+                                      setTempAddress(loc);
+                                      setShowSuggestions(false);
+                                      const newLocationData = { address: loc, latitude: 0, longitude: 0 };
+                                      setLocationData(newLocationData);
+                                      localStorage.setItem("location", JSON.stringify(newLocationData));
+                                      setLocationError(null);
+                                    }}
+                                  >
+                                    <MapPin className="inline w-3 h-3 mr-2 text-[#4EB5A4]" />
+                                    {loc}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {showSuggestions && locationSuggestions.length === 0 && tempAddress.trim().length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm text-gray-500">
+                                No delivery routes found for "{tempAddress}"
+                              </div>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-2">
-                            💡 Tip: Include landmarks for easier delivery (e.g., "Near Central Mosque, Kano")
+                            💡 Start typing your area name to see available delivery locations
                           </p>
                         </div>
 

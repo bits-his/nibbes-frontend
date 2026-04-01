@@ -61,6 +61,8 @@ const ProfilePage: React.FC = () => {
     confirm: false
   });
 
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -225,34 +227,35 @@ const ProfilePage: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Add file validation here (size, type, etc.)
-    const formData = new FormData();
-    formData.append('avatar', file);
-
+    setIsUploadingAvatar(true);
     try {
+      const formData = new FormData();
+      formData.append('file', file);
+
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BACKEND_URL}/api/auth/avatar`, {
+      const uploadRes = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
-        credentials: 'include'
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(prev => prev ? { ...prev, avatar: data.avatarUrl } : null);
-        toast({
-          title: 'Avatar Updated',
-          description: 'Your profile picture has been updated.',
-          action: <CheckCircle className="h-5 w-5 text-green-500" />
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Upload Failed',
-        description: 'Failed to upload avatar. Please try again.',
-        variant: 'destructive',
-      });
+      if (!uploadRes.ok) throw new Error('Failed to upload image');
+
+      const { url: cdnUrl } = await uploadRes.json();
+
+      // Save avatar URL to user profile
+      const saveRes = await apiRequest('PATCH', '/api/auth/me', { avatar: cdnUrl });
+      if (!saveRes.ok) throw new Error('Failed to save avatar');
+
+      const { user: updatedUser } = await saveRes.json();
+      setProfile(prev => prev ? { ...prev, avatar: cdnUrl } : null);
+      login({ ...updatedUser }, localStorage.getItem('token') || '');
+
+      toast({ title: 'Avatar Updated', description: 'Profile picture updated successfully.' });
+    } catch (error: any) {
+      toast({ title: 'Upload Failed', description: error.message || 'Failed to upload avatar.', variant: 'destructive' });
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -346,13 +349,18 @@ const ProfilePage: React.FC = () => {
                       )}
                     </div>
                     <label htmlFor="avatar-upload" className="absolute bottom-2 right-2 bg-white rounded-full p-2 border-2 border-[#50BAA8] shadow-lg cursor-pointer transition-all hover:scale-110">
-                      <Camera className="h-4 w-4 text-[#50BAA8]" />
+                      {isUploadingAvatar ? (
+                        <Loader2 className="h-4 w-4 text-[#50BAA8] animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4 text-[#50BAA8]" />
+                      )}
                       <input
                         id="avatar-upload"
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={handleAvatarUpload}
+                        disabled={isUploadingAvatar}
                       />
                     </label>
                   </div>
