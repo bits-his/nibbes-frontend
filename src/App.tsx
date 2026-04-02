@@ -536,9 +536,9 @@ function Router() {
       <Route
         path="/docket"
         component={() => (
-          <PublicRoute>
+          <ProtectedRoute requiredPermissions={["docket_display"]}>
             <DucketDisplay />
-          </PublicRoute>
+          </ProtectedRoute>
         )}
       />
       <Route
@@ -561,7 +561,11 @@ function Router() {
 
       <Route
         path="/feedback"
-        component={() => <FeedbackPage />}
+        component={() => (
+          <ProtectedRoute>
+            <FeedbackPage />
+          </ProtectedRoute>
+        )}
       />
 
       <Route

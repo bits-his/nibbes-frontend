@@ -24,7 +24,7 @@ const DEFAULT_CHARGES = {
 };
 
 const CACHE_KEY = 'service_charges_cache';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const CACHE_VERSION = 'v3'; // Increment to invalidate old cache
 
 export function ServiceChargesProvider({ children }: { children: ReactNode }) {
@@ -97,8 +97,17 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
       };
     } catch (error) {
       console.error('❌ Error fetching service charges:', error);
-      // Use defaults on error
-      setServiceCharges([]); // Clear charges on error
+      // On error, keep whatever is in cache rather than falling back to zero
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        try {
+          const cachedData = JSON.parse(cached);
+          if (cachedData.allCharges) setServiceCharges(cachedData.allCharges);
+          if (cachedData.serviceCharge) setServiceChargeRate(cachedData.serviceCharge);
+          if (cachedData.vat) setVatRate(cachedData.vat);
+          console.log('⚠️ Using stale cache due to fetch error');
+        } catch (e) {}
+      }
       return {
         serviceCharge: DEFAULT_CHARGES.serviceCharge,
         vat: DEFAULT_CHARGES.vat,
@@ -138,7 +147,6 @@ export function ServiceChargesProvider({ children }: { children: ReactNode }) {
     // Cache expired, wrong version, or doesn't exist - fetch fresh data
     console.log('🔄 Cache expired or invalid, fetching fresh data...');
     await fetchCharges();
-    setIsLoading(false);
     setIsLoading(false);
   };
 
