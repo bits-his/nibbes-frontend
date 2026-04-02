@@ -957,14 +957,18 @@ const getStatusBadge = (status: string) => {
                       {/* Hide print ticket button for refunded orders */}
                       {order.status !== "refunded" && (
                         <Button
-                          variant={order.kitchenPrinted ? "secondary" : "outline"}
+                          variant={order.kitchenPrinted && order.status !== 'pending' ? "secondary" : "outline"}
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-2"
                           onClick={() => handlePrintPreview(order)}
-                          disabled={order.kitchenPrinted}
+                          disabled={order.kitchenPrinted && order.status !== 'pending'}
                         >
                           <Printer className="w-4 h-4" />
-                          {order.kitchenPrinted ? "Already Printed ✓" : "Print Ticket"}
+                          {order.kitchenPrinted && order.status !== 'pending' 
+                            ? "Already Printed ✓" 
+                            : order.kitchenPrinted && order.status === 'pending'
+                              ? "Reprint Ticket"
+                              : "Print Ticket"}
                         </Button>
                       )}
                     </div>
