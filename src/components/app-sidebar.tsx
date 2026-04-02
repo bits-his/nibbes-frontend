@@ -18,6 +18,7 @@ import {
   Settings,
   Eye,
   DollarSign,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -210,6 +211,19 @@ const menuItems: MenuItem[] = [
     icon: Settings,
     roles: ["admin"],
     permissions: ["settings"],
+  },
+  {
+    title: "Customer Feedback",
+    url: "/customer-feedback",
+    icon: MessageSquare,
+    roles: ["admin"],
+    permissions: ["customer_feedback"],
+  },
+  {
+    title: "Feedback",
+    url: "/feedback",
+    icon: MessageSquare,
+    roles: ["admin", "kitchen", "customer"],
   },
   {
     title: "Profile",

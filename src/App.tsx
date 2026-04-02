@@ -44,6 +44,8 @@ const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const GuestCheckout = lazy(() => import("@/pages/guest-checkout"));
 const QRCodePage = lazy(() => import("@/pages/qr-code"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
+const FeedbackPage = lazy(() => import("@/pages/feedback"));
+const CustomerFeedbackPage = lazy(() => import("@/pages/customer-feedback"));
 const CustomerAnalyticsPage = lazy(() => import("@/pages/customer-analytics"));
 const CashierAnalyticsPage = lazy(() => import("@/pages/cashier-analytics"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
@@ -553,6 +555,20 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["profile"]}>
             <ProfilePage />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/feedback"
+        component={() => <FeedbackPage />}
+      />
+
+      <Route
+        path="/customer-feedback"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["customer_feedback"]}>
+            <CustomerFeedbackPage />
           </ProtectedRoute>
         )}
       />
