@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getBusinessDayRange } from "@/lib/businessDay";
 import { 
   Card, 
   CardContent, 
@@ -72,16 +73,16 @@ export default function AnalyticsDashboard() {
         from = startDate;
         to = endDate;
       } else if (dateRange) {
-        const today = new Date().toISOString().split('T')[0];
         if (dateRange === '1') {
-          // For "Today", use same date for from and to
-          from = today;
-          to = today;
+          // For "Today", use 2am business day range
+          const bizDay = getBusinessDayRange();
+          from = bizDay.from.toISOString();
+          to = bizDay.to.toISOString();
         } else {
-          to = today;
+          const bizDay = getBusinessDayRange();
+          to = bizDay.to.toISOString();
           from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0];
+            .toISOString();
         }
       } else {
         setLoading(false);

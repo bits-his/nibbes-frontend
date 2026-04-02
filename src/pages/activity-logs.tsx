@@ -9,17 +9,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Download, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { getBusinessDayRange } from "@/lib/businessDay";
 
 export default function ActivityLogs() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
-  
-  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({
-    from: today,
-    to: endOfDay
-  });
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>(() => getBusinessDayRange());
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());

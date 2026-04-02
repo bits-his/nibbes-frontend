@@ -1237,11 +1237,24 @@ export default function Checkout() {
             const respCode = response.responseCode || response.resp
             
             if (respCode === '00') {
+              // Update order payment status to 'paid' and trigger stock deduction
+              try {
+                await apiRequest("PATCH", `/api/orders/${createdOrder.id}/payment-status`, {
+                  paymentStatus: 'paid',
+                  paymentMethod: 'card'
+                })
+                console.log(`✅ Walk-in order ${createdOrder.orderNumber} payment status updated to paid`)
+              } catch (updateError) {
+                console.error(`❌ Failed to update payment status for order ${createdOrder.orderNumber}:`, updateError)
+              }
+
               toast({
                 title: "Payment Successful!",
                 description: `Order #${createdOrder.orderNumber} has been paid.`,
               })
               localStorage.removeItem("pendingWalkInOrder")
+              queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
+              queryClient.invalidateQueries({ queryKey: ["/api/menu/all"] })
               startTransition(() => setLocation("/docket"))
             } else {
               toast({

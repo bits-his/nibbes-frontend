@@ -37,18 +37,17 @@ import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { usePrint } from "@/hooks/usePrint";
 import { useAuth } from "@/hooks/useAuth";
+import { getBusinessDayRange, isCurrentBusinessDay, getBusinessDayStart } from "@/lib/businessDay";
 
 export default function OrderManagement() {
   const { toast } = useToast();
   const { printInvoice } = usePrint();
   const { user } = useAuth();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState("all"); // New: filter for online/walk-in
-  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ 
-    from: new Date(new Date().setHours(0, 0, 0, 0)),  // Start of today
-    to: new Date(new Date().setHours(23, 59, 59, 999))   // End of today
-  });
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>(() => getBusinessDayRange());
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
 
   // WebSocket connection for real-time updates
@@ -116,14 +115,11 @@ export default function OrderManagement() {
   }, [user, toast]); // Add user to dependencies so WebSocket handler has access to current user role
 
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
-    queryKey: ["/api/orders", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
+    queryKey: ["/api/orders", dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
-      // Always use date range - default to today if not set
-      const fromDate = dateRange.from ? new Date(dateRange.from) : new Date();
-      fromDate.setHours(0, 0, 0, 0);
-      
-      const toDate = dateRange.to ? new Date(dateRange.to) : new Date();
-      toDate.setHours(23, 59, 59, 999);
+      // Use 2am business day boundaries
+      const fromDate = dateRange.from ? new Date(dateRange.from) : getBusinessDayRange().from;
+      const toDate = dateRange.to ? new Date(dateRange.to) : getBusinessDayRange().to;
 
       const params = new URLSearchParams();
       params.append('from', fromDate.toISOString());
@@ -145,14 +141,11 @@ export default function OrderManagement() {
     refundedOrders?: number;
     refundedAmount?: number;
   }>({
-    queryKey: ["/api/orders/stats", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
+    queryKey: ["/api/orders/stats", dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
-      // Always use date range - default to today if not set
-      const fromDate = dateRange.from ? new Date(dateRange.from) : new Date();
-      fromDate.setHours(0, 0, 0, 0);
-      
-      const toDate = dateRange.to ? new Date(dateRange.to) : new Date();
-      toDate.setHours(23, 59, 59, 999);
+      // Use 2am business day boundaries
+      const fromDate = dateRange.from ? new Date(dateRange.from) : getBusinessDayRange().from;
+      const toDate = dateRange.to ? new Date(dateRange.to) : getBusinessDayRange().to;
 
       const params = new URLSearchParams();
       params.append('from', fromDate.toISOString());
@@ -247,23 +240,16 @@ export default function OrderManagement() {
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesOrderType = orderTypeFilter === "all" || order.orderType === orderTypeFilter;
     
-    // Filter by date range if dates are selected
+    // Filter by date range if dates are selected (2am business day boundary)
     const orderDate = new Date(order.createdAt);
+    const orderBusinessDay = getBusinessDayStart(orderDate);
     
-    // Convert order date to start of day for comparison
-    const orderStartOfDay = new Date(orderDate);
-    orderStartOfDay.setHours(0, 0, 0, 0);
-    
-    // Convert date range dates to start/end of day for comparison
-    const rangeStartOfDay = dateRange.from ? new Date(dateRange.from) : null;
-    if (rangeStartOfDay) rangeStartOfDay.setHours(0, 0, 0, 0);
-    
-    const rangeEndOfDay = dateRange.to ? new Date(dateRange.to) : null;
-    if (rangeEndOfDay) rangeEndOfDay.setHours(23, 59, 59, 999);
+    const rangeStart = dateRange.from ? new Date(dateRange.from) : null;
+    const rangeEnd = dateRange.to ? new Date(dateRange.to) : null;
 
     const matchesDateRange = 
-      (!rangeStartOfDay || orderStartOfDay >= rangeStartOfDay) && 
-      (!rangeEndOfDay || orderStartOfDay <= rangeEndOfDay);
+      (!rangeStart || orderBusinessDay >= rangeStart) && 
+      (!rangeEnd || orderBusinessDay <= rangeEnd);
 
     return matchesSearch && matchesStatus && matchesOrderType && matchesDateRange;
   });
@@ -406,9 +392,8 @@ const getStatusBadge = (status: string) => {
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateRange.from && dateRange.to ? (
-                      // Check if it's showing today's data (default)
-                      (dateRange.from.toDateString() === new Date().toDateString() && 
-                       dateRange.to.toDateString() === new Date().toDateString()) ? (
+                      // Check if it's showing today's business day (2am-2am)
+                      dateRange.from && dateRange.to && isCurrentBusinessDay(dateRange.from, dateRange.to) ? (
                         <span>Today</span>
                       ) : (
                         <>
@@ -428,13 +413,7 @@ const getStatusBadge = (status: string) => {
                       size="sm"
                       className="w-full"
                       aria-label="Reset date range to today"
-                      onClick={() => {
-                        const today = new Date();
-                        setDateRange({
-                          from: new Date(today.setHours(0, 0, 0, 0)),
-                          to: new Date(today.setHours(23, 59, 59, 999))
-                        });
-                      }}
+                      onClick={() => setDateRange(getBusinessDayRange())}
                     >
                       Reset to Today
                     </Button>

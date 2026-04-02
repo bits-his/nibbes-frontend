@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   ArrowUpCircle,
@@ -28,6 +28,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { apiRequest } from "@/lib/queryClient"
+import { getBusinessDayRange, getBusinessDayStart } from "@/lib/businessDay"
 
 interface StoreEntry {
   id: string
@@ -72,6 +73,7 @@ export default function Transactions() {
 
   const [selectedItemCode, setSelectedItemCode] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyDateRange, setHistoryDateRange] = useState<string>("today")
 
   const { data: summary, isLoading: summaryLoading } = useQuery<SummaryData>({
     queryKey: ["/api/store-entries/summary"],
@@ -199,128 +201,211 @@ export default function Transactions() {
     setHistoryOpen(false)
   }
 
-  const ItemHistoryModal = () => (
-    <Dialog open={historyOpen} onOpenChange={(open) => (!open ? closeHistory() : null)}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-2xl">
-            <History className="w-5 h-5 text-[#50BAA8]" />
-            Item History — {selectedItemCode}
-          </DialogTitle>
-          <DialogDescription>
-            Complete audit trail of <span className="font-semibold text-gray-900">{selectedItemCode}</span>
-          </DialogDescription>
-        </DialogHeader>
+  const ItemHistoryModal = () => {
+    // Filter and sort history entries
+    const filteredHistoryEntries = useMemo(() => {
+      if (!itemHistory?.entries) return [];
+      
+      const bizDayStart = getBusinessDayRange().from;
+      
+      const filtered = itemHistory.entries.filter((entry) => {
+        if (historyDateRange === "all") return true;
+        const entryDate = new Date(entry.date);
+        const entryBizDay = getBusinessDayStart(entryDate);
+        if (historyDateRange === "today") return entryBizDay >= bizDayStart;
+        if (historyDateRange === "week") {
+          const weekAgo = new Date(bizDayStart);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return entryBizDay >= weekAgo;
+        }
+        if (historyDateRange === "month") {
+          const monthAgo = new Date(bizDayStart);
+          monthAgo.setDate(monthAgo.getDate() - 30);
+          return entryBizDay >= monthAgo;
+        }
+        return true;
+      });
+      
+      // Sort: today's entries first (newest first within each group)
+      return filtered.sort((a, b) => {
+        const aBizDay = getBusinessDayStart(new Date(a.date)).getTime();
+        const bBizDay = getBusinessDayStart(new Date(b.date)).getTime();
+        const todayStart = bizDayStart.getTime();
+        
+        const aIsToday = aBizDay >= todayStart;
+        const bIsToday = bBizDay >= todayStart;
+        
+        if (aIsToday && !bIsToday) return -1;
+        if (!aIsToday && bIsToday) return 1;
+        
+        // Both same group — newest first
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+    }, [itemHistory?.entries, historyDateRange]);
 
-        {historyLoading ? (
-          <div className="flex flex-col items-center justify-center py-10">
-            <Loader2 className="w-8 h-8 animate-spin text-[#50BAA8]" />
-            <p className="mt-3 text-sm text-gray-600">Fetching transactions...</p>
-          </div>
-        ) : !itemHistory ? (
-          <div className="py-10 text-center text-gray-500">No history found for this item.</div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-gray-500">Total Entries</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">{itemHistory?.totalEntries ?? 0}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-gray-500">Total In</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold text-green-600">
-                    {(itemHistory?.totalIn ?? 0).toLocaleString()}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-gray-500">Total Out</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold text-red-600">
-                    {(itemHistory?.totalOut ?? 0).toLocaleString()}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-gray-500">Balance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold text-purple-600">
-                    {(itemHistory?.balance ?? 0).toLocaleString()}
-                  </p>
-                </CardContent>
-              </Card>
+    // Compute stats from filtered entries
+    const filteredStats = useMemo(() => {
+      const totalIn = filteredHistoryEntries.reduce((sum, e) => sum + parseFloat(e.qtyIn.toString()), 0);
+      const totalOut = filteredHistoryEntries.reduce((sum, e) => sum + parseFloat(e.qtyOut.toString()), 0);
+      return {
+        totalEntries: filteredHistoryEntries.length,
+        totalIn,
+        totalOut,
+        balance: totalIn - totalOut,
+      };
+    }, [filteredHistoryEntries]);
+
+    return (
+      <Dialog open={historyOpen} onOpenChange={(open) => (!open ? closeHistory() : null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <History className="w-5 h-5 text-[#50BAA8]" />
+              Item History — {selectedItemCode}
+            </DialogTitle>
+            <DialogDescription>
+              Complete audit trail of <span className="font-semibold text-gray-900">{selectedItemCode}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {historyLoading ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <Loader2 className="w-8 h-8 animate-spin text-[#50BAA8]" />
+              <p className="mt-3 text-sm text-gray-600">Fetching transactions...</p>
             </div>
-
-            <ScrollArea className="h-80 pr-2">
-              <div className="space-y-3">
-                {(itemHistory?.entries ?? []).map((entry) => (
-                  <Card key={entry.id} className="border border-gray-100 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm text-gray-500">{formatDate(entry.date)}</p>
-                          <p className="text-lg font-semibold text-gray-900">{entry.description}</p>
-                        </div>
-                        <Badge className={getTypeColor(entry.referenceType)}>
-                          {getTypeLabel(entry.referenceType)}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <ArrowUpCircle className="w-4 h-4 text-green-600" />
-                          <span className="text-gray-500">Qty In:</span>
-                          <span className="font-semibold text-gray-900">
-                            {parseFloat(entry.qtyIn.toString()).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <ArrowDownCircle className="w-4 h-4 text-red-600" />
-                          <span className="text-gray-500">Qty Out:</span>
-                          <span className="font-semibold text-gray-900">
-                            {parseFloat(entry.qtyOut.toString()).toLocaleString()}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Source:</span>
-                          <p className="font-semibold">{entry.source}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Destination:</span>
-                          <p className="font-semibold">{entry.destination}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Performed By:</span>
-                          <p className="font-semibold">{entry.performedBy || "System"}</p>
-                        </div>
-                        {entry.notes && (
-                          <div className="md:col-span-2">
-                            <span className="text-gray-500">Notes:</span>
-                            <p className="font-medium text-gray-800">{entry.notes}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+          ) : !itemHistory ? (
+            <div className="py-10 text-center text-gray-500">No history found for this item.</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Total Entries</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold">{filteredStats.totalEntries}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Total In</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-green-600">
+                      {filteredStats.totalIn.toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Total Out</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-red-600">
+                      {filteredStats.totalOut.toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-gray-500">Balance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-purple-600">
+                      {filteredStats.balance.toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-            </ScrollArea>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
+
+              {/* Date Range Filter */}
+              <div className="flex items-center gap-3">
+                <Select value={historyDateRange} onValueChange={setHistoryDateRange}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Date Range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last 30 Days</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">
+                  Showing {filteredHistoryEntries.length} of {itemHistory?.entries?.length ?? 0} entries
+                </span>
+              </div>
+
+              <ScrollArea className="h-80 pr-2">
+                <div className="space-y-3">
+                  {filteredHistoryEntries.length === 0 ? (
+                    <div className="py-10 text-center text-gray-500">No entries for this period.</div>
+                  ) : (
+                    filteredHistoryEntries.map((entry) => {
+                      const isToday = getBusinessDayStart(new Date(entry.date)).getTime() >= getBusinessDayRange().from.getTime();
+                      return (
+                        <Card key={entry.id} className={`border shadow-sm ${isToday ? 'border-[#50BAA8]/30 bg-[#50BAA8]/5' : 'border-gray-100'}`}>
+                          <CardContent className="p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm text-gray-500">{formatDate(entry.date)}</p>
+                                  {isToday && <Badge className="bg-[#50BAA8] text-white text-xs">Today</Badge>}
+                                </div>
+                                <p className="text-lg font-semibold text-gray-900">{entry.description}</p>
+                              </div>
+                              <Badge className={getTypeColor(entry.referenceType)}>
+                                {getTypeLabel(entry.referenceType)}
+                              </Badge>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <ArrowUpCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-gray-500">Qty In:</span>
+                                <span className="font-semibold text-gray-900">
+                                  {parseFloat(entry.qtyIn.toString()).toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <ArrowDownCircle className="w-4 h-4 text-red-600" />
+                                <span className="text-gray-500">Qty Out:</span>
+                                <span className="font-semibold text-gray-900">
+                                  {parseFloat(entry.qtyOut.toString()).toLocaleString()}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Source:</span>
+                                <p className="font-semibold">{entry.source}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Destination:</span>
+                                <p className="font-semibold">{entry.destination}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Performed By:</span>
+                                <p className="font-semibold">{entry.performedBy || "System"}</p>
+                              </div>
+                              {entry.notes && (
+                                <div className="md:col-span-2">
+                                  <span className="text-gray-500">Notes:</span>
+                                  <p className="font-medium text-gray-800">{entry.notes}</p>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
