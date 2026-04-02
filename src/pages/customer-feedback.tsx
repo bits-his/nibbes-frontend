@@ -122,7 +122,7 @@ const CustomerFeedbackPage: React.FC = () => {
                 <p className="mt-2 font-semibold text-gray-800 text-sm">
                   {fb.userName || fb.name}
                 </p>
-                {fb.userPhone && (
+                {(fb.userPhone) && (
                   <p className="text-xs text-gray-400">{fb.userPhone}</p>
                 )}
                 <p className="text-xs text-gray-300 mt-0.5">

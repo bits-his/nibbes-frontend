@@ -229,8 +229,20 @@ const ProfilePage: React.FC = () => {
 
     setIsUploadingAvatar(true);
     try {
+      // Convert HEIC/HEIF or any image to JPEG via canvas
+      let uploadFile: File = file;
+      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+        const bitmap = await createImageBitmap(file);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+        const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/jpeg', 0.9));
+        uploadFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+      }
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadFile);
 
       const token = localStorage.getItem('token');
       const uploadRes = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
@@ -247,9 +259,18 @@ const ProfilePage: React.FC = () => {
       const saveRes = await apiRequest('PATCH', '/api/auth/me', { avatar: cdnUrl });
       if (!saveRes.ok) throw new Error('Failed to save avatar');
 
-      const { user: updatedUser } = await saveRes.json();
+      // Update local profile state
       setProfile(prev => prev ? { ...prev, avatar: cdnUrl } : null);
-      login({ ...updatedUser }, localStorage.getItem('token') || '');
+
+      // Update auth context + localStorage so avatar persists on navigation
+      if (user) {
+        const updatedUser = { ...user, avatar: cdnUrl };
+        const stored = localStorage.getItem('user');
+        if (stored) {
+          localStorage.setItem('user', JSON.stringify({ ...JSON.parse(stored), avatar: cdnUrl }));
+        }
+        login(updatedUser, localStorage.getItem('token') || '');
+      }
 
       toast({ title: 'Avatar Updated', description: 'Profile picture updated successfully.' });
     } catch (error: any) {
