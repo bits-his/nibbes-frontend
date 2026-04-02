@@ -957,18 +957,24 @@ const getStatusBadge = (status: string) => {
                       {/* Hide print ticket button for refunded orders */}
                       {order.status !== "refunded" && (
                         <Button
-                          variant={order.kitchenPrinted && order.status !== 'pending' ? "secondary" : "outline"}
+                          // 🔒 KITCHEN FIX: ALWAYS allow printing for pending orders
+                          // Kitchen staff may need to print multiple times (lost ticket, new cook, etc.)
+                          // Only disable for completed/cancelled orders to prevent unnecessary reprints
+                          variant={order.status === 'pending' ? "outline" : order.kitchenPrinted ? "secondary" : "outline"}
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-2"
                           onClick={() => handlePrintPreview(order)}
-                          disabled={order.kitchenPrinted && order.status !== 'pending'}
+                          // NEVER disable for pending orders - kitchen might need reprint!
+                          disabled={order.status !== 'pending' && order.kitchenPrinted}
                         >
                           <Printer className="w-4 h-4" />
-                          {order.kitchenPrinted && order.status !== 'pending' 
-                            ? "Already Printed ✓" 
-                            : order.kitchenPrinted && order.status === 'pending'
-                              ? "Reprint Ticket"
-                              : "Print Ticket"}
+                          {order.status === 'pending' 
+                            ? order.kitchenPrinted 
+                              ? "🖨️ Reprint Ticket" 
+                              : "🖨️ Print Ticket"
+                            : order.kitchenPrinted 
+                              ? "Already Printed ✓" 
+                              : "🖨️ Print Ticket"}
                         </Button>
                       )}
                     </div>

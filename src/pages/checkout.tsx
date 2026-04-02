@@ -955,20 +955,31 @@ export default function Checkout() {
 
   const [completedOrder, setCompletedOrder] = useState<any>(null)
   const [receiptPrinted, setReceiptPrinted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false) // 🔒 PREVENT DOUBLE SUBMISSION
+  const [lastSubmissionTime, setLastSubmissionTime] = useState<number>(0) // 🔒 TOUCH SCREEN PROTECTION
 
   const createWalkInOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
+      // 🔒 TOUCH SCREEN PROTECTION: Prevent rapid clicks (even if isSubmitting hasn't updated yet)
+      const now = Date.now()
+      if (isSubmitting || (now - lastSubmissionTime < 3000)) { // 3 second minimum between orders
+        console.warn(`⚠️ BLOCKED: Order submission too soon (${now - lastSubmissionTime}ms) - ignoring duplicate touch`)
+        throw new Error('Please wait - order is being processed')
+      }
+      setLastSubmissionTime(now)
+      setIsSubmitting(true)
+
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-      
+
       try {
         const response = await apiRequest("POST", "/api/orders", orderData, controller.signal)
         clearTimeout(timeoutId)
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           console.log('❌ Order creation failed, error data:', errorData)
-          
+
           // Check if it's a stock error
           if (errorData.stockError) {
             console.log('✅ Detected stock error, throwing with stockError flag')
@@ -980,7 +991,7 @@ export default function Checkout() {
           }
           throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
         }
-        
+
         return await response.json()
       } catch (error: any) {
         clearTimeout(timeoutId)
@@ -1005,6 +1016,11 @@ export default function Checkout() {
           throw new Error('Request timeout - please check your connection and try again')
         }
         throw error
+      } finally {
+        // 🔒 Keep lock for 2 seconds after completion to prevent immediate re-submission
+        setTimeout(() => {
+          setIsSubmitting(false)
+        }, 2000)
       }
     },
     onSuccess: (data: any) => {
@@ -2276,16 +2292,24 @@ export default function Checkout() {
                       <Button
                         type="submit"
                         size="lg"
-                        className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg"
-                        disabled={createOrderMutation.isPending || isProcessingPayment || isCalculatingDelivery}
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-all rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={createOrderMutation.isPending || isProcessingPayment || isCalculatingDelivery || isSubmitting}
                         data-testid="button-place-order"
+                        // 🔒 TOUCH SCREEN: Add pointer-events-none to physically prevent clicks
+                        style={{ pointerEvents: (createOrderMutation.isPending || isProcessingPayment || isCalculatingDelivery || isSubmitting) ? 'none' : 'auto' }}
                       >
-                        {isCalculatingDelivery 
-                          ? "Calculating..." 
-                          : createOrderMutation.isPending || isProcessingPayment 
-                            ? "Processing..." 
-                            : "Complete Order"}
+                        {isCalculatingDelivery
+                          ? "⏳ Calculating..."
+                          : createOrderMutation.isPending || isProcessingPayment || isSubmitting
+                            ? "⏳ Processing Order..."
+                            : "✅ Complete Order"}
                       </Button>
+                      {/* 🔒 TOUCH SCREEN WARNING */}
+                      {isSubmitting && (
+                        <p className="text-xs text-center text-muted-foreground mt-2">
+                          ⚠️ Please wait - order is being processed
+                        </p>
+                      )}
                     </div>
 
                     {/* Security note */}
