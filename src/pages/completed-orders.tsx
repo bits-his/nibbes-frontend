@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Filter, Eye, CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getBusinessDayRange, isCurrentBusinessDay, getBusinessDayStart } from "@/lib/businessDay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,10 +27,7 @@ import { Calendar } from "@/components/ui/calendar";
 export default function CompletedOrders() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({
-    from: new Date(new Date().setHours(0, 0, 0, 0)),  // Start of today
-    to: new Date(new Date().setHours(23, 59, 59, 999))   // End of today
-  });
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>(() => getBusinessDayRange());
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
 
   // WebSocket connection for real-time updates
@@ -71,17 +69,13 @@ export default function CompletedOrders() {
   const { data: orders, isLoading } = useQuery<OrderWithItems[]>({
     queryKey: ["/api/orders/completed", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
     queryFn: async () => {
-      // Build query parameters with proper date range (start of from date to end of to date)
+      // Build query parameters with 2am business day range
       const params = new URLSearchParams();
       if (dateRange.from) {
-        // Set time to start of the day (00:00:00)
         const fromDate = new Date(dateRange.from);
-        fromDate.setHours(0, 0, 0, 0);
         params.append('from', fromDate.toISOString());
 
-        // If no 'to' date is set, use the same date as 'from' (single day selection)
-        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
-        toDate.setHours(23, 59, 59, 999);
+        const toDate = dateRange.to ? new Date(dateRange.to) : getBusinessDayRange(dateRange.from).to;
         params.append('to', toDate.toISOString());
 
         console.log(`📅 Frontend fetching completed orders from ${fromDate.toISOString()} to ${toDate.toISOString()}`);
@@ -101,19 +95,15 @@ export default function CompletedOrders() {
     pendingOrders: number;
     completedOrders: number;
   }>({
-    queryKey: ["/api/orders/stats", dateRange.from?.toDateString(), dateRange.to?.toDateString()],
+    queryKey: ["/api/orders/stats", dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
-      // Build query parameters with proper date range (start of from date to end of to date)
+      // Build query parameters with 2am business day range
       const params = new URLSearchParams();
       if (dateRange.from) {
-        // Set time to start of the day (00:00:00)
         const fromDate = new Date(dateRange.from);
-        fromDate.setHours(0, 0, 0, 0);
         params.append('from', fromDate.toISOString());
 
-        // If no 'to' date is set, use the same date as 'from' (single day selection)
-        const toDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
-        toDate.setHours(23, 59, 59, 999);
+        const toDate = dateRange.to ? new Date(dateRange.to) : getBusinessDayRange(dateRange.from).to;
         params.append('to', toDate.toISOString());
       }
 
@@ -130,23 +120,16 @@ export default function CompletedOrders() {
       order.orderNumber.toString().includes(searchQuery) ||
       order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Filter by date range if dates are selected
+    // Filter by date range if dates are selected (2am business day boundary)
     const orderDate = new Date(order.createdAt);
+    const orderBusinessDay = getBusinessDayStart(orderDate);
 
-    // Convert order date to start of day for comparison
-    const orderStartOfDay = new Date(orderDate);
-    orderStartOfDay.setHours(0, 0, 0, 0);
-
-    // Convert date range dates to start/end of day for comparison
-    const rangeStartOfDay = dateRange.from ? new Date(dateRange.from) : null;
-    if (rangeStartOfDay) rangeStartOfDay.setHours(0, 0, 0, 0);
-
-    const rangeEndOfDay = dateRange.to ? new Date(dateRange.to) : null;
-    if (rangeEndOfDay) rangeEndOfDay.setHours(23, 59, 59, 999);
+    const rangeStart = dateRange.from ? new Date(dateRange.from) : null;
+    const rangeEnd = dateRange.to ? new Date(dateRange.to) : null;
 
     const matchesDateRange =
-      (!rangeStartOfDay || orderStartOfDay >= rangeStartOfDay) &&
-      (!rangeEndOfDay || orderStartOfDay <= rangeEndOfDay);
+      (!rangeStart || orderBusinessDay >= rangeStart) &&
+      (!rangeEnd || orderBusinessDay <= rangeEnd);
 
     return matchesSearch && matchesDateRange;
   });
@@ -210,8 +193,7 @@ export default function CompletedOrders() {
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange.from && dateRange.to ? (
-                    (dateRange.from.toDateString() === new Date().toDateString() &&
-                     dateRange.to.toDateString() === new Date().toDateString()) ? (
+                    isCurrentBusinessDay(dateRange.from, dateRange.to) ? (
                       <span>Today</span>
                     ) : (
                       <>

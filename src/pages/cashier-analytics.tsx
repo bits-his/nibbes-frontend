@@ -10,6 +10,7 @@ import { Users, DollarSign, ShoppingCart, TrendingUp, CreditCard, Clock, Calenda
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { getBusinessDayRange } from "@/lib/businessDay"
 
 interface CashierMetric {
   cashierId: string
@@ -78,19 +79,25 @@ function normalizePaymentMethod(paymentMethod: string | null | undefined): strin
 }
 
 export default function CashierAnalytics() {
+  // Get the current business day date string (2am-2am)
+  const getBusinessDayDateString = () => {
+    const bizDay = getBusinessDayRange();
+    return bizDay.from.toISOString().split('T')[0];
+  };
+
   const [cashierMetrics, setCashierMetrics] = useState<CashierMetric[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [hourlyPerformance, setHourlyPerformance] = useState<HourlyPerformance[]>([])
   const [dailyPerformance, setDailyPerformance] = useState<DailyPerformance[]>([])
   const [selectedCashier, setSelectedCashier] = useState<string>("all")
-  const [startDate, setStartDate] = useState<string>("")
-  const [endDate, setEndDate] = useState<string>("")
+  const [startDate, setStartDate] = useState<string>(getBusinessDayDateString())
+  const [endDate, setEndDate] = useState<string>(getBusinessDayDateString())
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [showTransactions, setShowTransactions] = useState(false)
   const [selectedCashierId, setSelectedCashierId] = useState<string>("")
-  const [transactionFromDate, setTransactionFromDate] = useState<string>("")
-  const [transactionToDate, setTransactionToDate] = useState<string>("")
+  const [transactionFromDate, setTransactionFromDate] = useState<string>(getBusinessDayDateString())
+  const [transactionToDate, setTransactionToDate] = useState<string>(getBusinessDayDateString())
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const { toast } = useToast()
 
@@ -98,13 +105,12 @@ export default function CashierAnalytics() {
     fetchAnalytics(startDate, endDate)
   }, [startDate, endDate])
 
-  // Set default date to today when modal opens (only if dates aren't already set)
+  // Set default date to today (business day) when modal opens
   useEffect(() => {
     if (showTransactions && selectedCashierId && !transactionFromDate && !transactionToDate) {
-      const today = new Date().toISOString().split('T')[0]
-      setTransactionFromDate(today)
-      setTransactionToDate(today)
-      // Don't fetch here - handleCashierClick or handleDateClick will handle it
+      const bizDay = getBusinessDayDateString()
+      setTransactionFromDate(bizDay)
+      setTransactionToDate(bizDay)
     }
   }, [showTransactions, selectedCashierId])
 
@@ -141,10 +147,11 @@ export default function CashierAnalytics() {
   }
 
   const handleReset = () => {
-    setStartDate("")
-    setEndDate("")
+    const bizDay = getBusinessDayDateString()
+    setStartDate(bizDay)
+    setEndDate(bizDay)
     setSelectedCashier("all")
-    fetchAnalytics()
+    fetchAnalytics(bizDay, bizDay)
   }
 
   const fetchTransactions = async (cashierId: string, fromDate?: string, toDate?: string) => {
@@ -176,11 +183,10 @@ export default function CashierAnalytics() {
 
   const handleCashierClick = (cashierId: string) => {
     setSelectedCashierId(cashierId)
-    // Default to today's date
-    const today = new Date().toISOString().split('T')[0]
-    setTransactionFromDate(today)
-    setTransactionToDate(today)
-    fetchTransactions(cashierId, today, today)
+    const bizDay = getBusinessDayDateString()
+    setTransactionFromDate(bizDay)
+    setTransactionToDate(bizDay)
+    fetchTransactions(cashierId, bizDay, bizDay)
   }
 
   const handleDateClick = (cashierId: string, date: string) => {
@@ -198,12 +204,11 @@ export default function CashierAnalytics() {
   }
 
   const handleTransactionReset = () => {
-    // Reset to today
-    const today = new Date().toISOString().split('T')[0]
-    setTransactionFromDate(today)
-    setTransactionToDate(today)
+    const bizDay = getBusinessDayDateString()
+    setTransactionFromDate(bizDay)
+    setTransactionToDate(bizDay)
     if (selectedCashierId) {
-      fetchTransactions(selectedCashierId, today, today)
+      fetchTransactions(selectedCashierId, bizDay, bizDay)
     }
   }
 
