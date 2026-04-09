@@ -17,7 +17,7 @@ export default function Login() {
   const { login } = useAuth()
   const [phoneNumber, setPhoneNumber] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(true)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -209,20 +209,20 @@ export default function Login() {
               <div className="relative group">
                 <Input
                   id="password"
-                  type="text"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-11 pr-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
-                {/* <button
+                <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button> */}
+                </button>
               </div>
             </div>
 

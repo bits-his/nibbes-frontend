@@ -7,85 +7,65 @@ export const useAutoLogout = (isLoggedIn: boolean) => {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    // Set session start time if not already set
-    const sessionStartTime = localStorage.getItem('sessionStartTime');
-    if (!sessionStartTime) {
+    if (!localStorage.getItem('sessionStartTime')) {
       localStorage.setItem('sessionStartTime', Date.now().toString());
     }
 
-    // Calculate time until next midnight
-    const getTimeUntilMidnight = () => {
+    // Calculate time until next 4AM
+    const getTimeUntil4AM = () => {
       const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0); // Set to next midnight
-      return tomorrow.getTime() - now.getTime();
+      const next4AM = new Date(now);
+      next4AM.setHours(4, 0, 0, 0);
+      // If it's already past 4AM today, target 4AM tomorrow
+      if (now >= next4AM) {
+        next4AM.setDate(next4AM.getDate() + 1);
+      }
+      return next4AM.getTime() - now.getTime();
     };
 
     const handleLogout = () => {
-      // TODO: Show toast notification instead of alert
-      // For now, commenting out alert as user will see login page anyway
-      // alert('Your session has expired. Please log in again.');
-
-      // Clear stored user data
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('sessionStartTime');
       localStorage.removeItem('cart');
       localStorage.removeItem('pendingCheckoutCart');
       localStorage.removeItem('location');
-
-      // Force page reload to login after clearing data
       window.location.href = '/login';
     };
 
-    const scheduleMidnightLogout = () => {
-      // Clear any existing timeout
-      if ((window as any).midnightLogoutTimeout) {
-        clearTimeout((window as any).midnightLogoutTimeout);
+    const schedule4AMLogout = () => {
+      if ((window as any).autoLogoutTimeout) {
+        clearTimeout((window as any).autoLogoutTimeout);
       }
-
-      // Calculate time until next midnight
-      const timeUntilMidnight = getTimeUntilMidnight();
-
-      // Set timeout to log out at midnight
-      (window as any).midnightLogoutTimeout = setTimeout(() => {
+      (window as any).autoLogoutTimeout = setTimeout(() => {
         handleLogout();
-      }, timeUntilMidnight);
+      }, getTimeUntil4AM());
     };
 
-    // Schedule logout for the next midnight
-    scheduleMidnightLogout();
+    schedule4AMLogout();
 
-    // Also check periodically (every minute) to verify we haven't passed midnight
+    // Check every minute if we've crossed 4AM
     const intervalId = setInterval(() => {
-      const currentTime = new Date();
+      const now = new Date();
       const sessionStart = localStorage.getItem('sessionStartTime');
-
-      // Check if it's past midnight from when the session started
       if (sessionStart) {
-        const sessionStartDate = new Date(parseInt(sessionStart));
-        const sessionStartDay = sessionStartDate.getDate();
-        const currentDay = currentTime.getDate();
-
-        // If the day has changed since session start, log out
-        if (currentDay !== sessionStartDay) {
+        const startTime = new Date(parseInt(sessionStart));
+        const start4AM = new Date(startTime);
+        start4AM.setHours(4, 0, 0, 0);
+        if (startTime >= start4AM) {
+          // Session started after 4AM, target next day's 4AM
+          start4AM.setDate(start4AM.getDate() + 1);
+        }
+        if (now >= start4AM) {
           handleLogout();
         }
       }
+      schedule4AMLogout();
+    }, 60000);
 
-      // Reschedule the timeout to ensure it's accurate for the next midnight
-      scheduleMidnightLogout();
-    }, 60000); // Check every minute
-
-    // Cleanup function
     return () => {
-      if ((window as any).midnightLogoutTimeout) {
-        clearTimeout((window as any).midnightLogoutTimeout);
-      }
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      if ((window as any).autoLogoutTimeout) clearTimeout((window as any).autoLogoutTimeout);
+      clearInterval(intervalId);
     };
   }, [isLoggedIn, setLocation]);
 };

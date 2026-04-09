@@ -98,6 +98,7 @@ export default function CashierAnalytics() {
   const [selectedCashierId, setSelectedCashierId] = useState<string>("")
   const [transactionFromDate, setTransactionFromDate] = useState<string>(getBusinessDayDateString())
   const [transactionToDate, setTransactionToDate] = useState<string>(getBusinessDayDateString())
+  const [showAmountLabel, setShowAmountLabel] = useState(false)
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const { toast } = useToast()
 
@@ -452,9 +453,17 @@ export default function CashierAnalytics() {
         {/* Payment Methods */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Payment Methods
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Payment Methods
+              </span>
+              <button
+                onClick={() => setShowAmountLabel(v => !v)}
+                className="text-xs font-normal px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                {showAmountLabel ? 'Show %' : 'Show ₦'}
+              </button>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -465,7 +474,10 @@ export default function CashierAnalytics() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent, value }) => showAmountLabel
+                    ? `${name}: ₦${Number(value).toLocaleString()}`
+                    : `${name}: ${(percent * 100).toFixed(0)}%`
+                  }
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
@@ -484,7 +496,10 @@ export default function CashierAnalytics() {
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                     {pm.name}
                   </span>
-                  <span className="font-medium">{pm.count} transactions</span>
+                  <span className="text-right">
+                    <span className="font-medium text-green-600">₦{Number(pm.value).toLocaleString()}</span>
+                    <span className="text-gray-400 ml-2">({pm.count} transactions)</span>
+                  </span>
                 </div>
               ))}
             </div>
