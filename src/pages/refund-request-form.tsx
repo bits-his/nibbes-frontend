@@ -45,6 +45,7 @@ export default function RefundRequestForm() {
   
   // Form data
   const [orderNumber, setOrderNumber] = useState('');
+  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [order, setOrder] = useState<any>(null);
   const [issueTypes, setIssueTypes] = useState<string[]>([]);
   const [issueDescription, setIssueDescription] = useState('');
@@ -64,14 +65,14 @@ export default function RefundRequestForm() {
   ];
 
   const fetchOrder = async () => {
-    if (!orderNumber.trim()) {
-      toast({ title: 'Order Number Required', variant: 'destructive' });
+    if (!orderNumber.trim() || !orderDate) {
+      toast({ title: 'Order number and date are required', variant: 'destructive' });
       return;
     }
 
     try {
       setLoading(true);
-      const response = await apiRequest('GET', `/api/orders/search?orderNumber=${orderNumber}`);
+      const response = await apiRequest('GET', `/api/orders/search?orderNumber=${orderNumber}&date=${orderDate}`);
       if (!response.ok) throw new Error('Order not found');
       
       const data = await response.json();
@@ -379,6 +380,12 @@ export default function RefundRequestForm() {
                     value={orderNumber}
                     onChange={(e) => setOrderNumber(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && fetchOrder()}
+                  />
+                  <Input
+                    type="date"
+                    value={orderDate}
+                    onChange={(e) => setOrderDate(e.target.value)}
+                    className="w-44"
                   />
                   <Button onClick={fetchOrder} disabled={loading}>
                     <Search className="w-4 h-4 mr-2" />
