@@ -1,5 +1,10 @@
 {
   "version": "1.0.2",
+<<<<<<< HEAD
   "buildHash": "mnt4w6fb",
   "buildTime": "2026-04-10T16:42:22.727Z"
+=======
+  "buildHash": "mnt4kh5l",
+  "buildTime": "2026-04-10T16:33:16.761Z"
+>>>>>>> b82c4af7b971df05299e4309e774cd1a5bcde1c7
 }
