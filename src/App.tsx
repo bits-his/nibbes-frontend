@@ -44,6 +44,8 @@ const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const GuestCheckout = lazy(() => import("@/pages/guest-checkout"));
 const QRCodePage = lazy(() => import("@/pages/qr-code"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
+const FeedbackPage = lazy(() => import("@/pages/feedback"));
+const CustomerFeedbackPage = lazy(() => import("@/pages/customer-feedback"));
 const CustomerAnalyticsPage = lazy(() => import("@/pages/customer-analytics"));
 const CashierAnalyticsPage = lazy(() => import("@/pages/cashier-analytics"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
@@ -534,9 +536,9 @@ function Router() {
       <Route
         path="/docket"
         component={() => (
-          <PublicRoute>
+          <ProtectedRoute requiredPermissions={["docket_display"]}>
             <DucketDisplay />
-          </PublicRoute>
+          </ProtectedRoute>
         )}
       />
       <Route
@@ -553,6 +555,24 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["profile"]}>
             <ProfilePage />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/feedback"
+        component={() => (
+          <ProtectedRoute>
+            <FeedbackPage />
+          </ProtectedRoute>
+        )}
+      />
+
+      <Route
+        path="/customer-feedback"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["customer_feedback"]}>
+            <CustomerFeedbackPage />
           </ProtectedRoute>
         )}
       />
@@ -711,7 +731,7 @@ function Router() {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const guestSession = getGuestSession();
   const mainRef = useRef<HTMLElement>(null);
 
@@ -748,27 +768,24 @@ function Layout({ children }: { children: React.ReactNode }) {
             <nav className="flex items-center" aria-label="Main navigation">
               <SidebarTrigger data-testid="button-sidebar-toggle" aria-label="Toggle sidebar" />
             </nav>
-            <div className="flex items-center gap-2">
-              <div className="text-[#50BAA8] font-medium">
-                {user ? (user.username || user.email) : guestSession ? `${guestSession.guestName} (Guest)` : "Guest"}
-              </div>
-              <div className="text-[#50BAA8]">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="lucide lucide-user"
+            <div className="flex items-center">
+              {user ? (
+                <button
+                  onClick={() => { logout(); }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
-                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  Logout
+                </button>
+              ) : (
+                <button
+                  onClick={() => { window.location.href = '/login'; }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-[#50BAA8] hover:bg-[#50BAA8]/10 rounded-lg transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  Sign In
+                </button>
+              )}
             </div>
           </header>
         )}

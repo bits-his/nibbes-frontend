@@ -18,7 +18,7 @@ interface PendingPayment {
   paystackStatus?: 'success' | 'failed' | 'abandoned' | 'ongoing' | 'pending';
   order: {
     id: string;
-    orderNumber: number;
+    orderNumber: string;
     customerName: string;
     customerPhone: string;
     orderType: string;
@@ -129,35 +129,45 @@ const PendingPayments: React.FC = () => {
     }
   };
 
-  const verifyPayment = async (transactionRef: string) => {
+  const verifyPayment = async (transactionRef: string, forceSuccess = false) => {
     try {
       setVerifyingPayments(prev => new Set(prev).add(transactionRef));
       
       const token = localStorage.getItem('token');
-      
-      // Use Paystack verification endpoint
-      const response = await fetch(`${backendUrl}/api/paystack/verify/${transactionRef}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
 
-      const data = await response.json();
+      let data;
+
+      if (forceSuccess) {
+        const response = await fetch(`${backendUrl}/api/payments/verify/${transactionRef}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ forceSuccess: true })
+        });
+        data = await response.json();
+      } else {
+        const response = await fetch(`${backendUrl}/api/paystack/verify/${transactionRef}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        data = await response.json();
+      }
       
       if (data.success) {
         toast({
           title: "Payment Verified! ✅",
-          description: "Payment has been successfully verified and marked as paid.",
+          description: data.message || "Payment has been successfully verified and marked as paid.",
         });
-        
-        // Remove the payment from the list since it's now paid
         setPayments(prev => prev.filter(p => p.transactionRef !== transactionRef));
       } else {
-        // Show error with suggestion
-        const description = data.message || "Payment could not be verified as successful.";
-          
+        const description = data.suggestion
+          ? `${data.message}. ${data.suggestion}`
+          : data.message || "Payment could not be verified as successful.";
         toast({
           title: "Verification Failed",
           description,
@@ -467,6 +477,16 @@ const PendingPayments: React.FC = () => {
                       )}
                       {verifyingPayments.has(payment.transactionRef) ? 'Verifying...' : 'Verify Payment'}
                     </Button>
+
+                    {/* <Button
+                      onClick={() => verifyPayment(payment.transactionRef, true)}
+                      disabled={verifyingPayments.has(payment.transactionRef)}
+                      variant="secondary"
+                      className="flex items-center gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Force Verify
+                    </Button> */}
                     
                     <Button
                       variant="outline"

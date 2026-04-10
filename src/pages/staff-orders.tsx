@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Minus, X, ChefHat, AlertCircle, Wifi } from "lucide-react";
+import { Plus, Minus, X, ChefHat, AlertCircle, Wifi, History, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -168,7 +168,7 @@ const MenuItemCard = memo<MenuItemCardProps>(({
       <CardContent className="p-3 md:p-4">
         <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{item.name}</h3>
         <p className="text-base md:text-lg font-bold">₦{parseFloat(item.price).toLocaleString()}</p>
-        {item.stockBalance !== null && item.stockBalance !== undefined ? (
+        {item.stockBalance !== null && item.stockBalance !== undefined && item.stockBalance <= 10 ? (
           <div className="flex items-center gap-1 mt-2">
             <span className="text-xs text-muted-foreground">Stock:</span>
             <span className={`text-xs font-semibold ${
@@ -179,9 +179,7 @@ const MenuItemCard = memo<MenuItemCardProps>(({
               {item.stockBalance} portions
             </span>
           </div>
-        ) : (
-          <Badge variant="secondary" className="mt-2 text-xs">Stock not tracked</Badge>
-        )}
+        ) : null}
         
         {isInCart && cartQuantity > 0 && (
           <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
@@ -232,9 +230,44 @@ export default function StaffOrders() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [expandedCartItem, setExpandedCartItem] = useState<number | null>(null);
+  const [showMyOrders, setShowMyOrders] = useState(false);
+  const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [myOrdersLoading, setMyOrdersLoading] = useState(false);
+  const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
   
   // PERFORMANCE FIX: Debounce search query (300ms delay)
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+
+  const fetchMyOrders = async () => {
+    setMyOrdersLoading(true);
+    try {
+      const res = await apiRequest('GET', '/api/orders/my-recent');
+      const data = await res.json();
+      setMyOrders(data.orders || []);
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to fetch your orders', variant: 'destructive' });
+    } finally {
+      setMyOrdersLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    setCancellingOrder(orderId);
+    try {
+      const res = await apiRequest('PATCH', `/api/orders/${orderId}/status`, { status: 'cancelled' });
+      if (res.ok) {
+        setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
+        toast({ title: 'Order Cancelled', description: 'Order has been cancelled successfully.' });
+      } else {
+        const err = await res.json();
+        toast({ title: 'Error', description: err.message || 'Failed to cancel order', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to cancel order', variant: 'destructive' });
+    } finally {
+      setCancellingOrder(null);
+    }
+  };
   
   // Network status for adaptive loading
   const networkStatus = useNetworkStatus();
@@ -686,7 +719,18 @@ export default function StaffOrders() {
         {/* Menu Section */}
         <div className="flex-1 flex flex-col border-r md:border-r overflow-hidden">
           <div className="p-4 md:p-6 border-b">
-            <h1 className="font-serif text-2xl md:text-3xl font-bold mb-3 md:mb-4">Walk-in Orders</h1>
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h1 className="font-serif text-2xl md:text-3xl font-bold">Walk-in Orders</h1>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => { setShowMyOrders(true); fetchMyOrders(); }}
+              >
+                <History className="h-4 w-4" />
+                My Orders
+              </Button>
+            </div>
             
             {/* Search Bar */}
             <div className="mb-4">
@@ -1056,6 +1100,60 @@ export default function StaffOrders() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* My Recent Orders Modal */}
+      <Dialog open={showMyOrders} onOpenChange={setShowMyOrders}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              My Recent Orders
+            </DialogTitle>
+          </DialogHeader>
+
+          {myOrdersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : myOrders.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No orders found</p>
+          ) : (
+            <div className="space-y-3">
+              {myOrders.map((order) => (
+                <div key={order.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span className="font-semibold">#{order.orderNumber}</span>
+                      <span className="text-sm text-muted-foreground ml-2">{order.customerName}</span>
+                    </div>
+                    <Badge variant={
+                      order.status === 'cancelled' ? 'destructive' :
+                      order.status === 'completed' ? 'default' : 'secondary'
+                    }>
+                      {order.status}
+                    </Badge>
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {order.orderItems?.length || 0} items · ₦{parseFloat(order.totalAmount).toLocaleString()} · {new Date(order.createdAt).toLocaleTimeString()}
+                  </div>
+                  {['pending', 'preparing'].includes(order.status) && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="w-full"
+                      disabled={cancellingOrder === order.id}
+                      onClick={() => handleCancelOrder(order.id)}
+                    >
+                      {cancellingOrder === order.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                      Cancel Order
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

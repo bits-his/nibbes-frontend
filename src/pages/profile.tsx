@@ -61,6 +61,8 @@ const ProfilePage: React.FC = () => {
     confirm: false
   });
 
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -225,34 +227,56 @@ const ProfilePage: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Add file validation here (size, type, etc.)
-    const formData = new FormData();
-    formData.append('avatar', file);
-
+    setIsUploadingAvatar(true);
     try {
+      // Convert HEIC/HEIF or any image to JPEG via canvas
+      let uploadFile: File = file;
+      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+        const bitmap = await createImageBitmap(file);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+        const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/jpeg', 0.9));
+        uploadFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+      }
+
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BACKEND_URL}/api/auth/avatar`, {
+      const uploadRes = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
-        credentials: 'include'
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(prev => prev ? { ...prev, avatar: data.avatarUrl } : null);
-        toast({
-          title: 'Avatar Updated',
-          description: 'Your profile picture has been updated.',
-          action: <CheckCircle className="h-5 w-5 text-green-500" />
-        });
+      if (!uploadRes.ok) throw new Error('Failed to upload image');
+
+      const { url: cdnUrl } = await uploadRes.json();
+
+      // Save avatar URL to user profile
+      const saveRes = await apiRequest('PATCH', '/api/auth/me', { avatar: cdnUrl });
+      if (!saveRes.ok) throw new Error('Failed to save avatar');
+
+      // Update local profile state
+      setProfile(prev => prev ? { ...prev, avatar: cdnUrl } : null);
+
+      // Update auth context + localStorage so avatar persists on navigation
+      if (user) {
+        const updatedUser = { ...user, avatar: cdnUrl };
+        const stored = localStorage.getItem('user');
+        if (stored) {
+          localStorage.setItem('user', JSON.stringify({ ...JSON.parse(stored), avatar: cdnUrl }));
+        }
+        login(updatedUser, localStorage.getItem('token') || '');
       }
-    } catch (error) {
-      toast({
-        title: 'Upload Failed',
-        description: 'Failed to upload avatar. Please try again.',
-        variant: 'destructive',
-      });
+
+      toast({ title: 'Avatar Updated', description: 'Profile picture updated successfully.' });
+    } catch (error: any) {
+      toast({ title: 'Upload Failed', description: error.message || 'Failed to upload avatar.', variant: 'destructive' });
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -346,13 +370,18 @@ const ProfilePage: React.FC = () => {
                       )}
                     </div>
                     <label htmlFor="avatar-upload" className="absolute bottom-2 right-2 bg-white rounded-full p-2 border-2 border-[#50BAA8] shadow-lg cursor-pointer transition-all hover:scale-110">
-                      <Camera className="h-4 w-4 text-[#50BAA8]" />
+                      {isUploadingAvatar ? (
+                        <Loader2 className="h-4 w-4 text-[#50BAA8] animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4 text-[#50BAA8]" />
+                      )}
                       <input
                         id="avatar-upload"
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={handleAvatarUpload}
+                        disabled={isUploadingAvatar}
                       />
                     </label>
                   </div>
@@ -515,7 +544,7 @@ const ProfilePage: React.FC = () => {
 
                   <Separator />
 
-                  <div className="p-6 bg-red-50 rounded-lg border border-red-200">
+                  {/* <div className="p-6 bg-red-50 rounded-lg border border-red-200">
                     <h4 className="font-semibold text-red-800 mb-2 flex items-center">
                       <Trash2 className="h-4 w-4 mr-2" />
                       Danger Zone
@@ -526,7 +555,7 @@ const ProfilePage: React.FC = () => {
                     <Button variant="outline" className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white">
                       Delete Account
                     </Button>
-                  </div>
+                  </div> */}
                 </div>
               ) : (
                 <div className="space-y-6 max-w-2xl">

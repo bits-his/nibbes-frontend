@@ -13,6 +13,7 @@ import {
   History,
   Loader2,
   X,
+  RefreshCw,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -75,11 +76,11 @@ export default function Transactions() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyDateRange, setHistoryDateRange] = useState<string>("today")
 
-  const { data: summary, isLoading: summaryLoading } = useQuery<SummaryData>({
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<SummaryData>({
     queryKey: ["/api/store-entries/summary"],
   })
 
-  const { data: entriesData, isLoading: entriesLoading } = useQuery<{ data: StoreEntry[] }>({
+  const { data: entriesData, isLoading: entriesLoading, refetch: refetchEntries } = useQuery<{ data: StoreEntry[] }>({
     queryKey: ["/api/store-entries"],
   })
 
@@ -411,7 +412,8 @@ export default function Transactions() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-br from-[#50BAA8] to-teal-600 rounded-xl shadow-lg">
               <FileText className="w-8 h-8 text-white" />
             </div>
@@ -419,6 +421,16 @@ export default function Transactions() {
               <h1 className="text-4xl font-bold text-gray-900">Transactions</h1>
               <p className="text-gray-600 mt-1">Complete inventory movement tracking</p>
             </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => { refetchSummary(); refetchEntries(); }}
+            disabled={summaryLoading || entriesLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${(summaryLoading || entriesLoading) ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           </div>
         </div>
 

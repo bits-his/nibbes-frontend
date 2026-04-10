@@ -56,7 +56,7 @@ const KitchenRequests: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.permissions?.includes('user_management');
 
   // Create request form state
   const [materials, setMaterials] = useState<RawMaterial[]>([
@@ -186,10 +186,14 @@ const KitchenRequests: React.FC = () => {
         fetchData();
       } else {
         const error = await response.json();
+        const msg = error.error || error.message || "Failed to create request";
+        const detail = error.available !== undefined
+          ? ` Only ${error.available} ${error.unit || 'units'} available.`
+          : '';
         toast({
           variant: "destructive",
-          title: "Error",
-          description: error.error || "Failed to create request",
+          title: "Request Failed",
+          description: msg + detail,
         });
       }
     } catch (error) {

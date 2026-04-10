@@ -417,7 +417,7 @@ export const usePrint = () => {
           <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
-          <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
+          <div class="footer-powered-by"><strong>Powered By: BrainStorm IT Solutions</strong></div>
         </div>
 
         <div class="dashed-separator"></div>
@@ -450,7 +450,7 @@ export const usePrint = () => {
         <div class="footer">
           <div class="footer-thanks">Thank you for your order!</div>
           <div class="footer-name">nibblesfastfood.com</div>
-          <div class="footer-powered-by"><strong>Powered By: Brainstorm IT Solution</strong></div>
+          <div class="footer-powered-by"><strong>Powered By: BrainStorm IT Solutions</strong></div>
         </div>
 
         <!-- Print Warning -->

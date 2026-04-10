@@ -42,7 +42,7 @@ interface Order {
   id: string
   customerName: string
   customerEmail: string
-  orderNumber: number
+  orderNumber: string
   totalAmount: string
   status: string
   paymentStatus: string

@@ -9,8 +9,9 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Package, Warehouse, Loader } from "lucide-react"
+import { Package, Warehouse, Loader, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 interface StoreItem {
   id: string
@@ -166,6 +167,15 @@ export default function Supervisor() {
             </div>
             <p className="text-gray-600 mt-2">View inventory and stock movements (Read-only)</p>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => fetchItems()}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           {/* Add Item button commented out for read-only mode */}
           {/* <Dialog open={showAddDialog} onOpenChange={(open) => {
             setShowAddDialog(open)
