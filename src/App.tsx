@@ -29,7 +29,11 @@ const Checkout = lazy(() => import("@/pages/checkout"));
 const CheckoutAlt = lazy(() => import("@/pages/checkout-alt"));
 const OrderStatus = lazy(() => import("@/pages/order-status"));
 const StaffOrders = lazy(() => import("@/pages/staff-orders"));
-const RefundManagement = lazy(() => import("@/pages/refund-management"));
+const RefundManagement = lazy(() => import("@/pages/refund-management-landing"));
+const RefundRequestForm = lazy(() => import("@/pages/refund-request-form"));
+const RefundApprovalDashboard = lazy(() => import("@/pages/refund-approval-dashboard"));
+const StoreCreditManagement = lazy(() => import("@/pages/store-credit-management"));
+const MisconductCardsDashboard = lazy(() => import("@/pages/misconduct-cards-dashboard"));
 const KitchenDisplay = lazy(() => import("@/pages/kitchen-display"));
 const OrderManagement = lazy(() => import("@/pages/order-management"));
 const ActivityLogs = lazy(() => import("@/pages/activity-logs"));
@@ -482,6 +486,38 @@ function Router() {
         component={() => (
           <ProtectedRoute requiredPermissions={["refund_management"]}>
             <RefundManagement />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/refund-management/request"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["refund_request_create", "refund_management"]}>
+            <RefundRequestForm />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/refund-management/approvals"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["refund_request_approve"]}>
+            <RefundApprovalDashboard />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/refund-management/store-credits"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["store_credit_manage"]}>
+            <StoreCreditManagement />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/refund-management/misconduct-cards"
+        component={() => (
+          <ProtectedRoute requiredPermissions={["misconduct_card_view", "misconduct_card_manage"]}>
+            <MisconductCardsDashboard />
           </ProtectedRoute>
         )}
       />
