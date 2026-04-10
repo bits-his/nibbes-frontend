@@ -39,6 +39,7 @@ export default function Supervisor() {
   const [showTransactionsDialog, setShowTransactionsDialog] = useState(false)
   const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const { toast } = useToast()
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -132,9 +133,20 @@ export default function Supervisor() {
     }
   }
 
+  const today = new Date().toISOString().split('T')[0];
+
+  const filteredTransactions = selectedItemTransactions.filter((t: any) => {
+    const tDate = new Date(t.date).toISOString().split('T')[0];
+    if (dateRange.start && dateRange.end) return tDate >= dateRange.start && tDate <= dateRange.end;
+    if (dateRange.start) return tDate >= dateRange.start;
+    if (dateRange.end) return tDate <= dateRange.end;
+    return true;
+  });
+
   const handleViewItemTransactions = async (item: StoreItem) => {
     try {
       setTransactionsLoading(true);
+      setDateRange({ start: today, end: today });
       const response = await apiRequest("GET", `/api/store-entries/item-code/${item.itemCode}`);
       const data = await response.json();
       // Extract entries from the data object
@@ -394,8 +406,7 @@ export default function Supervisor() {
         ...
       </Dialog> */}
 
-      {/* Transactions Dialog - Keep this for viewing transactions */}
-      <Dialog open={showTransactionsDialog} onOpenChange={setShowTransactionsDialog}>
+      <Dialog open={showTransactionsDialog} onOpenChange={(open) => { setShowTransactionsDialog(open); if (!open) setDateRange({ start: '', end: '' }); }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Item Transactions</DialogTitle>
@@ -404,12 +415,25 @@ export default function Supervisor() {
             </DialogDescription>
           </DialogHeader>
 
+          {/* Date range filter */}
+          <div className="flex gap-3 items-center mb-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">From</label>
+              <input type="date" className="border rounded px-2 py-1 text-sm" value={dateRange.start} onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">To</label>
+              <input type="date" className="border rounded px-2 py-1 text-sm" value={dateRange.end} onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))} />
+            </div>
+            <button className="mt-4 text-xs text-[#50BAA8] underline" onClick={() => setDateRange({ start: '', end: '' })}>Clear</button>
+          </div>
+
           {transactionsLoading ? (
             <div className="flex flex-col items-center justify-center py-10">
               <Loader className="h-10 w-10 animate-spin text-[#50BAA8]" />
               <p className="mt-3 text-sm text-gray-600">Loading transactions...</p>
             </div>
-          ) : selectedItemTransactions.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="py-10 text-center text-gray-500">
               No transactions found for this item
             </div>
@@ -422,7 +446,7 @@ export default function Supervisor() {
                 <div>Status</div>
               </div>
 
-              {selectedItemTransactions.map((transaction, index) => (
+              {filteredTransactions.map((transaction, index) => (
                 <div
                   key={index}
                   className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b pb-2 text-sm"
