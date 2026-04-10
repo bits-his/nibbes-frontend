@@ -19,6 +19,17 @@ export default function KitchenDisplay() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'active' | 'canceled'>('active');
+
+  // Clear dismissed cancelled orders older than 24h on mount
+  useEffect(() => {
+    const key = 'dismissed_cancelled_orders_ts';
+    const last = localStorage.getItem(key);
+    const now = Date.now();
+    if (!last || now - parseInt(last) > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('dismissed_cancelled_orders');
+      localStorage.setItem(key, now.toString());
+    }
+  }, []);
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [canceledOrdersCount, setCanceledOrdersCount] = useState<number>(0);
@@ -370,60 +381,48 @@ export default function KitchenDisplay() {
                   return old;
                 }
                 
-                if (updatedOrder.status === "completed" || updatedOrder.status === "cancelled") {
-                  // Remove completed/cancelled orders from active list
-                  
-                  // If cancelled, add to cancelled orders list
-                  if (updatedOrder.status === "cancelled") {
-                    console.log('🔄 [Kitchen Display] Order cancelled, updating cache:', updatedOrder.orderNumber);
-                    queryClient.setQueryData(
-                      ["/api/orders/canceled/today"],
-                      (oldCanceled: OrderWithItems[] = []) => {
-                        // Check if order already exists in cancelled list
-                        const exists = oldCanceled.some(o => o.id === updatedOrder.id);
-                        if (!exists) {
-                          const updated = [updatedOrder, ...oldCanceled];
-                          console.log('✅ Added to cancelled list. New count:', updated.length);
-                          // Update count state immediately using ref
-                          setCanceledOrdersCountRef.current(updated.length);
-                          return updated.sort((a, b) => 
-                            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                          );
-                        }
-                        console.log('ℹ️ Already in cancelled list. Count:', oldCanceled.length);
-                        return oldCanceled;
-                      }
-                    );
-                    
-                    // Force refetch to ensure count is accurate and to get updated data from server
-                    console.log('🔄 Forcing refetch of cancelled orders after cache update...');
-                    queryClient.refetchQueries({ 
-                      queryKey: ["/api/orders/canceled/today"]
-                    }).then(() => {
-                      const updatedCancelledData = queryClient.getQueryData<OrderWithItems[]>(["/api/orders/canceled/today"]);
-                      const newCount = updatedCancelledData?.length || 0;
-                      console.log('✅ Refetch complete. Setting count to:', newCount);
-                      setCanceledOrdersCountRef.current(newCount);
-                    });
-                  }
-                  
+                if (updatedOrder.status === "completed") {
+                  // Remove only completed orders from active list
                   return old.filter(o => o.id !== updatedOrder.id);
-                } else {
-                  // Update existing order with complete data
+                }
+
+                if (updatedOrder.status === "cancelled") {
+                  // Add to cancelled list
+                  queryClient.setQueryData(
+                    ["/api/orders/canceled/today"],
+                    (oldCanceled: OrderWithItems[] = []) => {
+                      const exists = oldCanceled.some(o => o.id === updatedOrder.id);
+                      if (!exists) {
+                        const updated = [updatedOrder, ...oldCanceled];
+                        setCanceledOrdersCountRef.current(updated.length);
+                        return updated.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                      }
+                      return oldCanceled;
+                    }
+                  );
+                  // Keep cancelled order in active list (update its status to show red card)
                   const index = old.findIndex(o => o.id === updatedOrder.id);
                   if (index >= 0) {
                     const updated = [...old];
                     updated[index] = updatedOrder;
-                    return updated.sort((a, b) => 
-                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                    );
-                  } else {
-                    // Order not in list, add it (might have been filtered out before)
-                    const updated = [updatedOrder, ...old];
-                    return updated.sort((a, b) => 
-                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                    );
+                    return updated;
                   }
+                  return [updatedOrder, ...old];
+                }
+
+                // Update existing order with complete data
+                const index = old.findIndex(o => o.id === updatedOrder.id);
+                if (index >= 0) {
+                  const updated = [...old];
+                  updated[index] = updatedOrder;
+                  return updated.sort((a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                  );
+                } else {
+                  const updated = [updatedOrder, ...old];
+                  return updated.sort((a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                  );
                 }
               }
               return old;
@@ -773,17 +772,17 @@ const getStatusBadge = (status: string) => {
     return order.orderNumber.toString().toLowerCase().includes(searchTerm.toLowerCase());
   }) || [];
 
+  const dismissedCancelledOrders = JSON.parse(localStorage.getItem('dismissed_cancelled_orders') || '[]');
+
   const activeOrders = activeTab === 'active' ? filteredOrders?.filter((order) => {
-    // Exclude completed and cancelled orders
-    if (order.status === "completed" || order.status === "cancelled") {
-      return false;
-    }
-    // Exclude orders with pending payment (waiting for Interswitch confirmation)
-    if (order.paymentStatus === 'pending' && order.status === 'pending') {
-      return false;
-    }
+    // Exclude completed orders
+    if (order.status === "completed") return false;
+    // Exclude dismissed cancelled orders
+    if (order.status === "cancelled" && dismissedCancelledOrders.includes(order.id)) return false;
+    // Exclude orders with pending payment
+    if (order.paymentStatus === 'pending' && order.status === 'pending') return false;
     return true;
-  }) : filteredOrders; // For canceled tab, show all filtered canceled orders
+  }) : filteredOrders;
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6">
@@ -861,7 +860,11 @@ const getStatusBadge = (status: string) => {
             {activeOrders.map((order) => (
               <Card
                 key={order.id}
-                className={`overflow-hidden border-2 ${activeTab === 'canceled' ? 'border-red-200 bg-red-50' : ''}`}
+                className={`overflow-hidden border-2 ${
+                  order.status === 'cancelled'
+                    ? 'border-red-500 bg-red-100'
+                    : activeTab === 'canceled' ? 'border-red-200 bg-red-50' : ''
+                }`}
                 data-testid={`card-order-${order.id}`}
               >
                 <CardHeader className="p-4 sm:p-6 bg-card space-y-2 sm:space-y-3">
@@ -954,8 +957,27 @@ const getStatusBadge = (status: string) => {
                           {updatingOrderId === String(order.id) ? "Updating..." : "Collected ✅"}
                         </Button>
                       )}
-                      {/* Hide print ticket button for refunded orders */}
-                      {order.status !== "refunded" && (
+                      {order.status === "cancelled" && (
+                        <button
+                          className="flex-1 flex items-center justify-center py-2 px-4 bg-red-100 border border-red-300 rounded-lg text-red-700 font-semibold text-sm hover:bg-red-200 transition-colors cursor-pointer"
+                          onClick={() => {
+                            // Persist dismissed order ID in localStorage
+                            const dismissed = JSON.parse(localStorage.getItem('dismissed_cancelled_orders') || '[]');
+                            if (!dismissed.includes(order.id)) {
+                              dismissed.push(order.id);
+                              localStorage.setItem('dismissed_cancelled_orders', JSON.stringify(dismissed));
+                            }
+                            queryClient.setQueryData(
+                              ["/api/orders/active"],
+                              (old: any[] = []) => old.filter(o => o.id !== order.id)
+                            );
+                          }}
+                        >
+                          Withdrawn ❌ (tap to dismiss)
+                        </button>
+                      )}
+                      {/* Hide print ticket button for refunded or cancelled orders */}
+                      {order.status !== "refunded" && order.status !== "cancelled" && (
                         <Button
                           // 🔒 KITCHEN FIX: ALWAYS allow printing for pending orders
                           // Kitchen staff may need to print multiple times (lost ticket, new cook, etc.)
