@@ -188,7 +188,14 @@ export default function RefundApprovalDashboard() {
                 <div>
                   <p className="text-xs text-muted-foreground">Amount</p>
                   <p className="font-semibold">
-                    {request.refundAmount ? `₦${parseFloat(request.refundAmount).toLocaleString()}` : 'N/A'}
+                    {request.actionRequested === 'replacement' 
+                      ? (() => {
+                          const items = request.replacementItems ? JSON.parse(request.replacementItems) : [];
+                          const total = items.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * item.quantity), 0);
+                          return total > 0 ? `₦${total.toLocaleString()}` : '-';
+                        })()
+                      : (request.refundAmount && request.refundAmount !== 'N/A' ? `₦${parseFloat(request.refundAmount).toLocaleString()}` : '-')
+                    }
                   </p>
                 </div>
                 <div>
@@ -197,7 +204,9 @@ export default function RefundApprovalDashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Payment Method</p>
-                  <p className="font-semibold">{request.refundPaymentMethod || 'N/A'}</p>
+                  <p className="font-semibold">
+                    {request.actionRequested === 'replacement' ? 'Replacement' : (request.refundPaymentMethod || '-')}
+                  </p>
                 </div>
               </div>
 
