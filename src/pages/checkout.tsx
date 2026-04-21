@@ -1327,6 +1327,11 @@ export default function Checkout() {
       // For cash/POS/transfer payments, create order directly with paid status
       // Use idempotency key from walkInOrder (generated when order was first created)
       // This prevents duplicate orders if user retries after network timeout
+      
+      const subtotalAmount = walkInOrder.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      const totalCharges = calculateTotal() - subtotalAmount;
+      const chargeBreakdown = serviceCharges.map(c => `${c.description}: ${c.type === 'percentage' ? c.amount + '%' : '₦' + c.amount}`).join(', ');
+      
       const orderData = {
         customerName: walkInOrder.customerName,
         customerPhone: walkInOrder.customerPhone || "N/A",
@@ -1337,6 +1342,7 @@ export default function Checkout() {
         paymentStatus: "paid",
         items: walkInOrder.items,
         totalAmount: calculateTotal(), // Include total with all charges
+        notes: chargeBreakdown ? `Charges applied: ${chargeBreakdown}` : undefined,
         idempotencyKey: walkInOrder.idempotencyKey, // Use existing idempotency key from order creation
         // Add payment splits info if multi-payment is enabled
         ...(multiPaymentEnabled && {

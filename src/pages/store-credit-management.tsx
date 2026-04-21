@@ -170,7 +170,7 @@ export default function StoreCreditManagement() {
               <div key={txn.id} className="p-3 border rounded">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <Badge variant={txn.transactionType === 'credit' ? 'success' : 'secondary'}>
+                    <Badge variant={txn.transactionType === 'credit' ? 'default' : 'secondary'}>
                       {txn.transactionType}
                     </Badge>
                     <p className="text-xs text-muted-foreground mt-1">

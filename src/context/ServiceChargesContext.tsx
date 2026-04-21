@@ -19,12 +19,12 @@ interface ServiceChargesContextType {
 const ServiceChargesContext = createContext<ServiceChargesContextType | undefined>(undefined);
 
 const DEFAULT_CHARGES = {
-  serviceCharge: 0,  // 0% - No service charge
-  vat: 0             // 0% - No VAT
+  serviceCharge: 2.5,  // 2.5% - Bank charge fallback
+  vat: 7.5             // 7.5% - VAT fallback
 };
 
 const CACHE_KEY = 'service_charges_cache';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const CACHE_VERSION = 'v3'; // Increment to invalidate old cache
 
 export function ServiceChargesProvider({ children }: { children: ReactNode }) {

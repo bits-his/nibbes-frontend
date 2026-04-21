@@ -813,6 +813,8 @@ export default function CustomerMenu() {
 
       const txnRef = `NKO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      const chargeBreakdown = serviceCharges.map(c => `${c.description}: ${c.type === 'percentage' ? c.amount + '%' : '₦' + c.amount}`).join(', ');
+
       const orderData = {
         customerName,
         customerPhone,
@@ -820,6 +822,7 @@ export default function CustomerMenu() {
         paymentMethod: "transfer",
         paymentStatus: "pending",
         transactionRef: txnRef,
+        notes: chargeBreakdown ? `Charges applied: ${chargeBreakdown}` : undefined,
         ...(locationData &&
           orderType === "delivery" && {
             location: {

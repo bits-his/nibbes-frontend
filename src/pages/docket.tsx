@@ -825,6 +825,28 @@ const getStatusCardColor = (status: string) => {
                     </div>
                   )}
 
+                  {/* Total Breakdown */}
+                  <div className="pt-3 border-t space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span>₦{order.orderItems?.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0).toLocaleString() || '0'}</span>
+                    </div>
+                    {order.deliveryFee && parseFloat(order.deliveryFee.toString()) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Delivery:</span>
+                        <span>₦{parseFloat(order.deliveryFee.toString()).toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Charges & Tax:</span>
+                      <span>₦{(parseFloat(order.totalAmount) - (order.orderItems?.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0) || 0) - (order.deliveryFee ? parseFloat(order.deliveryFee.toString()) : 0)).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                      <span>Total:</span>
+                      <span>₦{parseFloat(order.totalAmount).toLocaleString()}</span>
+                    </div>
+                  </div>
+
                   {/* Delivery Status Card - Show for delivery/online orders with tracking */}
                   {(order.orderType === "delivery" || order.orderType === "online") && (order.trackingNumber || order.deliveryRequestId) && (
                     <DeliveryStatusCard

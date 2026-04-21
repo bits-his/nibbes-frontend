@@ -69,20 +69,28 @@ export default function AnalyticsDashboard() {
       
       let from, to;
       
-      if (startDate && endDate) {
-        from = startDate;
-        to = endDate;
+      // Priority: custom dates > preset range
+      if (startDate && endDate && !dateRange) {
+        // User selected custom dates
+        from = new Date(startDate).toISOString();
+        to = new Date(endDate + 'T23:59:59.999Z').toISOString();
       } else if (dateRange) {
+        // User selected preset range
         if (dateRange === '1') {
           // For "Today", use 2am business day range
           const bizDay = getBusinessDayRange();
           from = bizDay.from.toISOString();
           to = bizDay.to.toISOString();
         } else {
-          const bizDay = getBusinessDayRange();
-          to = bizDay.to.toISOString();
-          from = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000)
-            .toISOString();
+          // For multi-day ranges (7/30/90 days), align to business day boundaries
+          const endBizDay = getBusinessDayRange();
+          to = endBizDay.to.toISOString();
+          
+          // Calculate start date and align to its business day start (2am)
+          const daysAgo = parseInt(dateRange);
+          const startDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+          const startBizDay = getBusinessDayRange(startDate);
+          from = startBizDay.from.toISOString();
         }
       } else {
         setLoading(false);
@@ -113,6 +121,40 @@ export default function AnalyticsDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportReport = () => {
+    if (!dashboardData) return;
+    
+    // Create CSV content
+    const csv = [
+      ['Analytics Report'],
+      ['Generated:', new Date().toLocaleString()],
+      [''],
+      ['Metric', 'Value'],
+      ['Revenue', `₦${parseFloat(dashboardData.revenueToday).toLocaleString()}`],
+      ['Orders', dashboardData.todayOrders],
+      ['Total Customers', dashboardData.totalCustomers],
+      ['Active Orders', dashboardData.activeOrders],
+      [''],
+      ['Top Items'],
+      ['Item Name', 'Quantity Sold', 'Order Count', 'Total Revenue'],
+      ...dashboardData.topItems.map(item => [
+        item.menuItemName,
+        item.totalQuantity,
+        item.orderCount,
+        `₦${parseFloat(item.totalRevenue).toLocaleString()}`
+      ])
+    ].map(row => row.join(',')).join('\n');
+    
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -156,7 +198,7 @@ export default function AnalyticsDashboard() {
             <h1 className="text-3xl font-bold text-gray-900">Analytics & Reports</h1>
             <p className="text-gray-600 mt-1">Track your business performance</p>
           </div>
-          <Button onClick={fetchDashboardData}>
+          <Button onClick={exportReport}>
             Export Report
           </Button>
         </div>
@@ -227,26 +269,26 @@ export default function AnalyticsDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Total Customers
+              Unique Customers
             </CardTitle>
             <Users className="w-4 h-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardData.totalCustomers}</div>
-            <p className="text-xs text-gray-500 mt-1">Registered customers</p>
+            <p className="text-xs text-gray-500 mt-1">In selected period</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Active Orders
+              Active Orders (Now)
             </CardTitle>
             <TrendingUp className="w-4 h-4 text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardData.activeOrders}</div>
-            <p className="text-xs text-gray-500 mt-1">In progress</p>
+            <p className="text-xs text-gray-500 mt-1">Currently in progress</p>
           </CardContent>
         </Card>
       </div>
@@ -259,7 +301,11 @@ export default function AnalyticsDashboard() {
         <CardContent>
           {dashboardData.topItems && dashboardData.topItems.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dashboardData.topItems}>
+              <BarChart data={dashboardData.topItems.map(item => ({
+                ...item,
+                totalQuantity: parseInt(item.totalQuantity),
+                totalRevenue: parseFloat(item.totalRevenue)
+              }))}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="menuItemName" />
                 <YAxis />
