@@ -7,9 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, ShoppingCart, RefreshCw, Search, User, Package, Calendar, ChevronRight, Zap, Star } from "lucide-react"
+import { Users, ShoppingCart, RefreshCw, Search, User, Package, Calendar, ChevronRight, Zap, Star, Download } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { toast } from "@/hooks/use-toast"
+import { getBusinessDayRange } from "@/lib/businessDay"
 
 interface CustomerAnalytics {
   customerId: string
@@ -64,12 +65,29 @@ const CustomerAnalyticsPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("overview")
+  
+  // Initialize with current business day
+  const todayBizDay = getBusinessDayRange();
   const [dateRange, setDateRange] = useState({
-    from: "",
-    to: "",
+    from: todayBizDay.from.toISOString().split('T')[0],
+    to: todayBizDay.to.toISOString().split('T')[0],
   })
 
   const wsRef = useRef<WebSocket | null>(null);
+  
+  // Calculate metrics from customers data
+  const totalOrders = customers.reduce((sum, c) => sum + c.orderCount, 0);
+  const topCustomer = customers.length > 0 
+    ? customers.reduce((top, c) => parseFloat(c.totalSpent) > parseFloat(top.totalSpent) ? c : top)
+    : null;
+  const topFiveCustomers = customers.slice(0, 5);
+  
+  // Filter customers by search term
+  const filteredCustomers = customers.filter(c => 
+    c.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.customerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.customerId?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   
   // Load customer analytics and set up WebSocket
   useEffect(() => {
@@ -78,12 +96,14 @@ const CustomerAnalyticsPage: React.FC = () => {
         setLoading(true);
         const params = new URLSearchParams()
 
-        // Only add date parameters if they have actual values
+        // Convert date strings to ISO timestamps for proper backend filtering
         if (dateRange.from && dateRange.from.trim() !== "") {
-          params.append("from", dateRange.from)
+          const fromDate = new Date(dateRange.from + 'T00:00:00');
+          params.append("from", fromDate.toISOString());
         }
         if (dateRange.to && dateRange.to.trim() !== "") {
-          params.append("to", dateRange.to)
+          const toDate = new Date(dateRange.to + 'T23:59:59.999');
+          params.append("to", toDate.toISOString());
         }
 
         const queryString = params.toString()
@@ -263,12 +283,14 @@ const CustomerAnalyticsPage: React.FC = () => {
     try {
       const params = new URLSearchParams()
 
-      // Only add date parameters if they have actual values
+      // Convert date strings to ISO timestamps for proper backend filtering
       if (dateRange.from && dateRange.from.trim() !== "") {
-        params.append("from", dateRange.from)
+        const fromDate = new Date(dateRange.from + 'T00:00:00');
+        params.append("from", fromDate.toISOString());
       }
       if (dateRange.to && dateRange.to.trim() !== "") {
-        params.append("to", dateRange.to)
+        const toDate = new Date(dateRange.to + 'T23:59:59.999');
+        params.append("to", toDate.toISOString());
       }
 
       const queryString = params.toString()
@@ -306,41 +328,43 @@ const CustomerAnalyticsPage: React.FC = () => {
     }
   }
 
+  const exportCustomers = () => {
+    if (!customers || customers.length === 0) return;
+    
+    const csv = [
+      ['Customer Analytics Report'],
+      ['Generated:', new Date().toLocaleString()],
+      ['Date Range:', `${dateRange.from} to ${dateRange.to}`],
+      [''],
+      ['Customer Name', 'Email', 'Phone', 'Order Count', 'Total Spent', 'Avg Order Value', 'First Order', 'Last Order'],
+      ...filteredCustomers.map(c => [
+        c.customerName || '',
+        c.customerEmail || '',
+        c.customerId || '',
+        c.orderCount,
+        `₦${parseFloat(c.totalSpent).toLocaleString()}`,
+        `₦${parseFloat(c.avgOrderValue).toLocaleString()}`,
+        c.firstOrderDate ? new Date(c.firstOrderDate).toLocaleDateString() : '',
+        c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : ''
+      ])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `customer-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   console.log("🔍 Rendering with customers state:", customers?.length || 0, "customers");
   console.log("📊 Customers data:", customers);
   console.log("🔎 Search term:", searchTerm);
 
-  const filteredCustomers = customers && Array.isArray(customers) ? customers.filter(
-    (customer) => {
-      const searchLower = searchTerm.toLowerCase().trim();
-      const name = (customer.customerName || "").toLowerCase();
-      const email = (customer.customerEmail || "").toLowerCase();
-
-      // If search is empty, show all customers
-      if (searchLower === "") return true;
-
-      // Check if name or email includes the search term
-      return name.includes(searchLower) || email.includes(searchLower);
-    }
-  ) : []
-
-  console.log("🔍 Filtered customers:", filteredCustomers?.length || 0, "from", customers?.length || 0, "total");
-
   const sortedCustomers = filteredCustomers && Array.isArray(filteredCustomers) ? [...filteredCustomers].sort((a, b) => parseFloat(b.totalSpent) - parseFloat(a.totalSpent)) : []
 
   console.log("📋 Sorted customers:", sortedCustomers?.length || 0);
-
-  // const totalRevenue = customers.reduce((sum, customer) => sum + Number.parseFloat(parseFloat(customer.totalSpent).toString()), 0)
-
-  const totalOrders = customers && Array.isArray(customers) ? customers.reduce((sum, customer) => sum + customer.orderCount, 0) : 0
-  const topCustomer =
-    customers && Array.isArray(customers) && customers.length > 0
-      ? customers.reduce((top, customer) => (customer.orderCount > top.orderCount ? customer : top), customers[0])
-      : null
-
-  console.log("📈 Stats - Total Orders:", totalOrders, "Top Customer:", topCustomer?.customerName || "None");
-
-  const topFiveCustomers = customers && Array.isArray(customers) ? [...customers].sort((a, b) => parseFloat(b.totalSpent) - parseFloat(a.totalSpent)).slice(0, 5) : []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -411,6 +435,14 @@ const CustomerAnalyticsPage: React.FC = () => {
                     Refresh Analytics
                   </>
                 )}
+              </Button>
+              <Button
+                onClick={exportCustomers}
+                variant="outline"
+                className="border-teal-600 text-teal-600 hover:bg-teal-50 font-medium transition duration-200 w-full sm:w-auto"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
               </Button>
             </div>
           </div>

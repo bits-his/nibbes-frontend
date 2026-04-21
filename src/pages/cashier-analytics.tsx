@@ -119,8 +119,16 @@ export default function CashierAnalytics() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (start) params.append('startDate', start)
-      if (end) params.append('endDate', end)
+      
+      // Convert date strings to ISO timestamps for proper backend filtering
+      if (start) {
+        const startDate = new Date(start + 'T00:00:00');
+        params.append('startDate', startDate.toISOString());
+      }
+      if (end) {
+        const endDate = new Date(end + 'T23:59:59.999');
+        params.append('endDate', endDate.toISOString());
+      }
       
       const url = `/api/cashier-analytics${params.toString() ? '?' + params.toString() : ''}`
       const response = await apiRequest('GET', url)
@@ -159,9 +167,16 @@ export default function CashierAnalytics() {
     try {
       setLoadingTransactions(true)
       const params = new URLSearchParams()
-      // Always send dates - if not provided, backend will default to today
-      if (fromDate) params.append('fromDate', fromDate)
-      if (toDate) params.append('toDate', toDate)
+      
+      // Convert date strings to ISO timestamps for proper backend filtering
+      if (fromDate) {
+        const startDate = new Date(fromDate + 'T00:00:00');
+        params.append('fromDate', startDate.toISOString());
+      }
+      if (toDate) {
+        const endDate = new Date(toDate + 'T23:59:59.999');
+        params.append('toDate', endDate.toISOString());
+      }
       
       const url = `/api/cashier-analytics/${cashierId}/transactions${params.toString() ? '?' + params.toString() : ''}`
       const response = await apiRequest('GET', url)

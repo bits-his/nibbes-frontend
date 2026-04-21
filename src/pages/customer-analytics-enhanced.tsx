@@ -233,8 +233,7 @@ export default function CustomerAnalyticsDashboard() {
                          segmentsData.data?.mediumValue?.length + 
                          segmentsData.data?.lowValue?.length || 0,
           churnRate: engagementData.data?.churnCount || 0,
-          avgOrderFrequency: segmentsData.data?.highValue?.reduce((sum: number, cust: any) => sum + cust.totalOrders, 0) / 
-                           (segmentsData.data?.highValue?.length || 1) || 0
+          avgOrderFrequency: 0 // Removed broken calculation
         };
 
         setCustomerOverview(overviewMetrics);
@@ -490,17 +489,6 @@ export default function CustomerAnalyticsDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{customerOverview.churnRate}%</div>
                     <p className="text-xs text-muted-foreground">-2.1% from last month</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Avg. Order Freq.</CardTitle>
-                    <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{customerOverview.avgOrderFrequency}</div>
-                    <p className="text-xs text-muted-foreground">orders/month</p>
                   </CardContent>
                 </Card>
               </div>
