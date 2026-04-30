@@ -248,10 +248,12 @@ export default function CashierAnalytics() {
   // Calculate totals
   const totalOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.totalOrders), 0)
   const totalRevenue = filteredMetrics.reduce((sum, m) => sum + Number(m.totalRevenue), 0)
+  const totalRevenueWithCharges = totalRevenue * 1.10 // Add 10% charges (2.5% + 7.5%)
   const totalPaidOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.paidOrders), 0)
   const totalPendingOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.pendingOrders), 0)
   const totalCancelledOrders = filteredMetrics.reduce((sum, m) => sum + Number(m.cancelledOrders), 0)
   const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0
+  const avgOrderValueWithCharges = totalPaidOrders > 0 ? totalRevenueWithCharges / totalPaidOrders : 0
   const successRate = totalOrders > 0 ? (totalPaidOrders / totalOrders) * 100 : 0
 
   // Payment method chart data (normalize payment methods)
@@ -382,8 +384,10 @@ export default function CashierAnalytics() {
             <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl md:text-2xl font-bold">₦{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-            <p className="text-[10px] md:text-xs text-gray-600 mt-1">From paid orders</p>
+            <div className="text-xl md:text-2xl font-bold">₦{totalRevenueWithCharges.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">
+              Subtotal: ₦{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} + 10% charges
+            </p>
           </CardContent>
         </Card>
 
@@ -393,8 +397,10 @@ export default function CashierAnalytics() {
             <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl md:text-2xl font-bold">₦{avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-            <p className="text-[10px] md:text-xs text-gray-600 mt-1">Per transaction</p>
+            <div className="text-xl md:text-2xl font-bold">₦{avgOrderValueWithCharges.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] md:text-xs text-gray-600 mt-1">
+              Subtotal: ₦{avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} + 10%
+            </p>
           </CardContent>
         </Card>
 
@@ -436,7 +442,8 @@ export default function CashierAnalytics() {
                   <th className="text-right p-3 font-medium text-gray-600">Paid</th>
                   <th className="text-right p-3 font-medium text-gray-600">Pending</th>
                   <th className="text-right p-3 font-medium text-gray-600">Cancelled</th>
-                  <th className="text-right p-3 font-medium text-gray-600">Revenue</th>
+                  <th className="text-right p-3 font-medium text-gray-600">Subtotal</th>
+                  <th className="text-right p-3 font-medium text-gray-600">Revenue (incl. 10%)</th>
                   <th className="text-right p-3 font-medium text-gray-600">Avg Order</th>
                 </tr>
               </thead>
@@ -453,8 +460,9 @@ export default function CashierAnalytics() {
                     <td className="p-3 text-right text-green-600">{Number(cashier.paidOrders).toLocaleString()}</td>
                     <td className="p-3 text-right text-yellow-600">{Number(cashier.pendingOrders).toLocaleString()}</td>
                     <td className="p-3 text-right text-red-600">{Number(cashier.cancelledOrders).toLocaleString()}</td>
-                    <td className="p-3 text-right font-medium">₦{Number(cashier.totalRevenue).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                    <td className="p-3 text-right">₦{Number(cashier.avgOrderValue).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td className="p-3 text-right text-sm text-muted-foreground">₦{Number(cashier.totalRevenue).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td className="p-3 text-right font-medium">₦{(Number(cashier.totalRevenue) * 1.10).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td className="p-3 text-right">₦{(Number(cashier.avgOrderValue) * 1.10).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -686,7 +694,8 @@ export default function CashierAnalytics() {
                     <th className="text-left p-3 font-medium text-gray-600">Customer</th>
                     <th className="text-left p-3 font-medium text-gray-600">Phone</th>
                     <th className="text-left p-3 font-medium text-gray-600">Payment Method</th>
-                    <th className="text-right p-3 font-medium text-gray-600">Amount</th>
+                    <th className="text-right p-3 font-medium text-gray-600">Subtotal</th>
+                    <th className="text-right p-3 font-medium text-gray-600">Total (incl. 10%)</th>
                     <th className="text-left p-3 font-medium text-gray-600">Status</th>
                     <th className="text-left p-3 font-medium text-gray-600">Date</th>
                   </tr>
@@ -698,7 +707,8 @@ export default function CashierAnalytics() {
                       <td className="p-3">{transaction.customerName}</td>
                       <td className="p-3">{transaction.customerPhone}</td>
                       <td className="p-3">{normalizePaymentMethod(transaction.paymentMethod)}</td>
-                      <td className="p-3 text-right font-medium">₦{Number(transaction.totalAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="p-3 text-right text-sm text-muted-foreground">₦{Number(transaction.totalAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="p-3 text-right font-medium">₦{(Number(transaction.totalAmount) * 1.10).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                       <td className="p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
                           transaction.status === 'completed' ? 'bg-green-100 text-green-800' :

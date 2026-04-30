@@ -228,6 +228,11 @@ export default function OrderManagement() {
     printInvoiceMutation.mutate(String(order.id));
   };
 
+  // Calculate total with 10% charges (2.5% bank + 7.5% VAT)
+  const calculateTotalWithCharges = (subtotal: number) => {
+    return subtotal * 1.10;
+  };
+
   const filteredOrders = orders?.filter((order) => {
     // Only show orders with paymentStatus === 'paid'
     if (order.paymentStatus !== 'paid') {
@@ -291,9 +296,15 @@ const getStatusBadge = (status: string) => {
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-sm text-muted-foreground mb-1">Revenue</div>
-              <div className="text-3xl font-bold" data-testid="stat-revenue">
-                ₦{Number(stats?.todayRevenue || 0).toLocaleString()}
+              <div className="text-sm text-muted-foreground mb-2">Revenue (incl. 10%)</div>
+              <div className="text-3xl font-bold mb-3" data-testid="stat-revenue">
+                ₦{(Number(stats?.todayRevenue || 0) * 1.10).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+              <div className="pl-2 border-l-2 border-gray-300">
+                <div className="text-xs text-gray-600 mb-1">Subtotal:</div>
+                <div className="text-lg font-semibold text-gray-800">
+                  ₦{Number(stats?.todayRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -472,7 +483,8 @@ const getStatusBadge = (status: string) => {
                       <th className="p-4 font-semibold">Customer</th>
                       <th className="p-4 font-semibold">Type</th>
                       <th className="p-4 font-semibold">Items</th>
-                      <th className="p-4 font-semibold">Total</th>
+                      <th className="p-4 font-semibold">Subtotal</th>
+                      <th className="p-4 font-semibold">Total (incl. 10%)</th>
                       <th className="p-4 font-semibold">Status</th>
                       <th className="p-4 font-semibold">Time</th>
                       <th className="p-4 font-semibold">Actions</th>
@@ -493,8 +505,11 @@ const getStatusBadge = (status: string) => {
                           <Badge variant="outline">{order.orderType}</Badge>
                         </td>
                         <td className="p-4">{order.orderItems.length}</td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          ₦{parseFloat(order.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
                         <td className="p-4 font-semibold">
-                          ₦{parseFloat(order.totalAmount).toLocaleString()}
+                          ₦{calculateTotalWithCharges(parseFloat(order.totalAmount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="p-4">{getStatusBadge(order.status)}</td>
                         <td className="p-4 text-sm text-muted-foreground">
