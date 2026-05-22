@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, ArrowUpDown } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowUpDown, Upload } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +66,7 @@ export default function MenuManagement() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingRowId, setUploadingRowId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -384,8 +385,8 @@ export default function MenuManagement() {
       formData.append("file", file);
 
       // Upload to CDN via backend endpoint
-      const BACKEND_URL =  'https://server.brainstorm.ng/nibbleskitchen';
-      const response = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://srv1635320.hstgr.cloud';
+      const response = await fetch(`${BACKEND_URL}/api/upload/image`, {
         method: "POST",
         headers: {
           // Authorization header will be added by axios interceptor if using axios
@@ -426,6 +427,28 @@ export default function MenuManagement() {
       form.setValue("imageUrl", "");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleRowImageUpload = async (itemId: string, file: File) => {
+    setUploadingRowId(itemId);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`${BACKEND_URL}/api/upload/image`, {
+        method: "POST",
+        headers: { ...(localStorage.getItem('token') && { 'Authorization': `Bearer ${localStorage.getItem('token')}` }) },
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      const { url } = await response.json();
+      await apiRequest("PATCH", `/api/menu/${itemId}`, { imageUrl: url });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      toast({ title: "Image updated" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingRowId(null);
     }
   };
 
@@ -830,6 +853,25 @@ export default function MenuManagement() {
                             {/* Actions */}
                             <TableCell className="text-center">
                               <div className="flex gap-2 justify-center">
+                                <label title="Upload Image" className="cursor-pointer">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    disabled={uploadingRowId === String(item.id)}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file && item.id) handleRowImageUpload(String(item.id), file);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                  <Button size="sm" variant="outline" className="h-8" asChild>
+                                    <span>
+                                      <Upload className="w-4 h-4 mr-1" />
+                                      {uploadingRowId === String(item.id) ? "..." : "Image"}
+                                    </span>
+                                  </Button>
+                                </label>
                                 <Button
                                   size="sm"
                                   variant="outline"

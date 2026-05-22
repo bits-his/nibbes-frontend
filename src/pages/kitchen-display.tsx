@@ -19,17 +19,24 @@ export default function KitchenDisplay() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'active' | 'canceled'>('active');
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
 
-  // Clear dismissed cancelled orders older than 24h on mount
-  useEffect(() => {
-    const key = 'dismissed_cancelled_orders_ts';
-    const last = localStorage.getItem(key);
-    const now = Date.now();
-    if (!last || now - parseInt(last) > 24 * 60 * 60 * 1000) {
-      localStorage.removeItem('dismissed_cancelled_orders');
-      localStorage.setItem(key, now.toString());
-    }
-  }, []);
+  // Play a short alert beep using Web Audio API
+  const playCancelAlert = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      [0, 0.18].forEach((delay) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.15);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.15);
+      });
+    } catch { /* silent if audio not available */ }
+  };
   const [kitchenStatus, setKitchenStatus] = useState<{ isOpen: boolean; updatedAt?: string }>({ isOpen: true });
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [canceledOrdersCount, setCanceledOrdersCount] = useState<number>(0);
@@ -496,6 +503,7 @@ export default function KitchenDisplay() {
         
         if (userRole && targetRoles.includes(userRole)) {
           console.log('✅ [Kitchen Display] Showing cancellation notification to user');
+          playCancelAlert();
           toastRef.current({
             title: "🚫 Order Cancelled",
             description: data.message || `Order #${data.orderNumber} has been cancelled`,
@@ -772,13 +780,9 @@ const getStatusBadge = (status: string) => {
     return order.orderNumber.toString().toLowerCase().includes(searchTerm.toLowerCase());
   }) || [];
 
-  const dismissedCancelledOrders = JSON.parse(localStorage.getItem('dismissed_cancelled_orders') || '[]');
-
   const activeOrders = activeTab === 'active' ? filteredOrders?.filter((order) => {
     // Exclude completed orders
     if (order.status === "completed") return false;
-    // Exclude dismissed cancelled orders
-    if (order.status === "cancelled" && dismissedCancelledOrders.includes(order.id)) return false;
     // Exclude orders with pending payment
     if (order.paymentStatus === 'pending' && order.status === 'pending') return false;
     return true;
@@ -862,7 +866,7 @@ const getStatusBadge = (status: string) => {
                 key={order.id}
                 className={`overflow-hidden border-2 ${
                   order.status === 'cancelled'
-                    ? 'border-red-500 bg-red-100'
+                    ? 'border-red-500 bg-red-100 animate-pulse'
                     : activeTab === 'canceled' ? 'border-red-200 bg-red-50' : ''
                 }`}
                 data-testid={`card-order-${order.id}`}
@@ -959,21 +963,24 @@ const getStatusBadge = (status: string) => {
                       )}
                       {order.status === "cancelled" && (
                         <button
-                          className="flex-1 flex items-center justify-center py-2 px-4 bg-red-100 border border-red-300 rounded-lg text-red-700 font-semibold text-sm hover:bg-red-200 transition-colors cursor-pointer"
-                          onClick={() => {
-                            // Persist dismissed order ID in localStorage
-                            const dismissed = JSON.parse(localStorage.getItem('dismissed_cancelled_orders') || '[]');
-                            if (!dismissed.includes(order.id)) {
-                              dismissed.push(order.id);
-                              localStorage.setItem('dismissed_cancelled_orders', JSON.stringify(dismissed));
+                          className="flex-1 flex items-center justify-center py-2 px-4 bg-red-100 border border-red-300 rounded-lg text-red-700 font-semibold text-sm hover:bg-red-200 transition-colors cursor-pointer disabled:opacity-50"
+                          disabled={dismissingId === String(order.id)}
+                          onClick={async () => {
+                            setDismissingId(String(order.id));
+                            try {
+                              await apiRequest("PATCH", `/api/orders/${order.id}/dismiss-cancel`, {});
+                              queryClient.setQueryData(
+                                ["/api/orders/active"],
+                                (old: any[] = []) => old.filter(o => o.id !== order.id)
+                              );
+                            } catch {
+                              toast({ title: "Failed to dismiss", variant: "destructive" });
+                            } finally {
+                              setDismissingId(null);
                             }
-                            queryClient.setQueryData(
-                              ["/api/orders/active"],
-                              (old: any[] = []) => old.filter(o => o.id !== order.id)
-                            );
                           }}
                         >
-                          Withdrawn ❌ (tap to dismiss)
+                          {dismissingId === String(order.id) ? "Dismissing..." : "Withdrawn ❌ (tap to dismiss)"}
                         </button>
                       )}
                       {/* Hide print ticket button for refunded or cancelled orders */}

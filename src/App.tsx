@@ -1,5 +1,7 @@
 import { Switch, Route, useLocation } from "wouter";
-import React, { useEffect, useState, useRef, createElement, lazy, Suspense } from "react";
+import React, { useEffect, useState, useRef, createElement, lazy, Suspense, useCallback } from "react";
+import { MessageSquare } from "lucide-react";
+import { BACKEND_URL } from "@/lib/queryClient";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -766,10 +768,48 @@ function Router() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const guestSession = getGuestSession();
   const mainRef = useRef<HTMLElement>(null);
+  const [feedbackCount, setFeedbackCount] = useState(0);
+
+  const canSeeFeedback = user && (user.role === "admin" || (user.permissions && user.permissions.includes("customer_feedback")));
+
+  const fetchFeedbackCount = useCallback(async () => {
+    if (!canSeeFeedback) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BACKEND_URL}/api/feedback`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) {
+        const total: number = data.data.length;
+        const seen = parseInt(localStorage.getItem("feedbackSeenCount") || "0", 10);
+        setFeedbackCount(Math.max(0, total - seen));
+      }
+    } catch { /* silent */ }
+  }, [canSeeFeedback]);
+
+  useEffect(() => {
+    fetchFeedbackCount();
+    const id = setInterval(fetchFeedbackCount, 60_000);
+    return () => clearInterval(id);
+  }, [fetchFeedbackCount]);
+
+  // Clear badge when user visits the feedback page
+  useEffect(() => {
+    if (location === "/customer-feedback" && canSeeFeedback) {
+      fetch(`${BACKEND_URL}/api/feedback`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            localStorage.setItem("feedbackSeenCount", String(data.data.length));
+            setFeedbackCount(0);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [location, canSeeFeedback]);
 
   useEffect(() => {
     // Scroll to top of the main element whenever the location changes
@@ -804,7 +844,21 @@ function Layout({ children }: { children: React.ReactNode }) {
             <nav className="flex items-center" aria-label="Main navigation">
               <SidebarTrigger data-testid="button-sidebar-toggle" aria-label="Toggle sidebar" />
             </nav>
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
+              {canSeeFeedback && (
+                <button
+                  onClick={() => setLocation("/customer-feedback")}
+                  className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Customer Feedback"
+                >
+                  <MessageSquare className="w-5 h-5 text-gray-500" />
+                  {feedbackCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                      {feedbackCount > 99 ? "99+" : feedbackCount}
+                    </span>
+                  )}
+                </button>
+              )}
               {user ? (
                 <button
                   onClick={() => { logout(); }}

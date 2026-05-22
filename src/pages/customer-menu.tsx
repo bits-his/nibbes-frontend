@@ -1492,7 +1492,6 @@ export default function CustomerMenu() {
                           </Button>
                         </div>
 
-                        {/* Image Only */}
                         <OptimizedImage
                           src={item.menuItem.imageUrl || ''}
                           alt={item.menuItem.name || 'Menu item'}
@@ -1502,6 +1501,9 @@ export default function CustomerMenu() {
                           priority={false}
                           className="w-full aspect-square object-cover"
                         />
+                        <p className="text-[10px] font-medium text-center truncate px-1 py-1 leading-tight">
+                          {item.menuItem.name}
+                        </p>
                       </CardContent>
                     </Card>
                 ))}

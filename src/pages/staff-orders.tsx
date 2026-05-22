@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Minus, X, ChefHat, AlertCircle, Wifi, History, Loader2 } from "lucide-react";
+import { Plus, Minus, X, ChefHat, AlertCircle, Wifi, History, Loader2, ShoppingCart } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -234,6 +234,7 @@ export default function StaffOrders() {
   const [myOrders, setMyOrders] = useState<any[]>([]);
   const [myOrdersLoading, setMyOrdersLoading] = useState(false);
   const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
+  const [cartSheetOpen, setCartSheetOpen] = useState(false);
   
   // PERFORMANCE FIX: Debounce search query (300ms delay)
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
@@ -721,6 +722,7 @@ export default function StaffOrders() {
           <div className="p-4 md:p-6 border-b">
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h1 className="font-serif text-2xl md:text-3xl font-bold">Walk-in Orders</h1>
+              <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -730,6 +732,21 @@ export default function StaffOrders() {
                 <History className="h-4 w-4" />
                 My Orders
               </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="relative flex items-center gap-2 md:hidden"
+                onClick={() => setCartSheetOpen(true)}
+                aria-label={`Open cart${cart.length > 0 ? `, ${cart.length} items` : ''}`}
+              >
+                <ShoppingCart className="h-4 w-4" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                    {cart.length}
+                  </span>
+                )}
+              </Button>
+              </div>
             </div>
             
             {/* Search Bar */}
@@ -821,8 +838,8 @@ export default function StaffOrders() {
           </div>
         </div>
 
-        {/* Cart Section */}
-        <div className="w-full md:w-[400px] md:pb-[0px] pb-[70px] md:pt-[70px] flex flex-col bg-card border-t md:border-t-0 md:border-l">
+        {/* Cart Section - desktop only */}
+        <div className="hidden md:flex w-full md:w-[400px] md:pb-[0px] pb-[70px] md:pt-[70px] flex-col bg-card border-t md:border-t-0 md:border-l">
           <CardHeader className="border-b">
             <CardTitle className="text-lg md:text-xl">Current Order</CardTitle>
           </CardHeader>
@@ -907,6 +924,9 @@ export default function StaffOrders() {
                             alt={item.menuItem.name || 'Menu item'}
                             className="w-full aspect-square object-cover"
                           />
+                          <p className="text-[10px] font-medium text-center truncate px-1 py-1 leading-tight">
+                            {item.menuItem.name}
+                          </p>
                         </CardContent>
                       </Card>
                     ))}
@@ -958,6 +978,124 @@ export default function StaffOrders() {
           </Form>
         </div>
       </div>
+
+      {/* Mobile Cart Bottom Sheet */}
+      {cartSheetOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setCartSheetOpen(false)} />
+          <div className="relative bg-background rounded-t-2xl flex flex-col max-h-[85vh] shadow-2xl">
+            {/* Sheet Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h2 className="font-semibold text-lg">Current Order ({cart.length} item{cart.length !== 1 ? 's' : ''})</h2>
+              <Button size="icon" variant="ghost" onClick={() => setCartSheetOpen(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Customer fields */}
+              <Form {...form}>
+                <div className="space-y-3">
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Customer Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter customer name" {...field} className="font-bold" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Phone Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="08012345678" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Form>
+
+              {/* Cart items grid */}
+              {cart.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No items added yet</p>
+                  <p className="text-sm mt-1">Close and tap menu items to add them</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {cart.map((item) => (
+                    <Card
+                      key={item.menuItem.id}
+                      className="border-border/50 shadow-sm overflow-hidden cursor-pointer relative"
+                      onClick={() => item.menuItem.id !== undefined && setExpandedCartItem(item.menuItem.id)}
+                    >
+                      <CardContent className="p-0 relative">
+                        <div className="absolute top-1.5 left-1.5 right-1.5 z-10 flex justify-between items-start">
+                          <div className="bg-[#4EB5A4] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow-md">
+                            {item.quantity}
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => { e.stopPropagation(); item.menuItem.id && removeFromCart(item.menuItem.id); }}
+                            className="h-5 w-5 bg-destructive/90 hover:bg-destructive text-white rounded-full p-0"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <ImageWithSkeleton
+                          src={item.menuItem.imageUrl || ''}
+                          alt={item.menuItem.name || 'Menu item'}
+                          className="w-full aspect-square object-cover"
+                        />
+                        <p className="text-[10px] font-medium text-center truncate px-1 py-1 leading-tight">
+                          {item.menuItem.name}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sheet Footer */}
+            {cart.length > 0 && (
+              <div className="p-4 border-t space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>₦{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                {subtotal > 0 && serviceCharges.map((charge) => (
+                  <div key={charge.id} className="flex justify-between text-sm text-muted-foreground">
+                    <span>{charge.description}{charge.type === 'percentage' ? ` (${charge.amount}%)` : ''}</span>
+                    <span>₦{calculateServiceChargeAmount(charge).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between font-bold text-base border-t pt-2">
+                  <span>Total</span>
+                  <span>₦{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => { setCartSheetOpen(false); form.handleSubmit(onSubmit)(); }}
+                >
+                  Proceed to Payment
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Floating submit bar for mobile */}
       {cart.length > 0 && (

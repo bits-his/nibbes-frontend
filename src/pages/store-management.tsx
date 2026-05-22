@@ -80,6 +80,7 @@ export default function StoreManagement() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const { toast } = useToast()
   const wsRef = useRef<WebSocket | null>(null);
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if user is kitchen staff (not admin)
   const isKitchenStaff = user?.role !== 'admin'
@@ -101,8 +102,9 @@ export default function StoreManagement() {
         case 'store_item_update':
         case 'stock_movement':
         case 'order_completed':
-          // Refresh store items when inventory changes
-          fetchItems();
+          // Debounce: collapse rapid WS events into a single fetch every 3s
+          if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+          fetchDebounceRef.current = setTimeout(() => fetchItems(), 3000);
           break;
         default:
           console.log('Store Management WebSocket received unknown event:', message.type);
@@ -130,6 +132,7 @@ export default function StoreManagement() {
 
     // Cleanup function to close the WebSocket connection
     return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       if (wsRef.current) {
         wsRef.current.close();
       }

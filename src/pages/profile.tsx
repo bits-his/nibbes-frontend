@@ -245,7 +245,7 @@ const ProfilePage: React.FC = () => {
       formData.append('file', uploadFile);
 
       const token = localStorage.getItem('token');
-      const uploadRes = await fetch(`${BACKEND_URL}/api/cdn/upload`, {
+      const uploadRes = await fetch(`${BACKEND_URL}/api/upload/image`, {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
