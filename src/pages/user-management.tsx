@@ -802,6 +802,7 @@ export default function UserManagement() {
                 </div>
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -933,6 +934,7 @@ export default function UserManagement() {
                   </div>
                 </div>
               )}
+              </>
             )}
           </CardContent>
         </Card>
