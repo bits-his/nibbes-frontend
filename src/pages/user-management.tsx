@@ -88,6 +88,12 @@ export default function UserManagement() {
   
   // Service charges modal state
   const [showServiceChargesModal, setShowServiceChargesModal] = useState(false)
+  
+  // Sorting and pagination state
+  const [sortField, setSortField] = useState<"username" | "createdAt">("username")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [currentPage, setCurrentPage] = useState(1)
+  const usersPerPage = 30
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -106,8 +112,36 @@ export default function UserManagement() {
       result = result.filter((user) => user.username.toLowerCase().includes(term) || user.email.toLowerCase().includes(term));
     }
 
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      if (sortField === "username") {
+        const comparison = a.username.toLowerCase().localeCompare(b.username.toLowerCase());
+        return sortDirection === "asc" ? comparison : -comparison;
+      } else {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
+      }
+    });
+
     return result;
-  }, [users, searchTerm, roleFilter])
+  }, [users, searchTerm, roleFilter, sortField, sortDirection])
+
+  // Paginated users
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * usersPerPage
+    return filteredUsers.slice(startIndex, startIndex + usersPerPage)
+  }, [filteredUsers, currentPage])
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage)
+  const startUser = filteredUsers.length > 0 ? (currentPage - 1) * usersPerPage + 1 : 0
+  const endUser = Math.min(currentPage * usersPerPage, filteredUsers.length)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, roleFilter])
 
   // Calculate user statistics
   const userStats = useMemo(() => {
@@ -775,12 +809,31 @@ export default function UserManagement() {
                       <th className="text-left py-4 px-6 font-semibold text-slate-700">Username</th>
                       <th className="text-left py-4 px-6 font-semibold text-slate-700">Email</th>
                       <th className="text-left py-4 px-6 font-semibold text-slate-700">Role</th>
-                      <th className="text-left py-4 px-6 font-semibold text-slate-700">Created</th>
+                      <th 
+                        className="text-left py-4 px-6 font-semibold text-slate-700 cursor-pointer hover:bg-slate-100 select-none"
+                        onClick={() => {
+                          if (sortField === "createdAt") {
+                            setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+                          } else {
+                            setSortField("createdAt")
+                            setSortDirection("desc")
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          Created
+                          {sortField === "createdAt" && (
+                            <span className="text-[#50BAA8]">
+                              {sortDirection === "asc" ? "↑" : "↓"}
+                            </span>
+                          )}
+                        </div>
+                      </th>
                       <th className="text-right py-4 px-6 font-semibold text-slate-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((user, index) => (
+                    {paginatedUsers.map((user, index) => (
                       <tr
                         key={user.id}
                         className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
@@ -830,6 +883,56 @@ export default function UserManagement() {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination Controls */}
+              {filteredUsers.length > usersPerPage && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
+                  <div className="text-sm text-slate-600">
+                    Showing {startUser} to {endUser} of {filteredUsers.length} users
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="border-slate-200 hover:bg-slate-100"
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="border-slate-200 hover:bg-slate-100"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-slate-600 px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="border-slate-200 hover:bg-slate-100"
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="border-slate-200 hover:bg-slate-100"
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              )}
             )}
           </CardContent>
         </Card>

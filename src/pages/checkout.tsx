@@ -1056,10 +1056,10 @@ export default function Checkout() {
         serviceChargeRate: serviceChargeRate,
         vat: vatAmount,
         vatRate: vatRate,
-        total: parseFloat(data.totalAmount || totalWithCharges),
+        total: totalWithCharges,
         paymentMethod: data.paymentMethod || 'N/A',
         paymentStatus: data.paymentStatus || 'paid',
-        tendered: parseFloat(data.totalAmount || totalWithCharges)
+        tendered: totalWithCharges
       }
       
       // Store completed order for print confirmation screen

@@ -9,9 +9,11 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Package, Warehouse, Loader, RefreshCw } from "lucide-react"
+import { Package, Warehouse, Loader, RefreshCw, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface StoreItem {
   id: string
@@ -37,6 +39,7 @@ export default function Supervisor() {
   const [items, setItems] = useState<StoreItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showTransactionsDialog, setShowTransactionsDialog] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null)
   const [selectedItemTransactions, setSelectedItemTransactions] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
@@ -146,6 +149,7 @@ export default function Supervisor() {
   const handleViewItemTransactions = async (item: StoreItem) => {
     try {
       setTransactionsLoading(true);
+      setSelectedItem(item);
       setDateRange({ start: today, end: today });
       const response = await apiRequest("GET", `/api/store-entries/item-code/${item.itemCode}`);
       const data = await response.json();
@@ -165,6 +169,12 @@ export default function Supervisor() {
       setTransactionsLoading(false);
     }
   }
+
+  const transactionSummary = {
+    totalIn: filteredTransactions.reduce((sum: number, t: any) => sum + parseFloat(t.qtyIn || 0), 0),
+    totalOut: filteredTransactions.reduce((sum: number, t: any) => sum + parseFloat(t.qtyOut || 0), 0),
+    get balance() { return this.totalIn - this.totalOut; }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
@@ -407,72 +417,110 @@ export default function Supervisor() {
       </Dialog> */}
 
       <Dialog open={showTransactionsDialog} onOpenChange={(open) => { setShowTransactionsDialog(open); if (!open) setDateRange({ start: '', end: '' }); }}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Item Transactions</DialogTitle>
+            <DialogTitle>Item History — {selectedItem?.itemCode}</DialogTitle>
             <DialogDescription>
-              All transactions for the selected item
+              Complete audit trail of {selectedItem?.name}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Date range filter */}
-          <div className="flex gap-3 items-center mb-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">From</label>
-              <input type="date" className="border rounded px-2 py-1 text-sm" value={dateRange.start} onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">To</label>
-              <input type="date" className="border rounded px-2 py-1 text-sm" value={dateRange.end} onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))} />
-            </div>
-            <button className="mt-4 text-xs text-[#50BAA8] underline" onClick={() => setDateRange({ start: '', end: '' })}>Clear</button>
-          </div>
-
           {transactionsLoading ? (
-            <div className="flex flex-col items-center justify-center py-10">
-              <Loader className="h-10 w-10 animate-spin text-[#50BAA8]" />
-              <p className="mt-3 text-sm text-gray-600">Loading transactions...</p>
-            </div>
-          ) : filteredTransactions.length === 0 ? (
-            <div className="py-10 text-center text-gray-500">
-              No transactions found for this item
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader className="h-12 w-12 animate-spin text-[#50BAA8]" />
+              <p className="mt-4 text-gray-600">Loading transaction history...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-semibold border-b pb-2">
-                <div>Date</div>
-                <div>Type</div>
-                <div>Quantity</div>
-                <div>Status</div>
+            <>
+              {/* Date Range Filter */}
+              <div className="flex gap-4 items-end bg-slate-50 p-4 rounded-lg">
+                <div className="flex-1">
+                  <Label>From</Label>
+                  <Input type="date" value={dateRange.start} onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))} />
+                </div>
+                <div className="flex-1">
+                  <Label>To</Label>
+                  <Input type="date" value={dateRange.end} onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))} />
+                </div>
+                <Button variant="outline" onClick={() => { const today = new Date().toISOString().split('T')[0]; setDateRange({ start: today, end: today }); }}>Today</Button>
+                <Button variant="outline" onClick={() => setDateRange({ start: '', end: '' })}>Clear</Button>
               </div>
 
-              {filteredTransactions.map((transaction, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b pb-2 text-sm"
-                >
-                  <div className="text-gray-600">
-                    {new Date(transaction.date).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <Badge variant="outline" className="capitalize">
-                      {transaction.source} → {transaction.destination}
-                    </Badge>
-                  </div>
-                  <div>
-                    <span className={transaction.qtyIn > 0 ? "text-green-600" : "text-red-600"}>
-                      {transaction.qtyIn > 0 ? `+${transaction.qtyIn}` : `-${transaction.qtyOut}`}
-                      {transaction.unit && ` ${transaction.unit}`}
-                    </span>
-                  </div>
-                  <div>
-                    <Badge variant="outline">
-                      {transaction.referenceType}
-                    </Badge>
-                  </div>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-xs text-gray-500">Total In</CardTitle></CardHeader>
+                  <CardContent><p className="text-2xl font-semibold text-green-600">{transactionSummary.totalIn.toLocaleString()}</p></CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-xs text-gray-500">Total Out</CardTitle></CardHeader>
+                  <CardContent><p className="text-2xl font-semibold text-red-600">{transactionSummary.totalOut.toLocaleString()}</p></CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-xs text-gray-500">Balance</CardTitle></CardHeader>
+                  <CardContent><p className="text-2xl font-semibold text-purple-600">{transactionSummary.balance.toLocaleString()}</p></CardContent>
+                </Card>
+              </div>
+
+              {filteredTransactions.length === 0 ? (
+                <div className="text-center py-10">
+                  <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">No transactions found</p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <ScrollArea className="h-96 pr-2">
+                  <div className="space-y-3">
+                    {filteredTransactions.map((transaction: any, index: number) => (
+                      <Card key={transaction.id ?? index} className="border border-gray-100 shadow-sm">
+                        <CardContent className="p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div>
+                              <p className="text-sm text-gray-500">
+                                {new Date(transaction.date).toLocaleDateString()} {new Date(transaction.date).toLocaleTimeString()}
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900">{transaction.description}</p>
+                            </div>
+                            <Badge variant={transaction.qtyIn > 0 ? "default" : "destructive"}>
+                              {transaction.qtyIn > 0 ? 'IN' : 'OUT'}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <ArrowUpCircle className="w-4 h-4 text-green-600" />
+                              <span className="text-gray-500">Qty In:</span>
+                              <span className="font-semibold text-gray-900">{parseFloat(transaction.qtyIn || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <ArrowDownCircle className="w-4 h-4 text-red-600" />
+                              <span className="text-gray-500">Qty Out:</span>
+                              <span className="font-semibold text-gray-900">{parseFloat(transaction.qtyOut || 0).toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Source:</span>
+                              <p className="font-semibold">{transaction.source || '-'}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Destination:</span>
+                              <p className="font-semibold">{transaction.destination || '-'}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Performed By:</span>
+                              <p className="font-semibold">{transaction.performedBy || 'System'}</p>
+                            </div>
+                            {transaction.notes && (
+                              <div className="md:col-span-2">
+                                <span className="text-gray-500">Notes:</span>
+                                <p className="font-medium text-gray-800">{transaction.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>
