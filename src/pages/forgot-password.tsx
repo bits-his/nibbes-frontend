@@ -6,11 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { apiRequest } from '@/lib/queryClient';
-import { forgotPasswordSchema } from '@shared/schema';
 
 export default function ForgotPassword() {
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -19,27 +18,29 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPasswordInputs, setShowPasswordInputs] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
+  const [accountVerified, setAccountVerified] = useState(false);
 
-  const handleVerifyEmail = async (e: React.FormEvent) => {
+  const handleVerifyAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
 
     try {
-      const response = await apiRequest('POST', '/api/auth/forgot-password/verify', { email });
+      const isEmail = identifier.includes('@');
+      const payload = isEmail ? { email: identifier } : { phoneNumber: identifier };
+
+      const response = await apiRequest('POST', '/api/auth/forgot-password/verify', payload);
       const data = await response.json();
       
       if (data.emailExists === false) {
-        setError('No account found with this email address. Please check your email and try again.');
+        setError(isEmail ? 'No account found with this email address. Please check and try again.' : 'No account found with this phone number. Please check and try again.');
       } else {
-        // Email exists, show the password inputs
         setShowPasswordInputs(true);
-        setEmailVerified(true);
+        setAccountVerified(true);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to verify email');
+      setError(err.message || 'Failed to verify account');
     } finally {
       setLoading(false);
     }
@@ -64,19 +65,18 @@ export default function ForgotPassword() {
     }
 
     try {
-      const response = await apiRequest('POST', '/api/auth/forgot-password/reset-direct', { 
-        email,
-        newPassword 
-      });
+      const isEmail = identifier.includes('@');
+      const payload = isEmail ? { email: identifier, newPassword } : { phoneNumber: identifier, newPassword };
+
+      const response = await apiRequest('POST', '/api/auth/forgot-password/reset-direct', payload);
       await response.json();
       
       setMessage('Password updated successfully!');
-      // Reset form
       setNewPassword('');
       setConfirmNewPassword('');
-      setEmail('');
+      setIdentifier('');
       setShowPasswordInputs(false);
-      setEmailVerified(false);
+      setAccountVerified(false);
       setLocation('/login');
     } catch (err: any) {
       setError(err.message || 'Failed to reset password');
@@ -99,31 +99,31 @@ export default function ForgotPassword() {
           <CardDescription>
             {showPasswordInputs 
               ? "Enter your new password" 
-              : "Enter your email to reset your password"}
+              : "Enter your phone number or email to reset your password"}
           </CardDescription>
         </CardHeader>
         
         {!showPasswordInputs ? (
-          <form onSubmit={handleVerifyEmail}>
+          <form onSubmit={handleVerifyAccount}>
             <CardContent className="space-y-4">
               {error && (
                 <div className="text-red-500 text-sm text-center">{error}</div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="identifier">Phone Number or Email</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  type="text"
+                  placeholder="Phone number or email"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                 />
               </div>
             </CardContent>
             <CardFooter className="flex flex-col">
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Verifying...' : 'Verify Email'}
+                {loading ? 'Verifying...' : 'Verify Account'}
               </Button>
               
               <div className="mt-4 text-center text-sm text-muted-foreground">
@@ -211,12 +211,12 @@ export default function ForgotPassword() {
                   className="p-0 h-auto"
                   onClick={() => {
                     setShowPasswordInputs(false);
-                    setEmailVerified(false);
+                    setAccountVerified(false);
                     setNewPassword('');
                     setConfirmNewPassword('');
                   }}
                 >
-                  Back to email verification
+                  Back to verification
                 </Button>
               </div>
             </CardFooter>
