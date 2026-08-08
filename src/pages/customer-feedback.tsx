@@ -249,22 +249,29 @@ const CustomerFeedbackPage: React.FC = () => {
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 15, totalPages: 0 });
+
+  const fetchFeedbacks = async (pageNum: number) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${BACKEND_URL}/api/feedback?page=${pageNum}&limit=15`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) {
+        setFeedbacks(data.data);
+        setPagination(data.pagination || { total: data.data?.length || 0, page: 1, limit: 15, totalPages: 1 });
+      }
+    } catch {
+      toast({ title: 'Failed to load feedback', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetch_ = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${BACKEND_URL}/api/feedback`, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-        if (data.success) setFeedbacks(data.data);
-      } catch {
-        toast({ title: 'Failed to load feedback', variant: 'destructive' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch_();
-  }, []);
+    fetchFeedbacks(page);
+  }, [page]);
 
   const handleShare = async (fb: FeedbackItem) => {
     setSharingId(fb.id);
@@ -298,7 +305,7 @@ const CustomerFeedbackPage: React.FC = () => {
     <div className="container mx-auto py-8 px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800">Customer Feedback</h1>
-        <p className="text-gray-500 mt-1">{feedbacks.length} review{feedbacks.length !== 1 ? 's' : ''} received</p>
+        <p className="text-gray-500 mt-1">{pagination?.total ?? feedbacks.length} review{(pagination?.total ?? feedbacks.length) !== 1 ? 's' : ''} received</p>
       </div>
 
       {feedbacks.length === 0 ? (
@@ -343,6 +350,28 @@ const CustomerFeedbackPage: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {(pagination?.totalPages ?? 0) > 1 && (
+        <div className="flex items-center justify-center gap-4 mt-8">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-gray-600">
+            Page {pagination?.page ?? 1} of {pagination?.totalPages ?? 1}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(pagination?.totalPages ?? 1, p + 1))}
+            disabled={page === (pagination?.totalPages ?? 1)}
+            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

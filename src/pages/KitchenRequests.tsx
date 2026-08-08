@@ -175,33 +175,34 @@ const KitchenRequests: React.FC = () => {
         notes: notes || null,
       });
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Kitchen request created successfully",
-        });
-        setShowCreateDialog(false);
-        setMaterials([{ id: '', name: '', quantity: 0, unit: 'kg' }]);
-        setNotes('');
-        fetchData();
-      } else {
-        const error = await response.json();
-        const msg = error.error || error.message || "Failed to create request";
-        const detail = error.available !== undefined
-          ? ` Only ${error.available} ${error.unit || 'units'} available.`
-          : '';
-        toast({
-          variant: "destructive",
-          title: "Request Failed",
-          description: msg + detail,
-        });
-      }
-    } catch (error) {
+      toast({
+        title: "Success",
+        description: "Kitchen request created successfully",
+      });
+      setShowCreateDialog(false);
+      setMaterials([{ id: '', name: '', quantity: 0, unit: 'kg' }]);
+      setNotes('');
+      fetchData();
+    } catch (error: any) {
       console.error('Error creating request:', error);
+      let description = "Failed to create request";
+
+      try {
+        const msg = error?.message || String(error);
+        const jsonStart = msg.indexOf('{');
+        if (jsonStart !== -1) {
+          const parsed = JSON.parse(msg.slice(jsonStart));
+          description = parsed.error || description;
+          if (parsed.available !== undefined) {
+            description += ` — Only ${parsed.available} ${parsed.unit || 'units'} available, but ${parsed.requested || ''} requested.`;
+          }
+        }
+      } catch {}
+
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to create request",
+        title: "Request Failed",
+        description,
       });
     }
   };

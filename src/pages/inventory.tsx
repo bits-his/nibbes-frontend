@@ -48,6 +48,7 @@ export default function InventoryManagement() {
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [showLowStockOnly, setShowLowStockOnly] = useState<boolean>(false)
+  const [searchQuery, setSearchQuery] = useState<string>("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState<boolean>(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false)
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState<boolean>(false)
@@ -185,16 +186,25 @@ export default function InventoryManagement() {
   useEffect(() => {
     let result = inventoryItems
 
+    // Filter by search query
+    if (searchQuery.trim()) {
+      result = result.filter((item) => 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
+    // Filter by category
     if (selectedCategory !== "all") {
       result = result.filter((item) => item.category === selectedCategory)
     } 
 
+    // Filter by low stock
     if (showLowStockOnly) {
       result = result.filter((item) => item.quantity <= item.minThreshold)
     }
 
     setFilteredItems(result)
-  }, [selectedCategory, showLowStockOnly, inventoryItems])
+  }, [selectedCategory, showLowStockOnly, searchQuery, inventoryItems])
 
   const handleAddItem = async (itemData: Omit<InventoryItem, "id" | "createdAt" | "updatedAt">) => {
     try {
@@ -502,12 +512,9 @@ export default function InventoryManagement() {
       setTransactionsLoading(true);
       setShowTransactionsDialog(true);
 
-      // Fetch transaction data for the specific item
-      // Try using itemCode first, fall back to item ID
-      const identifier = item.itemCode || item.id;
-      const endpoint = item.itemCode 
-        ? `/api/store-entries/item-code/${item.itemCode}`
-        : `/api/store-entries/inventory/${item.id}`;
+      // Always use inventory item ID to fetch transactions
+      // (itemCode formats differ between inventory controller and store entries)
+      const endpoint = `/api/store-entries/inventory/${item.id}`;
 
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://server.brainstorm.ng/nibbleskitchen'}${endpoint}`, {
         headers: {
@@ -657,6 +664,27 @@ export default function InventoryManagement() {
           {/* Filters and Controls */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
             <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-[250px]">
+                <Input
+                  type="text"
+                  placeholder="Search items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 h-10 border-slate-300 focus:border-[#50BAA8] focus:ring-[#50BAA8]"
+                />
+                <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter */}
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Select category" />
@@ -671,6 +699,7 @@ export default function InventoryManagement() {
                 </SelectContent>
               </Select>
 
+              {/* Low Stock Filter */}
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
