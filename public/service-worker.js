@@ -1,7 +1,7 @@
 // Nibbles Service Worker - Version 3.0.3
 // OPTIMIZED FOR OFFLINE SUPPORT AND PERFORMANCE
 
-const VERSION = '3.0.3';
+const VERSION = '3.0.4';
 const CACHE_NAME = `nibbles-kitchen-v${VERSION}`;
 const RUNTIME_CACHE = `nibbles-runtime-v${VERSION}`;
 
@@ -109,7 +109,39 @@ self.addEventListener('fetch', (event) => {
   }
 
   // -------------------------------------------------------------------------
-  // Strategy 2: CACHE-FIRST for images (including Cloudinary)
+  // Strategy 2: NETWORK-FIRST for API requests (never serve stale data)
+  // Stops the cache-first catch-all below from returning old API responses,
+  // which made edits appear "not saved" on refresh. Cached responses are only
+  // used as an offline fallback.
+  // -------------------------------------------------------------------------
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          // Cache successful GET responses only, for offline fallback
+          if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
+            const responseToCache = networkResponse.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Network failed - try cache as fallback
+          return caches.match(request).then((cachedResponse) => {
+            return cachedResponse || new Response(
+              JSON.stringify({ error: 'Network unavailable' }),
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            );
+          });
+        })
+    );
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Strategy 3: CACHE-FIRST for images (including Cloudinary)
   // -------------------------------------------------------------------------
   const isCloudinaryImage = url.hostname.includes('cloudinary.com');
   if (isCloudinaryImage || 

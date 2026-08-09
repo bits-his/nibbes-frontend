@@ -6,7 +6,7 @@ import "./index.css";
 // ============================================================================
 // VERSION CHECK: Force cache clear if version changed
 // ============================================================================
-const APP_VERSION = '1.0.2'; // Bumped to force immediate update
+const APP_VERSION = '1.0.3'; // Bumped to force immediate update
 const STORED_VERSION = localStorage.getItem('app_version');
 
 if (STORED_VERSION !== APP_VERSION) {

@@ -56,7 +56,7 @@ const KitchenRequests: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const isAdmin = user?.role === 'admin' || user?.permissions?.includes('user_management');
+  const isAdmin = user?.role === 'admin' || user?.permissions?.includes('user_management') || user?.permissions?.includes('kitchen_request_approve');
 
   // Create request form state
   const [materials, setMaterials] = useState<RawMaterial[]>([

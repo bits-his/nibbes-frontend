@@ -229,17 +229,11 @@ export default function InventoryManagement() {
       setIsAddDialogOpen(false);
     } catch (error) {
       console.error('Error adding inventory item:', error);
-      // Still add to UI for immediate feedback, but show error
-      const newItem: InventoryItem = {
-        ...itemData,
-        id: `item_${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setInventoryItems([...inventoryItems, newItem]);
-      setFilteredItems([...filteredItems, newItem]);
-      setIsAddDialogOpen(false);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add item. Please try again.",
+      });
     }
   }
 
@@ -289,23 +283,11 @@ export default function InventoryManagement() {
       setIsEditDialogOpen(false);
     } catch (error) {
       console.error('Error updating inventory item:', error);
-      // Still update UI for immediate feedback, but show error
-      const updatedItems = inventoryItems.map(item =>
-        item.id === itemData.id ? itemData : item
-      );
-
-      setInventoryItems(updatedItems);
-      setFilteredItems(updatedItems.filter(item => {
-        let match = true;
-        if (selectedCategory !== 'all') {
-          match = match && item.category === selectedCategory;
-        }
-        if (showLowStockOnly) {
-          match = match && item.quantity <= item.minThreshold;
-        }
-        return match;
-      }));
-      setIsEditDialogOpen(false);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update item. Please try again.",
+      });
     }
   }
 
