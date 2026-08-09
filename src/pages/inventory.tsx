@@ -531,17 +531,31 @@ export default function InventoryManagement() {
 
       // Handle different response formats and transform to expected format
       let rawEntries = data.entries || data.data?.entries || data.data || data || [];
-      
-      // Transform entries to match expected format
-      const transactions = rawEntries.map((entry: any) => ({
+      rawEntries = Array.isArray(rawEntries) ? rawEntries : [];
+
+      // Compute a running balance in chronological order so each entry shows the
+      // stock level left after that movement (IN adds, OUT subtracts)
+      const sortedAsc = [...rawEntries].sort(
+        (a: any, b: any) =>
+          new Date(a.date || a.createdAt).getTime() - new Date(b.date || b.createdAt).getTime()
+      );
+      let runningBalance = 0;
+      const withBalances = sortedAsc.map((entry: any) => {
+        runningBalance = Math.round(
+          (runningBalance + parseFloat(entry.qtyIn || 0) - parseFloat(entry.qtyOut || 0)) * 100
+        ) / 100;
+        return { ...entry, runningBalance };
+      });
+
+      // Display newest first, with the balance after each transaction
+      const transactions = withBalances.reverse().map((entry: any) => ({
         transactionType: entry.qtyIn > 0 ? 'IN' : 'OUT',
         quantity: entry.qtyIn > 0 ? entry.qtyIn : entry.qtyOut,
         unit: item.unit || '',
         transactionDate: entry.date || entry.createdAt,
         location: entry.qtyIn > 0 ? entry.source : entry.destination,
         remarks: entry.description || entry.notes || '',
-        costPrice: entry.costPrice || 0,
-        balanceAfter: entry.balanceAfter || 'N/A',
+        balanceAfter: entry.runningBalance,
       }));
       
       setSelectedItemTransactions(transactions);
@@ -997,10 +1011,7 @@ export default function InventoryManagement() {
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-semibold text-slate-900">
-                                ₦{Number(transaction.costPrice || 0).toLocaleString()}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                Balance: {transaction.balanceAfter || 'N/A'}
+                                Balance: {transaction.balanceAfter}
                               </p>
                             </div>
                           </div>
