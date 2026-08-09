@@ -1156,6 +1156,7 @@ const AddEditInventoryForm: React.FC<AddEditInventoryFormProps> = ({ onSubmit, o
               <SelectItem value="grams">grams</SelectItem>
               <SelectItem value="bunch">bunch</SelectItem>
               <SelectItem value="pack">pack</SelectItem>
+              <SelectItem value="mudu">mudu</SelectItem>
             </SelectContent>
           </Select>
         </div>

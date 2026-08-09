@@ -676,6 +676,8 @@ const KitchenRequests: React.FC = () => {
                             <div className="font-medium">{request.finishedProductName}</div>
                             <div className="text-sm text-gray-500">Qty: {request.finishedProductQuantity}</div>
                           </div>
+                        ) : request.notes ? (
+                          <div className="font-medium">{request.notes}</div>
                         ) : (
                           <span className="text-gray-400">N/A</span>
                         )}
