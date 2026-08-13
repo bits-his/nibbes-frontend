@@ -10,7 +10,7 @@ A comprehensive frontend application for the Nibbles Order Management System wit
 - **Inventory Management**: Track and manage ingredients and supplies
 - **Kitchen Display**: Real-time kitchen order management
 - **User Management**: Role-based access control with admin, kitchen, and customer roles
-- **Responsive Design**: Mobile-friendly interface using Tailwind CSS
+- **Responsive Design**: Mobile-friendly interface using Tailwind CSs
 
 ## Environment Variables
 
